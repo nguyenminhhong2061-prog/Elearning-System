@@ -36,8 +36,50 @@ cd datn
 Bộ test gồm hai loại:
 
 - Test API/nghiệp vụ chạy trên H2 (nhanh, không cần Docker).
-- `DatabaseMigrationTests` chạy toàn bộ migration trên một Postgres tạm (Testcontainers) rồi khởi động app với
-  `ddl-auto=validate`. Test này **cần Docker đang chạy** và sẽ lỗi nếu entity không khớp bảng trong schema.
+- Các test kế thừa `AbstractPostgresIntegrationTest` (ví dụ `DatabaseMigrationTests`) chạy toàn bộ migration trên
+  một Postgres tạm (Testcontainers, dùng chung một container cho cả lần chạy) rồi khởi động app với
+  `ddl-auto=validate`. Các test này **cần Docker đang chạy** và sẽ lỗi nếu entity không khớp bảng trong schema.
+  Dùng lớp này cho test cần kiểm tra ràng buộc thật của schema (CHECK, khóa ngoại...).
+
+## Xác thực (Auth)
+
+**Mọi API đều cần token, trừ đăng ký và đăng nhập.** Token là JWT (HS256), gửi trong header
+`Authorization: Bearer <token>`. Thiếu hoặc sai token trả 401, sai quyền trả 403 (đều có thân JSON).
+
+| Endpoint | Mô tả |
+|---|---|
+| `POST /api/auth/register` | Đăng ký tài khoản learner (`fullName`, `email`, `password` 8–72 ký tự). 201; 409 nếu trùng email |
+| `POST /api/auth/login` | Đăng nhập, trả `accessToken`. 401 nếu sai email/mật khẩu; 403 nếu tài khoản bị khóa |
+| `POST /api/auth/change-password` | Đổi mật khẩu (`currentPassword`, `newPassword`). 204; 400 nếu sai mật khẩu hiện tại |
+| `GET /api/users/me` | Thông tin người dùng hiện tại |
+
+Đăng xuất: client xóa token. Token không lưu ở server và tự hết hạn sau 8 giờ.
+
+Biến môi trường (xem `.env.example`):
+
+- `JWT_SECRET`: khóa ký token, tối thiểu 32 byte. Nếu để trống, app sinh khóa ngẫu nhiên mỗi lần khởi động
+  (tiện khi dev, nhưng phải đăng nhập lại sau mỗi lần restart). **Luôn đặt khi chạy demo/Neon.**
+- `ADMIN_EMAIL` và `ADMIN_PASSWORD`: khi cả hai được đặt, app tạo tài khoản admin lúc khởi động (nếu chưa có).
+
+### Dành cho các module khác
+
+Lấy người dùng hiện tại qua `CurrentUser` (`com.example.datn.common.security`), không đọc security context trực tiếp:
+
+```java
+private final CurrentUser currentUser;   // inject qua constructor
+
+Long userId = currentUser.id();          // users.id của người đang gọi API
+boolean admin = currentUser.isAdmin();
+```
+
+Giới hạn theo vai trò bằng `@PreAuthorize("hasRole('ADMIN')")` trên phương thức controller hoặc service.
+
+Test MockMvc: dùng `TestAuth` (`com.example.datn.support`). `@WithMockUser` không dùng được vì API là stateless.
+
+```java
+mockMvc.perform(get("/api/xxx").with(TestAuth.learner(42)));   // CurrentUser.id() == 42
+mockMvc.perform(post("/api/xxx").with(TestAuth.admin()));
+```
 
 ## Cơ sở dữ liệu và migration
 
