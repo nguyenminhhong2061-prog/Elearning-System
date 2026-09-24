@@ -20,7 +20,11 @@ cd datn
 ```
 
 Ứng dụng chạy tại `http://localhost:8080`. Giá trị mặc định trong `application.properties` khớp với
-`docker-compose.yml` (database `datn`, user `datn`, mật khẩu `datn`, cổng `5432`), nên không cần tạo file `.env`.
+`docker-compose.yml` (database `datn`, user `datn`, mật khẩu `datn`, cổng `5433`), nên không cần tạo file `.env`.
+
+> Postgres trong Docker dùng cổng **5433** (không phải 5432) để không đụng với PostgreSQL cài trực tiếp trên máy.
+> Nếu không kết nối được với lỗi `password authentication failed`, kiểm tra xem app có đang nối nhầm vào
+> một Postgres khác đang nghe cổng đó không.
 
 ## Chạy test
 
