@@ -1,6 +1,7 @@
 # DATN — Nền tảng học tiếng Anh cá nhân hóa theo AI
 
-Backend Spring Boot (Java 21) + PostgreSQL. Schema do Flyway quản lý.
+Backend Spring Boot (Java 21) + PostgreSQL. Schema do Flyway quản lý. Frontend React (Vite) nằm trong `frontend/`,
+xem [frontend/README.md](frontend/README.md) để biết cách chạy.
 
 ## Yêu cầu
 
