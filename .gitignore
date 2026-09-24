@@ -1,0 +1,22 @@
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Secrets and local environment (never commit real credentials)
+.env
+.env.*
+!.env.example
+
+# Node / frontend build output
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
