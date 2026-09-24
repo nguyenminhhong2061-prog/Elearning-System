@@ -8,9 +8,9 @@ const VARIANTS = {
 
 const SIZES = {
   // Login button in the design: 14px padding, 15px semibold.
-  md: 'px-4 py-3.5 text-[15px]',
+  md: 'px-4 py-3.5 text-body',
   // "Thêm" button in the design: 12px 18px, 13px semibold.
-  sm: 'px-[18px] py-3 text-[13px]',
+  sm: 'px-4.5 py-3 text-label',
 }
 
 /**
@@ -42,7 +42,7 @@ export function Button({
       )}
       {...props}
     >
-      {loading && <Spinner label="Đang xử lý" className="size-4 border-white/40 border-t-white" />}
+      {loading && <Spinner label={null} className="size-4 border-white/40 border-t-white" />}
       {children}
     </button>
   )

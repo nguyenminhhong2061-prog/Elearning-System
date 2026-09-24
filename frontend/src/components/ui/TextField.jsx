@@ -19,7 +19,7 @@ export function TextField({ label, error, hint, endAdornment, id, className, typ
 
   return (
     <div className={cx('flex flex-col gap-1.5', className)}>
-      <label htmlFor={inputId} className="text-[13px] font-medium text-ink-soft">
+      <label htmlFor={inputId} className="text-label font-medium text-ink-soft">
         {label}
       </label>
       <div className="relative">
@@ -30,11 +30,13 @@ export function TextField({ label, error, hint, endAdornment, id, className, typ
           aria-invalid={error ? true : undefined}
           aria-describedby={hasMessage ? messageId : undefined}
           className={cx(
-            'w-full rounded-lg border bg-white px-4 py-3.5 text-[15px] text-ink outline-none transition-colors',
-            'placeholder:text-muted-light',
-            'focus:border-brand focus:ring-2 focus:ring-brand/25',
+            'w-full rounded-lg border bg-white px-4 py-3.5 text-body text-ink outline-none transition-colors',
+            'placeholder:text-muted-light focus:ring-2',
             'disabled:cursor-not-allowed disabled:bg-surface-alt disabled:text-muted',
-            error ? 'border-danger-solid' : 'border-line',
+            // An invalid field stays red while focused, so the error is not hidden by the focus colour.
+            error
+              ? 'border-danger-solid focus:border-danger-solid focus:ring-danger-solid/20'
+              : 'border-line focus:border-brand focus:ring-brand/25',
             endAdornment && 'pr-16',
           )}
           {...inputProps}

@@ -4,7 +4,7 @@ const VARIANTS = {
   // Login card and other pages on a light background.
   light: { mark: 'size-7 rounded-lg', text: 'text-lg text-brand-dark' },
   // Dark sidebar.
-  dark: { mark: 'size-[26px] rounded-[7px]', text: 'text-base text-white' },
+  dark: { mark: 'size-6.5 rounded-[7px]', text: 'text-base text-white' },
 }
 
 export function Logo({ variant = 'light', className }) {

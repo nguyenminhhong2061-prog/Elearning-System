@@ -24,12 +24,14 @@ describe('Button', () => {
       </Button>,
     )
 
-    const button = screen.getByRole('button', { name: /Đăng nhập/ })
+    const button = screen.getByRole('button', { name: 'Đăng nhập' })
     await userEvent.click(button)
 
     expect(button).toBeDisabled()
     expect(button).toHaveAttribute('aria-busy', 'true')
     expect(onClick).not.toHaveBeenCalled()
+    // The spinner is decorative: it neither changes the button's name nor adds a second live region.
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
   it('does not submit forms unless type="submit" is given', () => {

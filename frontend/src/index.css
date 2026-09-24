@@ -8,6 +8,17 @@
 @theme {
   --font-sans: "Be Vietnam Pro", system-ui, sans-serif;
 
+  /* Type scale: the design's sizes that Tailwind's default scale lacks (it has 12px text-xs, 14px text-sm,
+     18px text-lg...). Use text-title, text-body, text-label, text-tag. */
+  --text-title: 1.625rem; /* 26px: page titles */
+  --text-title--line-height: 2rem;
+  --text-body: 0.9375rem; /* 15px: inputs, buttons */
+  --text-body--line-height: 1.25rem;
+  --text-label: 0.8125rem; /* 13px: field labels, secondary text */
+  --text-label--line-height: 1rem;
+  --text-tag: 0.6875rem; /* 11px: tags such as "Dễ" / "Khó" */
+  --text-tag--line-height: 0.875rem;
+
   /* Brand (teal) */
   --color-brand: #12A594;
   --color-brand-dark: #0B7B70;
@@ -28,6 +39,7 @@
   --color-sidebar: #16211F;
   --color-sidebar-raised: #22302D;
   --color-sidebar-deep: #0F1A18;
+  --color-sidebar-text: #D4DAD8;
 
   /* Status */
   --color-danger: #B02A2A;
