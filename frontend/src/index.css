@@ -25,6 +25,7 @@
   --color-brand-tint: #E2F5F2;
   --color-brand-tint-line: #9FDCD3;
   --color-brand-soft: #CDEBE6;
+  --color-brand-stripe: #DCF2EE; /* second stripe of the topic image placeholder */
 
   /* Surfaces, borders, text */
   --color-canvas: #EDF0EF;

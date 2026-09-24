@@ -6,6 +6,8 @@ import { ProtectedRoute } from '@/features/auth/guards/ProtectedRoute'
 import { ChangePasswordPage } from '@/features/auth/pages/ChangePasswordPage'
 import { LoginPage } from '@/features/auth/pages/LoginPage'
 import { RegisterPage } from '@/features/auth/pages/RegisterPage'
+import { TopicDetailPage } from '@/features/vocabulary/pages/TopicDetailPage'
+import { TopicsPage } from '@/features/vocabulary/pages/TopicsPage'
 import { ComingSoonPage } from '@/pages/ComingSoonPage'
 import { HomePage } from '@/pages/HomePage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
@@ -32,8 +34,13 @@ export function AppRoutes() {
           <Route index element={<HomePage />} />
           <Route path="account/change-password" element={<ChangePasswordPage />} />
 
+          {/* Module A: vocabulary. */}
+          <Route path="vocabulary">
+            <Route index element={<TopicsPage />} />
+            <Route path="topics/:topicId" element={<TopicDetailPage />} />
+          </Route>
+
           {/* Sections owned by other modules. Replace the placeholder when the module's pages exist. */}
-          <Route path="vocabulary/*" element={<ComingSoonPage title="Từ vựng" />} />
           <Route path="exercises/*" element={<ComingSoonPage title="Bài tập" />} />
           <Route path="tests/*" element={<ComingSoonPage title="Kiểm tra" />} />
           <Route path="plan/*" element={<ComingSoonPage title="Kế hoạch" />} />

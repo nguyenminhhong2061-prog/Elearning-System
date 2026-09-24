@@ -20,6 +20,7 @@ npm run dev        # http://localhost:5173
 | Lệnh | Tác dụng |
 |---|---|
 | `npm run dev` | Chạy server phát triển (tự nạp lại khi sửa code) |
+| `npm run dev:mock` | Như `dev`, nhưng API từ vựng (`/api/topics`, `/api/vocabulary`) trả **dữ liệu giả** trong `mock/`. Dùng khi backend chưa có các API đó; đăng nhập vẫn cần backend thật |
 | `npm run build` | Build bản production vào `dist/` |
 | `npm run preview` | Chạy thử bản đã build |
 | `npm run lint` | Kiểm tra code bằng oxlint |
@@ -49,6 +50,7 @@ Cấu hình tùy chọn (copy `.env.example` thành `.env.local`, file này khô
 | Tailwind CSS 4 | Style. Token của thiết kế nằm trong `src/index.css` (khối `@theme`) |
 | react-router 7 | Điều hướng |
 | axios | Gọi API (qua `httpClient` dùng chung) |
+| TanStack Query 5 | Tải và lưu tạm dữ liệu từ server (trạng thái đang tải, lỗi, phân trang, làm mới) |
 | react-hook-form + zod | Form và kiểm tra dữ liệu (thông báo tiếng Việt) |
 | Vitest, React Testing Library | Test |
 | oxlint | Lint |
@@ -58,18 +60,22 @@ Cấu hình tùy chọn (copy `.env.example` thành `.env.local`, file này khô
 ```
 frontend/
 ├── LinguaStep-design-source/  # bản thiết kế gốc (chỉ để tham khảo, xem mục Thiết kế)
+├── mock/                      # dữ liệu giả và API giả cho `npm run dev:mock` (không vào bản build)
 └── src/
     ├── main.jsx               # điểm vào: BrowserRouter + App
     ├── index.css              # Tailwind, design token, @font-face
     ├── app/
-    │   ├── App.jsx            # AuthProvider + routes
+    │   ├── App.jsx            # AuthProvider + QueryProvider + routes
+    │   ├── QueryProvider.jsx  # cache TanStack Query, mỗi tài khoản một cache riêng
     │   └── router.jsx         # NƠI DUY NHẤT khai báo route
     ├── api/                   # dùng chung: httpClient, ApiError, tokenStorage, hằng số enum, JSDoc typedef
     ├── components/
-    │   ├── ui/                # Button, TextField, PasswordField, Alert, Card, Avatar, Spinner, Logo
+    │   ├── ui/                # Button, TextField, PasswordField, SearchField, Alert, LoadError, Card, Tag,
+    │   │                      # Skeleton, Avatar, Spinner, Logo
     │   └── layout/            # AppLayout (thanh bên), Page, AuthLayout, navItems.js
     ├── features/
-    │   └── auth/              # đăng nhập, đăng ký, đổi mật khẩu, AuthProvider, useAuth, route guard
+    │   ├── auth/              # đăng nhập, đăng ký, đổi mật khẩu, AuthProvider, useAuth, route guard
+    │   └── vocabulary/        # module A: danh sách chủ đề, chi tiết chủ đề (api/, components/, pages/)
     ├── pages/                 # trang chung: HomePage, ComingSoonPage, NotFoundPage, ForbiddenPage
     ├── lib/                   # hàm tiện ích nhỏ
     └── test/                  # setup.js, fakeBackend.js (giả lập backend cho test)
@@ -128,6 +134,29 @@ const { data } = await httpClient.get('/api/topics')   // token được gắn t
   `ROLES`, `USER_STATUS`, `CEFR_LEVELS` trong `@/api/constants` thay vì gõ chuỗi. Kiểu dữ liệu API mô tả bằng
   JSDoc trong `@/api/types`.
 
+### Hiển thị dữ liệu từ server (TanStack Query)
+
+Trong component, đừng tự gọi API trong `useEffect`. Viết hàm gọi API trong `features/<module>/api/` rồi bọc bằng
+`useQuery` (xem `src/features/vocabulary/api/queries.js`):
+
+```js
+export const grammarKeys = { all: ['grammar'], lessons: () => ['grammar', 'lessons'] }
+
+export function useLessons() {
+  return useQuery({ queryKey: grammarKeys.lessons(), queryFn: getLessons })
+}
+```
+
+Trang dùng `isPending` (hiện `Skeleton`), `isError` (hiện `<LoadError error={...} onRetry={() => query.refetch()} />`)
+và `data`. Danh sách dài dùng `useInfiniteQuery` với API trả `PageResponse` (`items`, `page`, `totalPages`...).
+Mỗi tài khoản có cache riêng, nên đăng xuất rồi đăng nhập tài khoản khác không thấy dữ liệu của người trước.
+
+### API chưa có ở backend
+
+Chốt contract trước (ví dụ `docs/api/vocabulary.md` ở thư mục gốc), viết frontend theo đó, test bằng
+`installFakeBackend`, và muốn xem trên trình duyệt thì thêm API giả trong `mock/` rồi chạy `npm run dev:mock`
+(xem `mock/vocabularyMockApi.js`).
+
 ### Test
 
 Test đặt cạnh file, đuôi `.test.js` hoặc `.test.jsx`. Muốn test cả luồng mà không cần backend, dùng
@@ -161,7 +190,9 @@ Khi chuyển một khối từ file thiết kế sang Tailwind, lưu ý:
 - Font là Be Vietnam Pro (có bộ ký tự tiếng Việt), tự host trong `src/assets/fonts/`, không phụ thuộc Google Fonts.
 
 Component dùng chung nằm trong `src/components/ui/`. Hãy dùng lại thay vì tự viết ô nhập hay nút mới, để giao diện
-các module đồng nhất.
+các module đồng nhất. `Button` có ba kiểu: `primary` (teal), `secondary` (xám, chỉ đặt trên nền trắng vì trên nền
+trang sẽ bị chìm) và `outline` (trắng có viền, dùng được trên mọi nền). `Page` có `width="wide"` (920px, mặc định)
+và `width="narrow"` (520px, cho màn một cột như chi tiết chủ đề, flashcard).
 
 ## Bảo mật và giới hạn đã biết
 

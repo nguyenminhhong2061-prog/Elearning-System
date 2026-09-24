@@ -234,7 +234,7 @@ describe('session on start-up', () => {
       'GET /api/users/me': () => ({ status: 401, data: { status: 401, message: 'Authentication required' } }),
     })
 
-    renderApp('/vocabulary')
+    renderApp('/plan')
 
     await heading('Đăng nhập')
     expect(screen.getByRole('status')).toHaveTextContent('Phiên đăng nhập đã hết hạn')
@@ -431,9 +431,9 @@ describe('sidebar', () => {
     signInBeforeStart()
     backend = installFakeBackend({ 'GET /api/users/me': () => ({ data: learner }) })
 
-    renderApp('/vocabulary')
+    renderApp('/exercises')
 
-    await heading('Từ vựng')
+    await heading('Bài tập')
     expect(screen.getByText('Sắp ra mắt')).toBeInTheDocument()
   })
 })
