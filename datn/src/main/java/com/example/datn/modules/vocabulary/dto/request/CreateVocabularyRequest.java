@@ -1,6 +1,6 @@
 package com.example.datn.modules.vocabulary.dto.request;
 
-import com.example.datn.modules.vocabulary.enums.CefrLevel;
+import com.example.datn.common.enums.CefrLevel;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
