@@ -7,7 +7,7 @@ giao diện **tiếng Việt**. Code và comment viết bằng tiếng Anh, gi�
 
 - **Node 22** và npm 10 (đã chạy thử với Node 22.20)
 - Backend chạy tại `http://localhost:8080` (xem README ở thư mục gốc). Chưa bật backend vẫn xem được giao diện,
-  nhưng các lời gọi API sẽ báo lỗi kết nối.
+  nhưng đăng nhập sẽ báo "Không kết nối được máy chủ".
 
 ## Chạy
 
@@ -25,6 +25,9 @@ npm run dev        # http://localhost:5173
 | `npm run lint` | Kiểm tra code bằng oxlint |
 | `npm test` | Chạy toàn bộ test một lần (Vitest + React Testing Library) |
 | `npm run test:watch` | Chạy test và tự chạy lại khi sửa |
+
+Muốn có tài khoản admin để thử: chạy backend với `ADMIN_EMAIL` và `ADMIN_PASSWORD` (xem README gốc).
+Tài khoản đăng ký qua giao diện luôn là learner.
 
 ## Kết nối tới backend
 
@@ -44,11 +47,91 @@ Cấu hình tùy chọn (copy `.env.example` thành `.env.local`, file này khô
 |---|---|
 | React 19, Vite 8 | Giao diện và build |
 | Tailwind CSS 4 | Style. Token của thiết kế nằm trong `src/index.css` (khối `@theme`) |
-| react-router | Điều hướng |
-| axios | Gọi API |
-| react-hook-form + zod | Form và kiểm tra dữ liệu (tiếng Việt) |
+| react-router 7 | Điều hướng |
+| axios | Gọi API (qua `httpClient` dùng chung) |
+| react-hook-form + zod | Form và kiểm tra dữ liệu (thông báo tiếng Việt) |
 | Vitest, React Testing Library | Test |
 | oxlint | Lint |
+
+## Cấu trúc thư mục
+
+```
+frontend/
+├── LinguaStep-design-source/  # bản thiết kế gốc (chỉ để tham khảo, xem mục Thiết kế)
+└── src/
+    ├── main.jsx               # điểm vào: BrowserRouter + App
+    ├── index.css              # Tailwind, design token, @font-face
+    ├── app/
+    │   ├── App.jsx            # AuthProvider + routes
+    │   └── router.jsx         # NƠI DUY NHẤT khai báo route
+    ├── api/                   # dùng chung: httpClient, ApiError, tokenStorage, hằng số enum, JSDoc typedef
+    ├── components/
+    │   ├── ui/                # Button, TextField, PasswordField, Alert, Card, Avatar, Spinner, Logo
+    │   └── layout/            # AppLayout (thanh bên), Page, AuthLayout, navItems.js
+    ├── features/
+    │   └── auth/              # đăng nhập, đăng ký, đổi mật khẩu, AuthProvider, useAuth, route guard
+    ├── pages/                 # trang chung: HomePage, ComingSoonPage, NotFoundPage, ForbiddenPage
+    ├── lib/                   # hàm tiện ích nhỏ
+    └── test/                  # setup.js, fakeBackend.js (giả lập backend cho test)
+```
+
+Import dùng alias `@/` thay cho đường dẫn tương đối dài: `import { Button } from '@/components/ui/Button'`.
+File chứa JSX phải có đuôi `.jsx`, file logic thuần dùng `.js`. Mỗi module đặt code trong `src/features/<module>/`.
+
+## Hướng dẫn cho các module khác
+
+### Thêm trang cho module
+
+1. Tạo trang trong `src/features/<module>/pages/`, bọc nội dung bằng `Page` để có tiêu đề tab, tiêu đề trang và
+   độ rộng đúng thiết kế:
+
+   ```jsx
+   import { Page } from '@/components/layout/Page'
+
+   export function GrammarListPage() {
+     return <Page title="Ngữ pháp">...</Page>
+   }
+   ```
+
+2. Đăng ký route trong `src/app/router.jsx`, bên trong nhóm `AppLayout` (thay `ComingSoonPage` của mục tương ứng).
+3. Nếu cần, sửa mục của mình trong `src/components/layout/navItems.js` (thanh bên).
+
+Trang chỉ dành cho admin: bọc bằng `<Route element={<ProtectedRoute roles={[ROLES.ADMIN]} />}>`. Đây chỉ là để
+giao diện gọn, backend mới là nơi chặn quyền thật (`@PreAuthorize`).
+
+### Lấy người dùng hiện tại
+
+```jsx
+import { useAuth } from '@/features/auth/context/useAuth'
+
+const { user, isAdmin } = useAuth()   // user: { id, fullName, email, role, status, currentLevel, createdAt }
+```
+
+`currentLevel` có thể là `null` (chưa xác định trình độ). Trong các trang nằm dưới `AppLayout`, `user` luôn có giá trị.
+
+### Gọi API
+
+```js
+import { httpClient } from '@/api/httpClient'
+import { describeApiError } from '@/api/errorMessages'
+
+const { data } = await httpClient.get('/api/topics')   // token được gắn tự động
+```
+
+- Mọi lỗi đều là `ApiError` với `status` là mã HTTP, hoặc `0` khi không kết nối được máy chủ.
+- 401 (token hết hạn hoặc sai) được xử lý chung: người dùng bị đăng xuất và chuyển về trang đăng nhập kèm thông
+  báo "Phiên đăng nhập đã hết hạn". Module **không** cần tự xử lý 401.
+- `error.message` là thông báo tiếng Anh của backend, **không hiện cho người dùng**. Dùng
+  `describeApiError(error, 'Thông báo mặc định')` để có câu tiếng Việt cho lỗi mạng, 403, 5xx; lỗi riêng
+  (400, 404, 409...) thì tự kiểm tra `error.status`.
+- Giá trị enum trong JSON là **chữ hoa** (`'LEARNER'`, `'ADMIN'`, `'ACTIVE'`...), khác với DB (chữ thường). Dùng
+  `ROLES`, `USER_STATUS`, `CEFR_LEVELS` trong `@/api/constants` thay vì gõ chuỗi. Kiểu dữ liệu API mô tả bằng
+  JSDoc trong `@/api/types`.
+
+### Test
+
+Test đặt cạnh file, đuôi `.test.js` hoặc `.test.jsx`. Muốn test cả luồng mà không cần backend, dùng
+`installFakeBackend` trong `src/test/fakeBackend.js` (xem `src/features/auth/authFlow.test.jsx`).
 
 ## Thiết kế (design system)
 
@@ -56,31 +139,34 @@ Bản thiết kế gốc nằm trong `LinguaStep-design-source/`: mở `LinguaSt
 còn `index.html` là đặc tả (mỗi khối `<sc-if>` là một màn hình, `logic.reference.js` mô tả dữ liệu và tương tác).
 Đây chỉ là tài liệu tham khảo, chạy trên runtime riêng của công cụ thiết kế: **không copy code từ đó vào `src/`**.
 
-Màu, font và bo góc lấy từ bản thiết kế LinguaStep và khai báo **một lần** trong `src/index.css`. Mỗi màu thành
-một class Tailwind, ví dụ `bg-brand`, `text-brand-dark`, `text-ink`, `border-line`, `bg-canvas`,
-`bg-danger-bg`. **Không ghi mã hex trực tiếp trong component**; cần màu mới thì thêm token.
+Mọi token khai báo **một lần** trong `src/index.css` và trở thành class Tailwind.
+**Không ghi mã hex trực tiếp trong component**; cần màu mới thì thêm token.
 
-Font là Be Vietnam Pro (có bộ ký tự tiếng Việt), tự host trong `src/assets/fonts/`, không phụ thuộc Google Fonts.
+| Nhóm | Class |
+|---|---|
+| Màu thương hiệu | `brand` (#12A594), `brand-dark` (#0B7B70, chữ/link), `brand-tint`, `brand-tint-line`, `brand-soft` |
+| Nền, viền, chữ | `canvas` (nền trang), `surface-alt`, `line` (viền), `ink` (chữ chính), `ink-soft`, `muted`, `muted-light` |
+| Thanh bên | `sidebar`, `sidebar-raised`, `sidebar-deep`, `sidebar-text` |
+| Trạng thái | `danger`, `danger-bg`, `danger-solid`, `success`, `success-bg`, `success-line`, `success-solid`, `warning-solid`, `accent` (cam) |
+| Cỡ chữ | `text-title` (26px), `text-lg` (18px), `text-body` (15px), `text-sm` (14px), `text-label` (13px), `text-xs` (12px), `text-tag` (11px) |
 
-Component dùng chung nằm trong `src/components/ui/`: `Button`, `TextField`, `PasswordField`, `Alert`, `Spinner`,
-`Logo`. Hãy dùng lại thay vì tự viết ô nhập hay nút mới, để giao diện các module đồng nhất.
+Ví dụ: `bg-brand text-white`, `border-line`, `text-muted`, `bg-danger-bg text-danger`.
 
-## Cấu trúc thư mục
+Khi chuyển một khối từ file thiết kế sang Tailwind, lưu ý:
 
-```
-frontend/
-├── vite.config.js        # proxy /api, alias "@" trỏ tới src/, cấu hình Vitest
-├── .env.example
-├── public/               # favicon
-└── src/
-    ├── main.jsx
-    ├── index.css         # Tailwind, design token, @font-face
-    ├── app/              # App.jsx (khung ứng dụng)
-    ├── components/ui/    # component giao diện dùng chung
-    ├── lib/              # hàm tiện ích
-    ├── assets/fonts/
-    └── test/setup.js     # thiết lập chung cho test
-```
+- **Kích thước hộp:** file thiết kế dùng `content-box`, nghĩa là padding nằm ngoài `width`/`max-width`. Tailwind
+  dùng `border-box`. Ví dụ thẻ đăng nhập `max-width: 420px; padding: 40px` thực tế rộng 500px, nên ở đây là `max-w-125`.
+- **Khoảng cách trong Tailwind 4** tính theo bội số của 4px: `p-4` = 16px, `py-2.75` = 11px, `max-w-230` = 920px.
+  IDE (extension Tailwind CSS IntelliSense) sẽ gợi ý dạng này nếu viết `[920px]`.
+- Font là Be Vietnam Pro (có bộ ký tự tiếng Việt), tự host trong `src/assets/fonts/`, không phụ thuộc Google Fonts.
 
-Import dùng alias `@/` thay cho đường dẫn tương đối dài: `import { Button } from '@/components/ui/Button'`.
-File chứa JSX phải có đuôi `.jsx`, file logic thuần dùng `.js`.
+Component dùng chung nằm trong `src/components/ui/`. Hãy dùng lại thay vì tự viết ô nhập hay nút mới, để giao diện
+các module đồng nhất.
+
+## Bảo mật và giới hạn đã biết
+
+- Token lưu trong `localStorage` để F5 không mất phiên (backend không dùng cookie). Đổi lại, script chạy trên trang
+  đọc được token, nên **không dùng `dangerouslySetInnerHTML`**. Nếu cần hiển thị markdown (ví dụ câu trả lời của
+  chatbot), dùng thư viện có sanitize.
+- Đăng xuất chỉ xóa token ở trình duyệt. Token cũ vẫn hợp lệ ở backend đến khi hết hạn (8 giờ), kể cả sau khi đổi
+  mật khẩu hoặc bị khóa tài khoản. Chưa có refresh token: hết 8 giờ phải đăng nhập lại.
