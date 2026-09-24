@@ -32,6 +32,17 @@
  */
 
 /**
+ * PageResponse<T>: one page of a paginated list (see docs/api/vocabulary.md). `page` is 0-based.
+ * @template T
+ * @typedef {object} PageResponse
+ * @property {T[]} items
+ * @property {number} page
+ * @property {number} size
+ * @property {number} totalItems
+ * @property {number} totalPages
+ */
+
+/**
  * ApiErrorResponse, the body of every error the backend returns. `message` is English and, for validation
  * errors, has the form "field: reason", so it is not shown to users as is (see errorMessages.js).
  * @typedef {object} ApiErrorBody

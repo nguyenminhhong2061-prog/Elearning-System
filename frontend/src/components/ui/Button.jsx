@@ -3,7 +3,10 @@ import { Spinner } from './Spinner'
 
 const VARIANTS = {
   primary: 'bg-brand text-white hover:bg-brand-dark',
+  // Grey button ("Thêm" in the design). Use it on white surfaces only: on the page background it disappears.
   secondary: 'bg-canvas text-ink hover:bg-line',
+  // White button with a border ("Hủy" in the design). Works on any background.
+  outline: 'border border-line bg-white text-ink-soft hover:bg-surface-alt',
 }
 
 const SIZES = {

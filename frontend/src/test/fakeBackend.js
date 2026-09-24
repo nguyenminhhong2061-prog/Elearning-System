@@ -5,11 +5,12 @@ import { httpClient } from '@/api/httpClient'
  * Replaces the network under the real httpClient with fake endpoints, so tests exercise the whole frontend
  * stack (forms, authApi, interceptors, AuthProvider, router) without a backend.
  *
- * `routes` maps "METHOD /path" to a function receiving { body, authorization } and returning
- * { status?, data? } (status defaults to 200) or { networkError: true } to simulate an unreachable server.
- * Requests to a path with no route fail the test loudly.
+ * `routes` maps "METHOD /path" (without the query string) to a function receiving { body, params, authorization }
+ * and returning { status?, data? } (status defaults to 200) or { networkError: true } to simulate an unreachable
+ * server. `params` is the query parameters object passed to axios, if any. Requests to a path with no route fail
+ * the test loudly.
  *
- * @returns {{ calls: Array<{ key: string, body: unknown, authorization: string | undefined }>, restore: () => void }}
+ * @returns {{ calls: Array<{ key: string, body: unknown, params?: object, authorization: string | undefined }>, restore: () => void }}
  */
 export function installFakeBackend(routes) {
   const originalAdapter = httpClient.defaults.adapter
@@ -22,9 +23,10 @@ export function installFakeBackend(routes) {
 
     const body = typeof config.data === 'string' ? JSON.parse(config.data) : undefined
     const authorization = config.headers.get('Authorization') || undefined
-    calls.push({ key, body, authorization })
+    const params = config.params
+    calls.push({ key, body, params, authorization })
 
-    const result = await handler({ body, authorization })
+    const result = await handler({ body, params, authorization })
     if (result.networkError) {
       throw new AxiosError('Network Error', AxiosError.ERR_NETWORK, config)
     }
