@@ -52,6 +52,10 @@ Cấu hình tùy chọn (copy `.env.example` thành `.env.local`, file này khô
 
 ## Thiết kế (design system)
 
+Bản thiết kế gốc nằm trong `LinguaStep-design-source/`: mở `LinguaStep-standalone.html` bằng trình duyệt để xem,
+còn `index.html` là đặc tả (mỗi khối `<sc-if>` là một màn hình, `logic.reference.js` mô tả dữ liệu và tương tác).
+Đây chỉ là tài liệu tham khảo, chạy trên runtime riêng của công cụ thiết kế: **không copy code từ đó vào `src/`**.
+
 Màu, font và bo góc lấy từ bản thiết kế LinguaStep và khai báo **một lần** trong `src/index.css`. Mỗi màu thành
 một class Tailwind, ví dụ `bg-brand`, `text-brand-dark`, `text-ink`, `border-line`, `bg-canvas`,
 `bg-danger-bg`. **Không ghi mã hex trực tiếp trong component**; cần màu mới thì thêm token.
