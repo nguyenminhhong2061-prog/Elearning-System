@@ -1,5 +1,5 @@
 import { CEFR_LEVELS } from '../src/api/constants.js'
-import { addDays } from '../src/lib/dates.js'
+import { addDays, todayInVietnam } from '../src/lib/dates.js'
 import { INTERVALS } from './scheduler.js'
 import { MOCK_TOPICS, MOCK_WORDS } from './vocabularyFixtures.js'
 
@@ -70,6 +70,9 @@ export function learningStatusOf(user, wordId) {
 }
 
 export const isDue = (state, today) => state !== undefined && state.nextReviewAt <= today
+
+/** Whether the word was last reviewed today in Vietnam time (lastReviewedAt is a UTC instant). */
+export const isReviewedToday = (state, today) => todayInVietnam(new Date(state.lastReviewedAt)) === today
 
 /** VocabularyItem of the contract. */
 export function toItem(user, word) {

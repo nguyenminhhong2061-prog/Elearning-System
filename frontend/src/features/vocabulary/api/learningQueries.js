@@ -13,10 +13,15 @@ export function useLearningSummary() {
   return useQuery({ queryKey: learningKeys.summary(), queryFn: getLearningSummary })
 }
 
-export function useLearningHistory() {
+/**
+ * Reviewed words, 20 at a time ("Xem thêm"). Each filter has its own cache entry, so switching back to a list shows
+ * it at once.
+ * @param {{ status?: 'LEARNING' | 'MASTERED', reviewedToday?: boolean }} [filter]
+ */
+export function useLearningHistory(filter = {}) {
   return useInfiniteQuery({
-    queryKey: learningKeys.history(),
-    queryFn: ({ pageParam }) => getLearningHistory({ page: pageParam, size: HISTORY_PAGE_SIZE }),
+    queryKey: learningKeys.history(filter),
+    queryFn: ({ pageParam }) => getLearningHistory({ ...filter, page: pageParam, size: HISTORY_PAGE_SIZE }),
     initialPageParam: 0,
     getNextPageParam: (last) => (last.page + 1 < last.totalPages ? last.page + 1 : undefined),
   })

@@ -28,8 +28,12 @@ export async function getLearningSummary() {
   return data
 }
 
-/** GET /api/learning/history: words reviewed at least once, latest first. */
-export async function getLearningHistory({ page = 0, size = 20 } = {}) {
-  const { data } = await httpClient.get('/api/learning/history', { params: { page, size } })
+/**
+ * GET /api/learning/history: words reviewed at least once, latest first, optionally only those of one status or
+ * reviewed today.
+ * @param {{ page?: number, size?: number, status?: 'LEARNING' | 'MASTERED', reviewedToday?: boolean }} [query]
+ */
+export async function getLearningHistory({ page = 0, size = 20, status, reviewedToday } = {}) {
+  const { data } = await httpClient.get('/api/learning/history', { params: { page, size, status, reviewedToday } })
   return data
 }

@@ -112,12 +112,21 @@ của A1). `400` nếu `result` sai; `404` nếu từ không tồn tại hoặc 
 ```
 
 `dueToday`: số từ đến hạn (A2: khác 0 thì hiện nhắc "Bạn có N từ cần ôn hôm nay"). `upcoming`: đúng 7 phần tử cho 7 ngày
-kế tiếp (bắt đầu từ ngày mai), số từ đến hạn đúng ngày đó. `reviewedToday`: số từ có `lastReviewedAt` trong hôm nay.
+kế tiếp (bắt đầu từ ngày mai), số từ đến hạn đúng ngày đó. `reviewedToday`: số từ có `lastReviewedAt` trong hôm nay
+(theo giờ Việt Nam, như mọi chỗ khác nói "hôm nay"; lần ôn lúc 6 giờ sáng là 23 giờ hôm trước theo UTC).
 
 ### `GET /api/learning/history` — lịch sử học
 
-`page`, `size` như `GET /api/vocabulary`. Trả `PageResponse<LearningCard>` gồm các từ người dùng đã đánh giá ít nhất
-một lần, sắp theo `lastReviewedAt` mới nhất trước.
+| Tham số | Ý nghĩa |
+|---|---|
+| `status` | `LEARNING` hoặc `MASTERED`: chỉ các từ đang ở trạng thái đó (thẻ "Đang học", "Đã thuộc") |
+| `reviewedToday` | `true`: chỉ các từ có `lastReviewedAt` trong hôm nay (thẻ "Đã ôn hôm nay"). Không gửi hoặc `false`: không lọc |
+| `page`, `size` | Như `GET /api/vocabulary` |
+
+Trả `PageResponse<LearningCard>` gồm các từ người dùng đã đánh giá ít nhất một lần và khớp mọi bộ lọc đã gửi, sắp theo
+`lastReviewedAt` mới nhất trước. `totalItems` khi lọc phải bằng số tương ứng của `summary` (`learningCount`,
+`masteredCount`, `reviewedToday`), vì giao diện hiện hai con số này cạnh nhau. `400` nếu `status` hoặc `reviewedToday`
+sai giá trị.
 
 ## Frontend dùng như thế nào
 
@@ -127,6 +136,7 @@ một lần, sắp theo `lastReviewedAt` mới nhất trước.
 | Nút "Học N từ" ở chi tiết chủ đề | Tính từ `Topic`: `min(20, dueCount + wordCount − learnedCount)` |
 | Phiên flashcard | `GET /api/learning/session`, rồi `POST /api/learning/reviews` cho từng thẻ |
 | Tab "Lịch sử học" | `GET /api/learning/summary` và `GET /api/learning/history` |
+| Bấm thẻ "Đang học", "Đã thuộc", "Đã ôn hôm nay" | `GET /api/learning/history?status=LEARNING`, `?status=MASTERED`, `?reviewedToday=true` |
 
 Sau mỗi lần đánh giá, frontend làm mới dữ liệu chủ đề, danh sách và thống kê (số từ đã học thay đổi).
 
@@ -135,5 +145,5 @@ Sau mỗi lần đánh giá, frontend làm mới dữ liệu chủ đề, danh s
 1. Migration thêm cột bậc ôn (ví dụ `interval_days`) vào `user_vocabulary`.
 2. Entity `UserVocabulary` với converter chữ thường cho `status` và `last_review_result` (dùng `LowercaseEnumConverter`).
 3. Scheduler thuần logic theo bảng trên, có unit test (bậc, trạng thái, ngày theo giờ Việt Nam).
-4. Bốn endpoint trên, lấy người dùng qua `CurrentUser`.
+4. Bốn endpoint trên, lấy người dùng qua `CurrentUser`; `history` có bộ lọc `status` và `reviewedToday`.
 5. Phát sự kiện `WordReviewedEvent` sau mỗi lần đánh giá để module Tiến độ (Nhân) tự cập nhật `user_progress`.
