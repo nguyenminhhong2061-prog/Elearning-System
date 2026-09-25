@@ -1,6 +1,6 @@
 package com.example.datn.modules.vocabulary.entity;
 
-import com.example.datn.modules.vocabulary.enums.CefrLevel;
+import com.example.datn.common.enums.CefrLevel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

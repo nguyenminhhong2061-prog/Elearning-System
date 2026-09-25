@@ -1,4 +1,4 @@
-package com.example.datn.modules.vocabulary.enums;
+package com.example.datn.common.enums;
 
 public enum CefrLevel {
     A1,

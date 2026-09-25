@@ -1,6 +1,6 @@
 package com.example.datn.modules.vocabulary.dto.response;
 
-import com.example.datn.modules.vocabulary.enums.CefrLevel;
+import com.example.datn.common.enums.CefrLevel;
 
 public record VocabularyResponse(
         Long id,
