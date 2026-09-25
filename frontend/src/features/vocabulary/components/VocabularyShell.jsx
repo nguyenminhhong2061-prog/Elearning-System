@@ -3,6 +3,7 @@ import { TabLinks } from '@/components/ui/TabLinks'
 import { useCustomLists } from '../api/listsQueries'
 import { useTopics } from '../api/queries'
 import { formatCount, summarizeTopics } from '../topicProgress'
+import { GamesBanner } from '@/features/games/components/GamesBanner'
 import { DueReviewBanner } from './DueReview'
 
 function useVocabularyTabs() {
@@ -52,6 +53,7 @@ export function VocabularyShell({ tab, title, headerAside, showReminder = false,
       {showReminder && <DueReviewBanner />}
       <TabLinks label="Mục từ vựng" tabs={tabs} current={tab} />
       {children}
+      {(tab === 'topics' || tab === 'lists') && <GamesBanner />}
     </Page>
   )
 }

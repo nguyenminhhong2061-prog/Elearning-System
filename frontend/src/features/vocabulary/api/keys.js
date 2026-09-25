@@ -13,7 +13,8 @@ export const vocabularyKeys = {
 export const learningKeys = {
   all: ['learning'],
   summary: () => [...learningKeys.all, 'summary'],
-  history: () => [...learningKeys.all, 'history'],
+  /** @param {{ status?: string, reviewedToday?: boolean }} [filter] */
+  history: (filter = {}) => [...learningKeys.all, 'history', filter],
 }
 
 export const listKeys = {

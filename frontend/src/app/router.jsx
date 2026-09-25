@@ -2,6 +2,8 @@ import { Route, Routes } from 'react-router'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AuthLayout } from '@/components/layout/AuthLayout'
 import { GuestRoute } from '@/features/auth/guards/GuestRoute'
+import { GamePlayPage } from '@/features/games/pages/GamePlayPage'
+import { GamesPage } from '@/features/games/pages/GamesPage'
 import { ProtectedRoute } from '@/features/auth/guards/ProtectedRoute'
 import { ChangePasswordPage } from '@/features/auth/pages/ChangePasswordPage'
 import { LoginPage } from '@/features/auth/pages/LoginPage'
@@ -44,6 +46,8 @@ export function AppRoutes() {
             <Route path="topics/:topicId/study" element={<StudySessionPage mode="topic" />} />
             <Route path="lists/:listId" element={<ListDetailPage />} />
             <Route path="lists/:listId/study" element={<StudySessionPage mode="list" />} />
+            <Route path="games" element={<GamesPage />} />
+            <Route path="games/:gameId" element={<GamePlayPage />} />
           </Route>
 
           {/* Sections owned by other modules. Replace the placeholder when the module's pages exist. */}

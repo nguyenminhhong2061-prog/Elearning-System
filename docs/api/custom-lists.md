@@ -40,7 +40,7 @@ backend dùng `current_level` của người học, chưa có thì `A1` (cột `
 | `GET /api/custom-lists/{id}` | | `200` `CustomList` |
 | `PUT /api/custom-lists/{id}` | `{ "name" }` | `200` `CustomList` |
 | `DELETE /api/custom-lists/{id}` | | `204` |
-| `GET /api/custom-lists/{id}/words` | `page`, `size` như `GET /api/vocabulary` | `200` `PageResponse<VocabularyItem>`, theo `word` |
+| `GET /api/custom-lists/{id}/words` | `page`, `size` như `GET /api/vocabulary` | `200` `PageResponse<VocabularyItem>`, từ dễ đến khó như `GET /api/vocabulary` |
 | `POST /api/custom-lists/{id}/words` | `{ "vocabularyId": 101 }` | `201` `VocabularyItem` |
 | `POST /api/custom-lists/{id}/words/new` | `NewWord` | `201` `VocabularyItem` (từ vừa tạo, đã nằm trong danh sách) |
 | `DELETE /api/custom-lists/{id}/words/{vocabularyId}` | | `204` |

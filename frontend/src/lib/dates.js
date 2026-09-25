@@ -30,6 +30,16 @@ export function formatWeekday(isoDate) {
   return name.charAt(0).toLocaleUpperCase('vi') + name.slice(1)
 }
 
+const clockTime = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: TIME_ZONE })
+
+/** An instant as Vietnam time: "15:05" today, "15:05, 24/09" on another day. */
+export function formatMoment(isoInstant, today = todayInVietnam()) {
+  const moment = new Date(isoInstant)
+  const time = clockTime.format(moment)
+  const day = todayInVietnam(moment)
+  return day === today ? time : `${time}, ${formatDayMonth(day)}`
+}
+
 /** When a word is next reviewed, relative to today: "hôm nay", "ngày mai" or "28/09" (overdue dates count as today). */
 export function describeReviewDate(isoDate, today = todayInVietnam()) {
   if (isoDate <= today) return 'hôm nay'

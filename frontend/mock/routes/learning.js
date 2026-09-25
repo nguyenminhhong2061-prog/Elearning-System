@@ -1,11 +1,12 @@
 import { addDays } from '../../src/lib/dates.js'
 import { HttpError, paginate } from '../http.js'
 import { applyReview, INTERVALS } from '../scheduler.js'
-import { findWord, isDue, sessionCards, toCard, topics, visibleWords } from '../store.js'
+import { findWord, isDue, isReviewedToday, sessionCards, toCard, topics, visibleWords } from '../store.js'
 
 // docs/api/learning.md
 
 const RESULTS = ['FORGOT', 'VAGUE', 'REMEMBERED']
+const HISTORY_STATUSES = ['LEARNING', 'MASTERED']
 
 function parseSize(searchParams) {
   const raw = searchParams.get('size')
@@ -83,7 +84,7 @@ export function learningRoutes({ findList } = {}) {
           dueToday: states.filter((state) => isDue(state, today)).length,
           learningCount: states.filter((state) => state.status === 'LEARNING').length,
           masteredCount: states.filter((state) => state.status === 'MASTERED').length,
-          reviewedToday: states.filter((state) => state.lastReviewedAt.slice(0, 10) === today).length,
+          reviewedToday: states.filter((state) => isReviewedToday(state, today)).length,
           upcoming: Array.from({ length: 7 }, (_, index) => {
             const date = addDays(today, index + 1)
             return { date, count: states.filter((state) => state.nextReviewAt === date).length }
@@ -94,8 +95,22 @@ export function learningRoutes({ findList } = {}) {
     {
       method: 'GET',
       pattern: /^\/api\/learning\/history$/,
-      handle: ({ user, searchParams }) => {
+      handle: ({ user, today, searchParams }) => {
+        const status = searchParams.get('status')
+        if (status !== null && !HISTORY_STATUSES.includes(status)) {
+          throw new HttpError(400, 'status must be LEARNING or MASTERED')
+        }
+        const reviewedToday = searchParams.get('reviewedToday')
+        if (reviewedToday !== null && reviewedToday !== 'true' && reviewedToday !== 'false') {
+          throw new HttpError(400, 'reviewedToday must be true or false')
+        }
+
         const reviewed = [...user.learning.entries()]
+          .filter(
+            ([, state]) =>
+              (status === null || state.status === status) &&
+              (reviewedToday !== 'true' || isReviewedToday(state, today)),
+          )
           .sort(([, a], [, b]) => b.lastReviewedAt.localeCompare(a.lastReviewedAt))
           .map(([id]) => findWord(user, id))
           .filter(Boolean)
