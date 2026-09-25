@@ -1,9 +1,8 @@
+import { CEFR_LEVELS } from '../../src/api/constants.js'
 import { HttpError, paginate } from '../http.js'
-import { byWord, countsFor, topics, toItem, visibleWords } from '../store.js'
+import { byLevel, countsFor, topics, toItem, visibleWords } from '../store.js'
 
 // docs/api/vocabulary.md
-
-const CEFR_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
 
 function topicWithCounts(user, topic, today) {
   const words = visibleWords(user).filter((word) => word.topicId === topic.id)
@@ -41,7 +40,7 @@ export const vocabularyRoutes = [
             (!level || word.difficultyLevel === level) &&
             (!q || word.word.toLowerCase().includes(q) || word.meaning.toLowerCase().includes(q)),
         )
-        .sort(byWord)
+        .sort(byLevel)
         .map((word) => toItem(user, word))
       return paginate(matching, searchParams)
     },

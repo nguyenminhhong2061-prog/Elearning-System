@@ -64,7 +64,7 @@ Từ chưa học: `learningStatus = NEW`, `lastReviewResult`, `nextReviewAt`, `l
 | `size` | Số thẻ tối đa, mặc định `20`, tối đa `50` |
 
 Thứ tự thẻ: **từ đến hạn trước** (từ có `lastReviewResult = VAGUE` trước, rồi theo `nextReviewAt` sớm nhất), **sau đó
-đến từ mới** (theo `word`). Từ đã học nhưng chưa đến hạn không vào phiên. Chế độ ôn (A2) chỉ có từ đến hạn.
+đến từ mới**, từ dễ đến khó như danh sách từ của chủ đề (theo `difficultyLevel` rồi `word`, xem `GET /api/vocabulary`). Từ đã học nhưng chưa đến hạn không vào phiên. Chế độ ôn (A2) chỉ có từ đến hạn.
 
 ```json
 {

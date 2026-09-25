@@ -82,8 +82,11 @@ Trả `200` với một `Topic`; `404` nếu không có.
 | `page` | `0` | Trang, từ 0 |
 | `size` | `20` | Số từ mỗi trang, tối đa `100` |
 
-Sắp xếp theo `word` tăng dần (không phân biệt hoa thường), rồi theo `id`. Trả `200` với `PageResponse<VocabularyItem>`;
-`400` nếu `level`, `page` hoặc `size` không hợp lệ.
+**Sắp xếp từ dễ đến khó:** theo `difficultyLevel` (A1, A2, B1, B2, C1, C2), cùng trình độ thì theo `word` tăng dần
+(không phân biệt hoa thường), rồi theo `id`. Thứ tự này phải do server làm vì danh sách được phân trang: trình duyệt
+chỉ có trang đã tải, nên nếu tự sắp xếp thì từ A1 ở trang sau sẽ nhảy lên đầu khi bấm "Xem thêm từ". Sáu giá trị
+`A1`…`C2` xếp theo chữ cái cũng đúng thứ tự trình độ, nên `ORDER BY difficulty_level, lower(word), id` là đủ.
+Trả `200` với `PageResponse<VocabularyItem>`; `400` nếu `level`, `page` hoặc `size` không hợp lệ.
 
 > **Thay đổi không tương thích:** hiện endpoint này trả mảng. Từ Phase 2 trả `PageResponse`. Chỉ `VocabularyApiTests`
 > của module `vocabulary` đang dùng nên cần sửa cùng lúc.
@@ -105,6 +108,6 @@ Thân yêu cầu giữ nguyên như hiện tại. **Chỉ `ADMIN`**; learner nh�
 
 1. Thêm `wordCount`, `learnedCount`, `dueCount` vào `TopicResponse` (một truy vấn đếm theo nhóm, không N+1).
 2. `learningStatus` cho từng từ theo người dùng hiện tại (`CurrentUser`), join `user_vocabulary`.
-3. `q`, `level`, phân trang cho `GET /api/vocabulary`; `PageResponse` trong `common`.
+3. `q`, `level`, phân trang và thứ tự từ dễ đến khó cho `GET /api/vocabulary`; `PageResponse` trong `common`.
 4. `@PreAuthorize("hasRole('ADMIN')")` cho các endpoint ghi.
 5. Migration seed 8–10 chủ đề, mỗi chủ đề 20–30 từ (có thể lấy từ `frontend/mock/vocabularyFixtures.js`).

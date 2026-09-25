@@ -1,3 +1,4 @@
+import { CEFR_LEVELS } from '../src/api/constants.js'
 import { addDays } from '../src/lib/dates.js'
 import { INTERVALS } from './scheduler.js'
 import { MOCK_TOPICS, MOCK_WORDS } from './vocabularyFixtures.js'
@@ -99,11 +100,18 @@ export function countsFor(user, words, today) {
   return { wordCount: words.length, learnedCount, dueCount }
 }
 
-const byWord = (a, b) => a.word.localeCompare(b.word, 'en', { sensitivity: 'base' }) || a.id - b.id
+/**
+ * Order of every word list (topics, searches, personal lists, new words of a session): easiest level first, A1 to C2,
+ * then alphabetically. See docs/api/vocabulary.md.
+ */
+export const byLevel = (a, b) =>
+  CEFR_LEVELS.indexOf(a.difficultyLevel) - CEFR_LEVELS.indexOf(b.difficultyLevel) ||
+  a.word.localeCompare(b.word, 'en', { sensitivity: 'base' }) ||
+  a.id - b.id
 
 /**
  * Cards of a study session (docs/api/learning.md): due words first (VAGUE ones first, then the most overdue), then
- * words never studied unless `dueOnly`.
+ * words never studied, easiest first, unless `dueOnly`.
  */
 export function sessionCards(user, pool, today, { size, dueOnly }) {
   const due = pool
@@ -114,8 +122,7 @@ export function sessionCards(user, pool, today, { size, dueOnly }) {
       const vague = (stateB.lastReviewResult === 'VAGUE') - (stateA.lastReviewResult === 'VAGUE')
       return vague || stateA.nextReviewAt.localeCompare(stateB.nextReviewAt) || a.id - b.id
     })
-  const fresh = dueOnly ? [] : pool.filter((word) => !user.learning.has(word.id)).sort(byWord)
+  const fresh = dueOnly ? [] : pool.filter((word) => !user.learning.has(word.id)).sort(byLevel)
   return [...due, ...fresh].slice(0, size).map((word) => toCard(user, word))
 }
 
-export { byWord }

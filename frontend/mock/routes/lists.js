@@ -1,9 +1,9 @@
+import { CEFR_LEVELS } from '../../src/api/constants.js'
 import { HttpError, paginate } from '../http.js'
-import { byWord, countsFor, findWord, toItem } from '../store.js'
+import { byLevel, countsFor, findWord, toItem } from '../store.js'
 
 // docs/api/custom-lists.md
 
-const CEFR_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
 let nextListId = 1
 let nextWordId = 10_000 // learners' own words, after the fixture ids
 
@@ -118,7 +118,7 @@ export const listRoutes = [
     pattern: /^\/api\/custom-lists\/(\d+)\/words$/,
     handle: ({ user, match, searchParams }) => {
       const list = requireList(user, match)
-      const words = listWords(user, list).sort(byWord).map((word) => toItem(user, word))
+      const words = listWords(user, list).sort(byLevel).map((word) => toItem(user, word))
       return paginate(words, searchParams, { defaultSize: 50 })
     },
   },
