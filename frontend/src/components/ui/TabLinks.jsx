@@ -12,7 +12,9 @@ import { cx } from '@/lib/cx'
  */
 export function TabLinks({ label, tabs, current }) {
   return (
-    <nav aria-label={label} className="flex gap-5 overflow-x-auto border-b border-line">
+    // The grey base line is an inset shadow rather than a border that the tabs overlap with a negative margin: that
+    // 1px of overflow made the scrollable bar show a vertical scrollbar on Windows.
+    <nav aria-label={label} className="flex gap-5 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-line)]">
       {tabs.map((tab) => {
         const selected = tab.id === current
         return (
@@ -21,7 +23,7 @@ export function TabLinks({ label, tabs, current }) {
             to={tab.to}
             aria-current={selected ? 'page' : undefined}
             className={cx(
-              '-mb-px flex-none border-b-2 pb-2.5 text-sm font-semibold whitespace-nowrap',
+              'flex-none border-b-2 pb-2.5 text-sm font-semibold whitespace-nowrap',
               selected ? 'border-brand text-brand-dark' : 'border-transparent text-muted hover:text-ink-soft',
             )}
           >

@@ -29,6 +29,7 @@ function Layout({ title, children }) {
   return (
     <Page
       title={title}
+      width="medium"
       heading={
         <Link to={GAMES_PATH} className="self-start text-label font-medium">
           ← Trò chơi
@@ -36,8 +37,8 @@ function Layout({ title, children }) {
       }
     >
       <div className="flex flex-wrap items-start gap-5">
-        <div className="flex-[1_1_432px]">{children}</div>
-        <Leaderboard className="flex-[1_1_320px]" />
+        <div className="min-w-0 flex-[2_1_432px]">{children}</div>
+        <Leaderboard className="flex-[1_1_320px] lg:max-w-110" />
       </div>
     </Page>
   )

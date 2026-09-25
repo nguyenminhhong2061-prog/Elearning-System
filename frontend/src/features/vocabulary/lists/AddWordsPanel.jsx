@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card'
 import { SearchField } from '@/components/ui/SearchField'
 import { TextField } from '@/components/ui/TextField'
 import { useAuth } from '@/features/auth/context/useAuth'
+import { cx } from '@/lib/cx'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import { useAddNewWordToList, useAddWordToList } from '../api/listsQueries'
 import { useWordSearch, WORD_SEARCH_MIN_LENGTH } from '../api/queries'
@@ -153,11 +154,11 @@ function NewWordForm({ listId, onAdded }) {
 }
 
 /** Both ways of adding words to a list (A3: "chọn từ kho có sẵn hoặc tự nhập"). */
-export function AddWordsPanel({ listId, wordIdsInList }) {
+export function AddWordsPanel({ listId, wordIdsInList, className }) {
   const [lastAdded, setLastAdded] = useState(null)
 
   return (
-    <Card className="flex flex-col gap-4">
+    <Card className={cx('flex flex-col gap-4', className)}>
       <h2 className="text-lg font-semibold text-ink">Thêm từ vào danh sách</h2>
       <p role="status" className="text-label font-medium text-success empty:hidden">
         {lastAdded ? `Đã thêm “${lastAdded}” vào danh sách.` : ''}

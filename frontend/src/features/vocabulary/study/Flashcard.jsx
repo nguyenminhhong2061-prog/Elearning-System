@@ -27,7 +27,7 @@ function Face({ hidden, back, children }) {
       aria-hidden={hidden || undefined}
       inert={hidden}
       className={cx(
-        'col-start-1 row-start-1 flex min-h-77 flex-col items-center justify-center gap-4 rounded-2xl border border-line bg-white p-6 text-center',
+        'col-start-1 row-start-1 flex min-h-77 flex-col items-center justify-center gap-4 rounded-2xl border border-line bg-white p-6 text-center 2xl:min-h-100',
         'shadow-[0_2px_10px_rgba(22,33,31,0.06)] [backface-visibility:hidden]',
         back && '[transform:rotateY(180deg)]',
       )}
