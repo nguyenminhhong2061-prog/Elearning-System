@@ -6,6 +6,8 @@ const VARIANTS = {
   secondary: 'bg-canvas text-ink hover:bg-line',
   // White button with a border ("Hủy" in the design). Works on any background.
   outline: 'border border-line bg-white text-ink-soft hover:bg-surface-alt',
+  // Destructive confirmation ("Xóa danh sách"). Same red as the "Chưa nhớ" button, which passes 4.5:1 with white.
+  danger: 'bg-review-forgot text-white hover:bg-danger',
 }
 
 const SIZES = {

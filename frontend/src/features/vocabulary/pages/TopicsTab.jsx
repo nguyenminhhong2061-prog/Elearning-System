@@ -7,9 +7,10 @@ import { cx } from '@/lib/cx'
 import { matchesSearch } from '@/lib/searchText'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import { useTopics, useWordSearch, WORD_SEARCH_MIN_LENGTH } from '../api/queries'
-import { TopicCard, TopicCardSkeleton, TopicGrid } from '../components/TopicCard'
+import { CreateListCard, TopicCard, TopicCardSkeleton, TopicGrid } from '../components/TopicCard'
 import { WordList, WordListSkeleton } from '../components/WordList'
 import { VocabularyShell } from '../components/VocabularyShell'
+import { CreateListDialog } from '../lists/CreateListDialog'
 import { formatCount } from '../topicProgress'
 
 const SEARCH_DELAY_MS = 300
@@ -89,6 +90,7 @@ export function TopicsTab() {
 
   const topicsQuery = useTopics()
   const topics = topicsQuery.data
+  const [creatingList, setCreatingList] = useState(false)
   const backTo = term ? `/vocabulary?q=${encodeURIComponent(term)}` : '/vocabulary'
 
   let body
@@ -129,6 +131,7 @@ export function TopicsTab() {
               {visibleTopics.map((topic) => (
                 <TopicCard key={topic.id} topic={topic} backTo={backTo} />
               ))}
+              {!term && <CreateListCard onClick={() => setCreatingList(true)} />}
             </TopicGrid>
           ) : (
             <NoResults>Không tìm thấy chủ đề phù hợp.</NoResults>
@@ -156,6 +159,7 @@ export function TopicsTab() {
       }
     >
       {body}
+      <CreateListDialog open={creatingList} onClose={() => setCreatingList(false)} />
     </VocabularyShell>
   )
 }

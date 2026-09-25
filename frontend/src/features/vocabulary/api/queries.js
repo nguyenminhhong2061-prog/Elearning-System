@@ -1,17 +1,6 @@
 import { keepPreviousData, useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
+import { vocabularyKeys } from './keys'
 import { getTopic, getTopics, getVocabularyPage } from './vocabularyApi'
-
-/**
- * Cache keys of the vocabulary data. Keys are nested so that invalidating `vocabularyKeys.all` (for example after a
- * flashcard session in Phase 3) refreshes every count and learning status at once.
- */
-export const vocabularyKeys = {
-  all: ['vocabulary'],
-  topics: () => [...vocabularyKeys.all, 'topics'],
-  topic: (id) => [...vocabularyKeys.topics(), id],
-  topicWords: (topicId) => [...vocabularyKeys.all, 'words', { topicId }],
-  search: (term) => [...vocabularyKeys.all, 'search', term],
-}
 
 export const TOPIC_WORDS_PAGE_SIZE = 20
 export const WORD_SEARCH_MIN_LENGTH = 2

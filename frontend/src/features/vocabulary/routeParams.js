@@ -6,6 +6,7 @@ export function parseId(raw) {
 }
 
 export const VOCABULARY_PATH = '/vocabulary'
+export const LISTS_TAB_PATH = '/vocabulary?tab=lists'
 
 /**
  * Where a back link returns: the page the user came from when it is a vocabulary page with its search or tab (passed

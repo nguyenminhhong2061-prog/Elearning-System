@@ -1,13 +1,18 @@
 import { Page } from '@/components/layout/Page'
 import { TabLinks } from '@/components/ui/TabLinks'
+import { useCustomLists } from '../api/listsQueries'
 import { useTopics } from '../api/queries'
 import { formatCount, summarizeTopics } from '../topicProgress'
 import { DueReviewBanner } from './DueReview'
 
-const VOCABULARY_TABS = [
-  { id: 'topics', label: 'Chủ đề có sẵn', to: '/vocabulary' },
-  { id: 'history', label: 'Lịch sử học', to: '/vocabulary?tab=history' },
-]
+function useVocabularyTabs() {
+  const { data: lists } = useCustomLists()
+  return [
+    { id: 'topics', label: 'Chủ đề có sẵn', to: '/vocabulary' },
+    { id: 'lists', label: lists ? `Danh sách của tôi (${lists.length})` : 'Danh sách của tôi', to: '/vocabulary?tab=lists' },
+    { id: 'history', label: 'Lịch sử học', to: '/vocabulary?tab=history' },
+  ]
+}
 
 /** "Đã học 35 / 74 từ · 6 chủ đề" from the topics (the design's line under the title), or null while unknown. */
 function useVocabularySummary() {
@@ -29,6 +34,7 @@ function useVocabularySummary() {
  */
 export function VocabularyShell({ tab, title, headerAside, showReminder = false, children }) {
   const summary = useVocabularySummary()
+  const tabs = useVocabularyTabs()
 
   return (
     <Page
@@ -44,7 +50,7 @@ export function VocabularyShell({ tab, title, headerAside, showReminder = false,
       }
     >
       {showReminder && <DueReviewBanner />}
-      <TabLinks label="Mục từ vựng" tabs={VOCABULARY_TABS} current={tab} />
+      <TabLinks label="Mục từ vựng" tabs={tabs} current={tab} />
       {children}
     </Page>
   )

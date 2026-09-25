@@ -36,4 +36,21 @@
  * @property {'NEW' | 'LEARNING' | 'MASTERED'} learningStatus for the current user
  */
 
+/**
+ * A learner's personal list (docs/api/custom-lists.md). Counts mean the same as for a Topic.
+ * @typedef {object} CustomList
+ * @property {number} id
+ * @property {string} name
+ * @property {string} createdAt ISO-8601 instant
+ * @property {number} wordCount
+ * @property {number} learnedCount
+ * @property {number} dueCount
+ */
+
+/**
+ * A word typed in by the learner. difficultyLevel is optional: the backend then uses the learner's level, or A1.
+ * @typedef {{ word: string, meaning: string, phonetic?: string | null, exampleSentence?: string | null,
+ *   difficultyLevel?: import('@/api/types').CefrLevel }} NewWord
+ */
+
 export {}

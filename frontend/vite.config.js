@@ -34,6 +34,9 @@ export default defineConfig(({ mode }) => {
       setupFiles: './src/test/setup.js',
       css: false,
       include: ['src/**/*.test.{js,jsx}', 'mock/**/*.test.js'],
+      // Full-flow tests type with user-event (one key at a time) and wait for debounced searches; with every file
+      // running in parallel they can pass the 5s default.
+      testTimeout: 15000,
     },
   }
 })
