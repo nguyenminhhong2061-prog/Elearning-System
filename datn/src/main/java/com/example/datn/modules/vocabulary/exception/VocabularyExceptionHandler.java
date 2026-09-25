@@ -15,13 +15,21 @@ import java.time.Instant;
 @RestControllerAdvice(basePackages = "com.example.datn.modules.vocabulary")
 public class VocabularyExceptionHandler {
 
-    @ExceptionHandler({TopicNotFoundException.class, VocabularyNotFoundException.class, ListNotFoundException.class})
+    @ExceptionHandler({
+            TopicNotFoundException.class,
+            VocabularyNotFoundException.class,
+            ListNotFoundException.class,
+            GameNotFoundException.class})
     public ResponseEntity<ApiErrorResponse> handleNotFound(RuntimeException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ApiErrorResponse(Instant.now(), 404, exception.getMessage()));
     }
 
-    @ExceptionHandler({InvalidSessionRequestException.class, InvalidListWordsException.class})
+    @ExceptionHandler({
+            InvalidSessionRequestException.class,
+            InvalidListWordsException.class,
+            InvalidPlayTokenException.class,
+            InvalidGameAnswerException.class})
     public ResponseEntity<ApiErrorResponse> handleInvalidRequest(RuntimeException exception) {
         return badRequest(exception.getMessage());
     }
