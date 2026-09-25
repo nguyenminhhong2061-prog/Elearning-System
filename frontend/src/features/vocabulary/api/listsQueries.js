@@ -61,12 +61,20 @@ export const useAddWordToList = (id) => useListMutation((vocabularyId) => addWor
 export const useAddNewWordToList = (id) => useListMutation((newWord) => addNewWordToList(id, newWord))
 export const useRemoveWordFromList = (id) => useListMutation((vocabularyId) => removeWordFromList(id, vocabularyId))
 
-/** Deleting also drops the list's own cache entries, so nothing tries to refetch a list that no longer exists. */
-export function useDeleteList(id) {
+/**
+ * Deleting also drops the list's own cache entries. The list page is usually still on screen when the request
+ * succeeds: if its queries lost their data while it renders again, they would refetch a list that no longer exists
+ * (404). So `onDeleted` runs first, typically to navigate away, and the cache is cleaned once the page is leaving.
+ *
+ * @param {number} id
+ * @param {{ onDeleted?: () => void }} [options]
+ */
+export function useDeleteList(id, { onDeleted } = {}) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: () => deleteCustomList(id),
     onSuccess: () => {
+      onDeleted?.()
       queryClient.removeQueries({ queryKey: listKeys.detail(id) })
       queryClient.invalidateQueries({ queryKey: listKeys.all })
       queryClient.invalidateQueries({ queryKey: learningKeys.all })
