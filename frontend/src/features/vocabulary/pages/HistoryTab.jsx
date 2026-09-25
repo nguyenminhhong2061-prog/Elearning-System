@@ -177,7 +177,7 @@ function ReviewedWords({ filterId, className }) {
         <>
           <WordList words={words} aside={ReviewState} />
           {history.hasNextPage && (
-            <Button variant="outline" loading={history.isFetchingNextPage} onClick={() => history.fetchNextPage()}>
+            <Button variant="outline" className="sm:min-w-60 sm:self-center" loading={history.isFetchingNextPage} onClick={() => history.fetchNextPage()}>
               {history.isFetchingNextPage ? 'Đang tải…' : `Xem thêm (còn ${formatCount(total - words.length)})`}
             </Button>
           )}

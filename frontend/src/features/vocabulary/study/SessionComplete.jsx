@@ -10,7 +10,7 @@ const DOT = { FORGOT: 'bg-review-forgot', VAGUE: 'bg-review-vague', REMEMBERED: 
  */
 export function SessionComplete({ results, backTo, backLabel, onContinue }) {
   return (
-    <div className="flex max-w-120 animate-screen-in flex-col items-center gap-4 rounded-2xl bg-sidebar-deep p-10 text-center">
+    <div className="mx-auto flex w-full max-w-120 animate-screen-in flex-col items-center gap-4 rounded-2xl bg-sidebar-deep p-10 text-center">
       <div className="flex size-25 items-center justify-center rounded-full border-6 border-brand text-title font-bold text-white">
         {results.length}
       </div>

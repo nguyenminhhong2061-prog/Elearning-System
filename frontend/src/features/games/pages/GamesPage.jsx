@@ -9,6 +9,9 @@ import { useGames } from '../api/gamesQueries'
 import { Leaderboard } from '../components/Leaderboard'
 import { GAME_TYPE_INFO } from '../constants'
 
+// One card per game, side by side as far as the width allows, sharing the whole column.
+const GAME_GRID = 'grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-3'
+
 function GameCard({ game }) {
   return (
     <li className="flex flex-col gap-3 rounded-xl border border-line bg-white p-5">
@@ -23,7 +26,7 @@ function GameCard({ game }) {
           {game.myBestScore === null ? 'Chưa chơi' : `Kỷ lục ${formatCount(game.myBestScore)}`}
         </Tag>
       </div>
-      <ButtonLink to={`/vocabulary/games/${game.id}`} size="sm" className="self-start" aria-label={`Chơi ${game.name}`}>
+      <ButtonLink to={`/vocabulary/games/${game.id}`} size="sm" className="mt-auto self-start" aria-label={`Chơi ${game.name}`}>
         Chơi →
       </ButtonLink>
     </li>
@@ -36,14 +39,20 @@ export function GamesPage() {
 
   let list
   if (games.isPending) {
-    list = Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="h-40 rounded-xl" />)
+    list = (
+      <div className={GAME_GRID}>
+        {Array.from({ length: 3 }, (_, index) => (
+          <Skeleton key={index} className="h-40 rounded-xl" />
+        ))}
+      </div>
+    )
   } else if (games.isError) {
     list = <LoadError error={games.error} onRetry={() => games.refetch()} message="Không tải được danh sách trò chơi." />
   } else if (games.data.length === 0) {
     list = <p className="text-sm text-muted">Chưa có trò chơi nào.</p>
   } else {
     list = (
-      <ul className="flex flex-col gap-3">
+      <ul className={GAME_GRID}>
         {games.data.map((game) => (
           <GameCard key={game.id} game={game} />
         ))}
@@ -65,8 +74,8 @@ export function GamesPage() {
       }
     >
       <div className="flex flex-wrap items-start gap-5">
-        <div className="flex flex-[1_1_432px] flex-col gap-3">{list}</div>
-        <Leaderboard className="flex-[1_1_320px]" />
+        <div className="flex min-w-0 flex-[3_1_432px] flex-col gap-3">{list}</div>
+        <Leaderboard className="flex-[1_1_320px] lg:max-w-110" />
       </div>
     </Page>
   )

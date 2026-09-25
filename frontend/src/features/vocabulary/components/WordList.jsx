@@ -30,6 +30,14 @@ function LevelTag(word) {
 
 const ROW = 'flex items-center gap-3 py-3.5'
 
+// The design's white box with one word per row. When the box is wide (a wide screen), the rows flow into two or three
+// columns, sized by the box itself (container queries), so the same list fits a narrow side column or a full page.
+// Every row has a bottom line; the white ::after strip covers the lines of the last row, whichever row that is.
+const BOX =
+  '@container relative rounded-xl border border-line bg-white px-5 py-1.5 after:absolute after:inset-x-0 after:bottom-1.5 after:h-px after:bg-white'
+const COLUMNS = 'grid gap-x-8 @3xl:grid-cols-2 @6xl:grid-cols-3'
+const ITEM = 'min-w-0 border-b border-canvas'
+
 /**
  * One word per row, as in the design's topic page: learned mark, "word — meaning", and the CEFR level.
  *
@@ -44,49 +52,53 @@ const ROW = 'flex items-center gap-3 py-3.5'
  */
 export function WordList({ words, describe, linkTo, linkState, aside = LevelTag }) {
   return (
-    <ul className="rounded-xl border border-line bg-white px-5 py-1.5">
-      {words.map((word) => {
-        const detail = describe?.(word)
-        const to = linkTo?.(word)
-        const content = (
-          <>
-            <LearnedMark status={word.learningStatus} />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-ink">
-                <span lang="en">{word.word}</span> — {word.meaning}
-              </p>
-              {detail && <p className="text-xs text-muted">{detail}</p>}
-            </div>
-            {aside(word)}
-          </>
-        )
+    <div className={BOX}>
+      <ul className={COLUMNS}>
+        {words.map((word) => {
+          const detail = describe?.(word)
+          const to = linkTo?.(word)
+          const content = (
+            <>
+              <LearnedMark status={word.learningStatus} />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-ink">
+                  <span lang="en">{word.word}</span> — {word.meaning}
+                </p>
+                {detail && <p className="text-xs text-muted">{detail}</p>}
+              </div>
+              {aside(word)}
+            </>
+          )
 
-        return (
-          <li key={word.id} className="border-b border-canvas last:border-b-0">
-            {to ? (
-              <Link to={to} state={linkState} className={cx(ROW, 'rounded-md hover:bg-surface-alt')}>
-                {content}
-              </Link>
-            ) : (
-              <div className={ROW}>{content}</div>
-            )}
-          </li>
-        )
-      })}
-    </ul>
+          return (
+            <li key={word.id} className={ITEM}>
+              {to ? (
+                <Link to={to} state={linkState} className={cx(ROW, 'rounded-md hover:bg-surface-alt')}>
+                  {content}
+                </Link>
+              ) : (
+                <div className={ROW}>{content}</div>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
   )
 }
 
-export function WordListSkeleton({ rows = 5 }) {
+export function WordListSkeleton({ rows = 6 }) {
   return (
-    <div aria-hidden="true" className="rounded-xl border border-line bg-white px-5 py-1.5">
-      {Array.from({ length: rows }, (_, index) => (
-        <div key={index} className="flex items-center gap-3 border-b border-canvas py-3.5 last:border-b-0">
-          <Skeleton className="size-5 rounded-full" />
-          <Skeleton className="h-4 flex-1" />
-          <Skeleton className="h-5 w-8 rounded-full" />
-        </div>
-      ))}
+    <div aria-hidden="true" className={BOX}>
+      <div className={COLUMNS}>
+        {Array.from({ length: rows }, (_, index) => (
+          <div key={index} className={cx(ITEM, 'flex items-center gap-3 py-3.5')}>
+            <Skeleton className="size-5 rounded-full" />
+            <Skeleton className="h-4 flex-1" />
+            <Skeleton className="h-5 w-8 rounded-full" />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

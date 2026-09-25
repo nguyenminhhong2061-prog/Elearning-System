@@ -9,6 +9,9 @@ import { useStudySession } from '../api/learningQueries'
 import { parseId, VOCABULARY_PATH } from '../routeParams'
 import { FlashcardSession } from '../study/FlashcardSession'
 
+// The flashcard column: 520px as in the design, larger on big screens so the card does not look lost in the window.
+const SESSION_WIDTH = '2xl:max-w-180'
+
 // Where a session's cards come from, and where "back" leads. `param` names the id in the URL.
 const MODES = {
   topic: { param: 'topicId', back: (id) => `/vocabulary/topics/${id}`, backLabel: 'Về chủ đề', title: 'Học chủ đề' },
@@ -18,7 +21,7 @@ const MODES = {
 
 function Message({ title, backTo, backLabel, children }) {
   return (
-    <Page title={title} width="narrow">
+    <Page title={title} width="focus">
       <Card className="flex flex-col items-start gap-4">
         <p className="text-sm text-muted">{children}</p>
         <ButtonLink to={backTo} variant="outline" size="sm">
@@ -56,16 +59,21 @@ export function StudySessionPage({ mode }) {
 
   if (session.isPending) {
     return (
-      <Page title={config.title} width="narrow" heading={<h1 className="sr-only">Đang chuẩn bị phiên học</h1>}>
+      <Page
+        title={config.title}
+        width="focus"
+        className={SESSION_WIDTH}
+        heading={<h1 className="sr-only">Đang chuẩn bị phiên học</h1>}
+      >
         <Skeleton className="h-1.5 w-full rounded-full" />
-        <Skeleton className="h-77 w-full rounded-2xl" />
+        <Skeleton className="h-77 w-full rounded-2xl 2xl:h-100" />
       </Page>
     )
   }
 
   if (session.isError) {
     return (
-      <Page title={config.title} width="narrow">
+      <Page title={config.title} width="focus">
         <LoadError error={session.error} onRetry={() => session.refetch()} message="Không tải được phiên học. Vui lòng thử lại." />
         <Link to={backTo} className="text-label font-medium">
           ← {config.backLabel}
@@ -88,7 +96,7 @@ export function StudySessionPage({ mode }) {
   }
 
   return (
-    <Page title={title} width="narrow" heading={<h1 className="sr-only">{title}</h1>}>
+    <Page title={title} width="focus" className={SESSION_WIDTH} heading={<h1 className="sr-only">{title}</h1>}>
       <FlashcardSession
         key={`${JSON.stringify(source)}:${round}`}
         cards={cards}

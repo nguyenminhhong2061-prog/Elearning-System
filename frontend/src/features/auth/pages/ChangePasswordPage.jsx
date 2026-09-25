@@ -50,8 +50,8 @@ export function ChangePasswordPage() {
   }
 
   return (
-    <Page title="Đổi mật khẩu">
-      <Card className="flex max-w-120 flex-col gap-5 p-6 sm:p-8">
+    <Page title="Đổi mật khẩu" width="focus">
+      <Card className="flex flex-col gap-5 p-6 sm:p-8">
         {succeeded && <Alert variant="success">Đã đổi mật khẩu thành công.</Alert>}
         {submitError && <Alert variant="error">{submitError}</Alert>}
 

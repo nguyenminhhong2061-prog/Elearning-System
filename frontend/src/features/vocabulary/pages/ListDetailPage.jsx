@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card'
 import { Dialog } from '@/components/ui/Dialog'
 import { LoadError } from '@/components/ui/LoadError'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { cx } from '@/lib/cx'
 import { useCustomList, useDeleteList, useListWords, useRemoveWordFromList, useRenameList } from '../api/listsQueries'
 import { WordList, WordListSkeleton } from '../components/WordList'
 import { studyableCount } from '../constants'
@@ -100,17 +101,20 @@ function DeleteDialog({ list, open, onClose }) {
   )
 }
 
+// Full width under the title on small screens, beside the title on large ones (like the topic page).
+const ACTION_WIDTH = 'w-full lg:w-auto lg:min-w-80 lg:max-w-100'
+
 function StudyAction({ list }) {
   if (list.wordCount === 0) return null
   if (studyableCount(list) === 0) {
     return (
-      <p className="rounded-lg border border-dashed border-line px-4 py-3 text-label text-muted">
+      <p className={cx(ACTION_WIDTH, 'rounded-lg border border-dashed border-line px-4 py-3 text-label text-muted')}>
         Bạn đã học hết danh sách này. Các từ sẽ được nhắc ôn lại theo lịch.
       </p>
     )
   }
   return (
-    <ButtonLink to={`/vocabulary/lists/${list.id}/study`} className="w-full">
+    <ButtonLink to={`/vocabulary/lists/${list.id}/study`} className={ACTION_WIDTH}>
       Học danh sách này →
     </ButtonLink>
   )
@@ -128,7 +132,7 @@ function ListWords({ listId, query }) {
   if (words.length === 0) {
     return (
       <Card>
-        <p className="text-sm text-muted">Danh sách chưa có từ nào. Hãy thêm từ ở bên dưới.</p>
+        <p className="text-sm text-muted">Danh sách chưa có từ nào. Hãy thêm từ trong khung “Thêm từ vào danh sách”.</p>
       </Card>
     )
   }
@@ -154,7 +158,7 @@ function ListWords({ listId, query }) {
         <Alert variant="error">{describeApiError(removeWord.error, 'Chưa bỏ được từ. Vui lòng thử lại.')}</Alert>
       )}
       {query.hasNextPage && (
-        <Button variant="outline" loading={query.isFetchingNextPage} onClick={() => query.fetchNextPage()}>
+        <Button variant="outline" className="sm:min-w-60 sm:self-center" loading={query.isFetchingNextPage} onClick={() => query.fetchNextPage()}>
           Xem thêm từ
         </Button>
       )}
@@ -175,7 +179,7 @@ export function ListDetailPage() {
     return (
       <Page
         title="Không tìm thấy danh sách"
-        width="narrow"
+        width="focus"
         heading={
           <div className="flex flex-col gap-2">
             <BackLink />
@@ -192,7 +196,7 @@ export function ListDetailPage() {
 
   if (listQuery.isError) {
     return (
-      <Page title="Danh sách của tôi" width="narrow" heading={<BackLink />}>
+      <Page title="Danh sách của tôi" width="focus" heading={<BackLink />}>
         <h1 className="sr-only">Danh sách của tôi</h1>
         <LoadError error={listQuery.error} onRetry={() => listQuery.refetch()} message="Không tải được danh sách." />
       </Page>
@@ -205,7 +209,6 @@ export function ListDetailPage() {
   return (
     <Page
       title={list?.name ?? 'Danh sách của tôi'}
-      width="narrow"
       heading={
         <div className="flex flex-col gap-2">
           <BackLink />
@@ -220,30 +223,37 @@ export function ListDetailPage() {
               <RenameForm list={list} onDone={() => setEditing(false)} />
             </>
           ) : (
-            <>
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <h1 className="text-[22px] leading-7 font-bold break-words text-ink">{list.name}</h1>
-                <div className="flex gap-1">
-                  <button type="button" onClick={() => setEditing(true)} className={`${TEXT_BUTTON} text-brand-dark`}>
-                    Đổi tên
-                  </button>
-                  <button type="button" onClick={() => setConfirmingDelete(true)} className={`${TEXT_BUTTON} text-danger`}>
-                    Xóa
-                  </button>
+            <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
+              <div className="flex min-w-0 flex-col gap-2">
+                <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 lg:justify-start">
+                  <h1 className="text-[22px] leading-7 font-bold break-words text-ink">{list.name}</h1>
+                  <div className="flex gap-1">
+                    <button type="button" onClick={() => setEditing(true)} className={`${TEXT_BUTTON} text-brand-dark`}>
+                      Đổi tên
+                    </button>
+                    <button type="button" onClick={() => setConfirmingDelete(true)} className={`${TEXT_BUTTON} text-danger`}>
+                      Xóa
+                    </button>
+                  </div>
                 </div>
+                <p className="text-label text-muted">
+                  {formatCount(list.wordCount)} từ
+                  {list.wordCount > 0 && ` · Đã học ${formatCount(list.learnedCount)} / ${formatCount(list.wordCount)} từ`}
+                </p>
               </div>
-              <p className="text-label text-muted">
-                {formatCount(list.wordCount)} từ
-                {list.wordCount > 0 && ` · Đã học ${formatCount(list.learnedCount)} / ${formatCount(list.wordCount)} từ`}
-              </p>
-            </>
+              <StudyAction list={list} />
+            </div>
           )}
         </div>
       }
     >
-      {list && <StudyAction list={list} />}
-      <ListWords listId={listId} query={wordsQuery} />
-      {list && <AddWordsPanel listId={listId} wordIdsInList={wordIdsInList} />}
+      {/* The words, and beside them on wide screens (below on small ones) the panel to add more. */}
+      <div className="flex flex-wrap items-start gap-5">
+        <div className="flex min-w-0 flex-[2_1_480px] flex-col gap-3">
+          <ListWords listId={listId} query={wordsQuery} />
+        </div>
+        {list && <AddWordsPanel listId={listId} wordIdsInList={wordIdsInList} className="min-w-0 flex-[1_1_340px]" />}
+      </div>
       {list && <DeleteDialog list={list} open={confirmingDelete} onClose={() => setConfirmingDelete(false)} />}
     </Page>
   )
