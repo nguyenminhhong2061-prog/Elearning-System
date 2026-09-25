@@ -1,5 +1,6 @@
 import { todayInVietnam } from '../src/lib/dates.js'
 import { delay, HttpError, readJson, send, sendError, userIdFromToken } from './http.js'
+import { gameRoutes } from './routes/games.js'
 import { learningRoutes } from './routes/learning.js'
 import { findList, listRoutes } from './routes/lists.js'
 import { vocabularyRoutes } from './routes/vocabulary.js'
@@ -11,7 +12,7 @@ import { userState } from './store.js'
 
 const LATENCY_MS = 250 // makes the loading states visible
 
-const ROUTES = [...vocabularyRoutes, ...learningRoutes({ findList }), ...listRoutes]
+const ROUTES = [...vocabularyRoutes, ...learningRoutes({ findList }), ...listRoutes, ...gameRoutes]
 
 function findRoute(method, pathname) {
   for (const route of ROUTES) {

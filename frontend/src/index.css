@@ -69,6 +69,10 @@
   /* Outline of buttons on dark surfaces (session complete card). */
   --color-sidebar-line: #3A4A46;
 
+  /* Word-match game: the tile being picked (design's orange pair, 6.9:1). */
+  --color-game-picked: #FDBA74;
+  --color-game-picked-text: #7C2D12;
+
   --animate-screen-in: screen-in 0.32s ease;
   @keyframes screen-in {
     from {

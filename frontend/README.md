@@ -75,7 +75,8 @@ frontend/
     │   └── layout/            # AppLayout (thanh bên), Page, AuthLayout, navItems.js
     ├── features/
     │   ├── auth/              # đăng nhập, đăng ký, đổi mật khẩu, AuthProvider, useAuth, route guard
-    │   └── vocabulary/        # module A: danh sách chủ đề, chi tiết chủ đề (api/, components/, pages/)
+    │   ├── vocabulary/        # module A: chủ đề, học flashcard (study/), nhắc ôn, lịch sử, danh sách riêng (lists/)
+    │   └── games/             # module A (A4): trò chơi từ vựng và bảng xếp hạng
     ├── pages/                 # trang chung: HomePage, ComingSoonPage, NotFoundPage, ForbiddenPage
     ├── lib/                   # hàm tiện ích nhỏ
     └── test/                  # setup.js, fakeBackend.js (giả lập backend cho test)
