@@ -65,6 +65,21 @@ class VocabularyPostgresIntegrationTests extends AbstractPostgresIntegrationTest
     }
 
     @Test
+    void seedGivesEveryTopicTwentyToThirtyWords() throws Exception {
+        String topics = mockMvc.perform(get("/api/topics").with(TestAuth.learner(createLearner())))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        List<String> seeded = List.of("Kinh doanh", "Du lịch", "Y tế", "Công nghệ", "Giáo dục", "Thể thao",
+                "Đời sống hằng ngày", "Môi trường");
+        assertThat(JsonPath.<List<String>>read(topics, "$[*].name")).containsSubsequence(seeded);
+        for (String name : seeded) {
+            List<Integer> wordCount = JsonPath.read(topics, "$[?(@.name == '" + name + "')].wordCount");
+            assertThat(wordCount).as(name).singleElement().satisfies(count -> assertThat(count).isBetween(20, 30));
+        }
+    }
+
+    @Test
     void searchRunsWithAndWithoutEachOptionalFilter() throws Exception {
         long learner = createLearner();
         long business = topicId("Kinh doanh");

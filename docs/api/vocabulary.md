@@ -113,4 +113,6 @@ Thân yêu cầu giữ nguyên như hiện tại. **Chỉ `ADMIN`**; learner nh�
    nằm trong module `vocabulary` (cả module A ở một module, tránh phụ thuộc vòng); Phase 2 chỉ đọc.
 3. `q` (thoát ký tự `%` và `_`), `level`, phân trang, thứ tự A1 → C2; `PageResponse` ở `common.dto`.
 4. `@PreAuthorize("hasRole('ADMIN')")` cho các endpoint ghi.
-5. Migration seed `V202609251600__seed_topics_and_vocabulary.sql`, sinh từ `frontend/mock/vocabularyFixtures.js`.
+5. Dữ liệu seed: `V202609251600__seed_topics_and_vocabulary.sql` (6 chủ đề, 74 từ, sinh từ
+   `frontend/mock/vocabularyFixtures.js`) và `V202609251700__seed_more_vocabulary.sql` (thêm 106 từ và 2 chủ đề).
+   Tổng cộng 8 chủ đề, 180 từ, mỗi chủ đề 22–26 từ. Dữ liệu giả của frontend giữ bộ nhỏ vì test frontend dựa vào nó.
