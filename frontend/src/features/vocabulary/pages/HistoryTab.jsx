@@ -116,13 +116,19 @@ function Stats({ summary, chosen }) {
   )
 }
 
+/**
+ * Built like the word list beside it (heading above a white box, same paddings), so on wide screens both headings
+ * and both boxes line up.
+ */
 function Upcoming({ days, className }) {
   const tomorrow = addDays(todayInVietnam(), 1)
 
   return (
-    <Card className={cx('flex flex-col gap-2', className)}>
-      <h2 className="text-lg font-semibold text-ink">Lịch ôn 7 ngày tới</h2>
-      <ul>
+    <section aria-labelledby="upcoming-reviews" className={cx('flex flex-col gap-3', className)}>
+      <h2 id="upcoming-reviews" className="text-lg font-semibold text-ink">
+        Lịch ôn 7 ngày tới
+      </h2>
+      <ul className="rounded-xl border border-line bg-white px-5 py-1.5">
         {days.map((day) => (
           <li key={day.date} className="flex items-center justify-between border-b border-canvas py-2.5 text-sm last:border-b-0">
             <span className="text-ink-soft">
@@ -134,7 +140,7 @@ function Upcoming({ days, className }) {
           </li>
         ))}
       </ul>
-    </Card>
+    </section>
   )
 }
 
