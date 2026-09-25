@@ -74,6 +74,9 @@ Trả `200` với một `Topic`; `404` nếu không có.
 
 ### `GET /api/vocabulary`
 
+Chỉ gồm các từ người dùng được thấy: từ hệ thống (`createdBy` là `null`) và từ chính họ tự nhập vào danh sách riêng
+(Phase 4, `docs/api/custom-lists.md`). `GET /api/vocabulary/{id}` trả `404` với từ tự nhập của người khác.
+
 | Tham số | Mặc định | Ý nghĩa |
 |---|---|---|
 | `topicId` | không lọc | Chỉ lấy từ của chủ đề này |

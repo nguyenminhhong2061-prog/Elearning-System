@@ -66,17 +66,36 @@ public class VocabularyService {
         return mapper.toResponse(repository.save(vocabulary), LearningStatus.NEW);
     }
 
-    /** One page of words matching the optional filters, easiest first (see VocabularyRepository#search). */
+    /**
+     * One page of the words the current user can see (system words and their own) matching the optional filters,
+     * easiest first (see VocabularyRepository#search).
+     */
     @Transactional(readOnly = true)
     public PageResponse<VocabularyResponse> search(Long topicId, String q, CefrLevel level, int page, int size) {
-        Page<Vocabulary> words = repository.search(topicId, level, toLikePattern(q), PageRequest.of(page, size));
+        Page<Vocabulary> words = repository.search(
+                currentUser.id(), topicId, level, toLikePattern(q), PageRequest.of(page, size));
+        return toPage(words);
+    }
+
+    /** A word another learner typed in is "not found" for everyone else, like a missing word. */
+    @Transactional(readOnly = true)
+    public VocabularyResponse findById(Long id) {
+        Vocabulary vocabulary = findEntity(id);
+        if (!vocabulary.isVisibleTo(currentUser.id())) {
+            throw new VocabularyNotFoundException(id);
+        }
+        return toResponse(vocabulary);
+    }
+
+    /** VocabularyItem responses of a page of words, with the current user's statuses read in one query. */
+    public PageResponse<VocabularyResponse> toPage(Page<Vocabulary> words) {
         Map<Long, LearningStatus> statuses = statusesOf(words.getContent().stream().map(Vocabulary::getId).toList());
         return PageResponse.from(words, word -> toResponse(word, statuses));
     }
 
-    @Transactional(readOnly = true)
-    public VocabularyResponse findById(Long id) {
-        return toResponse(findEntity(id));
+    /** The VocabularyItem response of one word, with the current user's status. */
+    public VocabularyResponse toResponse(Vocabulary vocabulary) {
+        return toResponse(vocabulary, statusesOf(List.of(vocabulary.getId())));
     }
 
     public VocabularyResponse update(Long id, UpdateVocabularyRequest request) {
@@ -106,10 +125,6 @@ public class VocabularyService {
         if (topicId != null && !topicRepository.existsById(topicId)) {
             throw new TopicNotFoundException(topicId);
         }
-    }
-
-    private VocabularyResponse toResponse(Vocabulary vocabulary) {
-        return toResponse(vocabulary, statusesOf(List.of(vocabulary.getId())));
     }
 
     private VocabularyResponse toResponse(Vocabulary vocabulary, Map<Long, LearningStatus> statuses) {

@@ -141,8 +141,7 @@ class LearningApiTests {
         asLearner(get("/api/learning/session").param("topicId", "999999"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));
-        // Personal lists arrive with Phase 4: until then, no list exists.
-        asLearner(get("/api/learning/session").param("listId", "1")).andExpect(status().isNotFound());
+        asLearner(get("/api/learning/session").param("listId", "999999")).andExpect(status().isNotFound());
     }
 
     @Test

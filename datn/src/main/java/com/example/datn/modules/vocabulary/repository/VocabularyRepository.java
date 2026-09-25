@@ -13,6 +13,11 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 
+/**
+ * Every query that lists words for a user applies the visibility rule of docs/api/custom-lists.md: system words
+ * (created_by NULL) plus the words that user typed in ({@code v.createdBy is null or v.createdBy = :userId}), the
+ * same rule as {@link Vocabulary#isVisibleTo}.
+ */
 public interface VocabularyRepository extends JpaRepository<Vocabulary, Long> {
 
     /**
@@ -24,7 +29,8 @@ public interface VocabularyRepository extends JpaRepository<Vocabulary, Long> {
      */
     @Query("""
             select v from Vocabulary v
-            where (:topicId is null or v.topicId = :topicId)
+            where (v.createdBy is null or v.createdBy = :userId)
+              and (:topicId is null or v.topicId = :topicId)
               and (:level is null or v.difficultyLevel = :level)
               and (:pattern is null
                    or lower(v.word) like :pattern escape '!'
@@ -32,6 +38,7 @@ public interface VocabularyRepository extends JpaRepository<Vocabulary, Long> {
             order by v.difficultyLevel, lower(v.word), v.id
             """)
     Page<Vocabulary> search(
+            @Param("userId") Long userId,
             @Param("topicId") Long topicId,
             @Param("level") CefrLevel level,
             @Param("pattern") String pattern,
@@ -50,6 +57,7 @@ public interface VocabularyRepository extends JpaRepository<Vocabulary, Long> {
             from Vocabulary v
             left join UserVocabulary uv on uv.vocabularyId = v.id and uv.userId = :userId
             where v.topicId in :topicIds
+              and (v.createdBy is null or v.createdBy = :userId)
             group by v.topicId
             """)
     List<TopicWordCounts> countByTopic(
@@ -65,6 +73,7 @@ public interface VocabularyRepository extends JpaRepository<Vocabulary, Long> {
     @Query("""
             select v from Vocabulary v
             where v.topicId = :topicId
+              and (v.createdBy is null or v.createdBy = :userId)
               and not exists (
                   select 1 from UserVocabulary uv
                   where uv.vocabularyId = v.id and uv.userId = :userId and uv.status <> :newStatus)
@@ -72,6 +81,39 @@ public interface VocabularyRepository extends JpaRepository<Vocabulary, Long> {
             """)
     List<Vocabulary> findNewInTopic(
             @Param("topicId") Long topicId,
+            @Param("userId") Long userId,
+            @Param("newStatus") LearningStatus newStatus,
+            Pageable pageable);
+
+    /** The words of a personal list the user can see, in the same easiest-first order as {@link #search}. */
+    @Query(value = """
+            select v from Vocabulary v
+            where v.id in (select i.id.vocabularyId from CustomVocabularyListItem i where i.id.listId = :listId)
+              and (v.createdBy is null or v.createdBy = :userId)
+            order by v.difficultyLevel, lower(v.word), v.id
+            """,
+            countQuery = """
+            select count(v) from Vocabulary v
+            where v.id in (select i.id.vocabularyId from CustomVocabularyListItem i where i.id.listId = :listId)
+              and (v.createdBy is null or v.createdBy = :userId)
+            """)
+    Page<Vocabulary> findInList(
+            @Param("listId") Long listId,
+            @Param("userId") Long userId,
+            Pageable pageable);
+
+    /** Words of a personal list the user has not started, easiest first, like {@link #findNewInTopic}. */
+    @Query("""
+            select v from Vocabulary v
+            where v.id in (select i.id.vocabularyId from CustomVocabularyListItem i where i.id.listId = :listId)
+              and (v.createdBy is null or v.createdBy = :userId)
+              and not exists (
+                  select 1 from UserVocabulary uv
+                  where uv.vocabularyId = v.id and uv.userId = :userId and uv.status <> :newStatus)
+            order by v.difficultyLevel, lower(v.word), v.id
+            """)
+    List<Vocabulary> findNewInList(
+            @Param("listId") Long listId,
             @Param("userId") Long userId,
             @Param("newStatus") LearningStatus newStatus,
             Pageable pageable);

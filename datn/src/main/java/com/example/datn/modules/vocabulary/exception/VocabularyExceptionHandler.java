@@ -21,13 +21,13 @@ public class VocabularyExceptionHandler {
                 .body(new ApiErrorResponse(Instant.now(), 404, exception.getMessage()));
     }
 
-    @ExceptionHandler(InvalidSessionRequestException.class)
-    public ResponseEntity<ApiErrorResponse> handleInvalidSession(InvalidSessionRequestException exception) {
+    @ExceptionHandler({InvalidSessionRequestException.class, InvalidListWordsException.class})
+    public ResponseEntity<ApiErrorResponse> handleInvalidRequest(RuntimeException exception) {
         return badRequest(exception.getMessage());
     }
 
-    @ExceptionHandler(ConcurrentReviewException.class)
-    public ResponseEntity<ApiErrorResponse> handleConcurrentReview(ConcurrentReviewException exception) {
+    @ExceptionHandler({ConcurrentReviewException.class, WordAlreadyInListException.class})
+    public ResponseEntity<ApiErrorResponse> handleConflict(RuntimeException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ApiErrorResponse(Instant.now(), 409, exception.getMessage()));
     }

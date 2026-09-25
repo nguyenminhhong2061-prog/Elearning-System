@@ -71,6 +71,7 @@ private final CurrentUser currentUser;   // inject qua constructor
 
 Long userId = currentUser.id();          // users.id của người đang gọi API
 boolean admin = currentUser.isAdmin();
+Optional<CefrLevel> level = currentUser.currentLevel();   // users.current_level, rỗng khi chưa có (đọc DB mỗi lần gọi)
 ```
 
 Giới hạn theo vai trò bằng `@PreAuthorize("hasRole('ADMIN')")` trên phương thức controller hoặc service.

@@ -10,6 +10,7 @@ import com.example.datn.modules.vocabulary.dto.response.LearningSummaryResponse.
 import com.example.datn.modules.vocabulary.dto.response.ReviewResponse;
 import com.example.datn.modules.vocabulary.dto.response.StudySessionResponse;
 import com.example.datn.modules.vocabulary.dto.response.StudySessionResponse.Source;
+import com.example.datn.modules.vocabulary.entity.CustomVocabularyList;
 import com.example.datn.modules.vocabulary.entity.Topic;
 import com.example.datn.modules.vocabulary.entity.UserVocabulary;
 import com.example.datn.modules.vocabulary.entity.Vocabulary;
@@ -18,7 +19,6 @@ import com.example.datn.modules.vocabulary.enums.ReviewResult;
 import com.example.datn.modules.vocabulary.enums.SessionType;
 import com.example.datn.modules.vocabulary.exception.ConcurrentReviewException;
 import com.example.datn.modules.vocabulary.exception.InvalidSessionRequestException;
-import com.example.datn.modules.vocabulary.exception.ListNotFoundException;
 import com.example.datn.modules.vocabulary.exception.TopicNotFoundException;
 import com.example.datn.modules.vocabulary.exception.VocabularyNotFoundException;
 import com.example.datn.modules.vocabulary.mapper.LearningCardMapper;
@@ -59,6 +59,7 @@ public class LearningService {
     private final CurrentUser currentUser;
     private final LearningCardMapper mapper;
     private final ApplicationEventPublisher events;
+    private final CustomListService customListService;
 
     public LearningService(
             TopicRepository topicRepository,
@@ -68,7 +69,8 @@ public class LearningService {
             StudyCalendar calendar,
             CurrentUser currentUser,
             LearningCardMapper mapper,
-            ApplicationEventPublisher events) {
+            ApplicationEventPublisher events,
+            CustomListService customListService) {
         this.topicRepository = topicRepository;
         this.vocabularyRepository = vocabularyRepository;
         this.progressRepository = progressRepository;
@@ -77,30 +79,38 @@ public class LearningService {
         this.currentUser = currentUser;
         this.mapper = mapper;
         this.events = events;
+        this.customListService = customListService;
     }
 
     /**
-     * Up to {@code size} cards: the due words first (VAGUE first, then the longest overdue), then, for a topic, the
-     * words never studied, easiest first. Words learned but not yet due are left out. Without a topic or list, only
-     * the due words of every topic and list (review mode).
+     * Up to {@code size} cards: the due words first (VAGUE first, then the longest overdue), then, for a topic or a
+     * personal list, the words never studied, easiest first. Words learned but not yet due are left out. Without a
+     * topic or list, only the due words of every topic and list (review mode).
      */
     @Transactional(readOnly = true)
     public StudySessionResponse session(Long topicId, Long listId, int size) {
         if (topicId != null && listId != null) {
             throw new InvalidSessionRequestException("Send topicId or listId, not both");
         }
-        if (listId != null) {
-            // Personal lists come with Phase 4 (docs/api/custom-lists.md); until then no list exists.
-            throw new ListNotFoundException(listId);
-        }
         Long userId = currentUser.id();
         LocalDate today = calendar.today();
+        if (listId != null) {
+            CustomVocabularyList list = customListService.requireOwnList(listId);
+            List<LearningCardResponse> cards = new ArrayList<>(dueCards(userId, null, list.getId(), today, size));
+            if (cards.size() < size) {
+                vocabularyRepository
+                        .findNewInList(list.getId(), userId, LearningStatus.NEW, PageRequest.of(0, size - cards.size()))
+                        .forEach(word -> cards.add(mapper.toCard(word, null)));
+            }
+            return new StudySessionResponse(new Source(SessionType.LIST, list.getId(), list.getName()), cards);
+        }
         if (topicId == null) {
-            return new StudySessionResponse(new Source(SessionType.DUE, null, null), dueCards(userId, null, today, size));
+            return new StudySessionResponse(
+                    new Source(SessionType.DUE, null, null), dueCards(userId, null, null, today, size));
         }
 
         Topic topic = topicRepository.findById(topicId).orElseThrow(() -> new TopicNotFoundException(topicId));
-        List<LearningCardResponse> cards = new ArrayList<>(dueCards(userId, topicId, today, size));
+        List<LearningCardResponse> cards = new ArrayList<>(dueCards(userId, topicId, null, today, size));
         if (cards.size() < size) {
             vocabularyRepository
                     .findNewInTopic(topicId, userId, LearningStatus.NEW, PageRequest.of(0, size - cards.size()))
@@ -175,8 +185,9 @@ public class LearningService {
         return PageResponse.from(words, mapper::toCard);
     }
 
-    private List<LearningCardResponse> dueCards(Long userId, Long topicId, LocalDate today, int size) {
-        return progressRepository.findDue(userId, topicId, today, ReviewResult.VAGUE, PageRequest.of(0, size)).stream()
+    private List<LearningCardResponse> dueCards(Long userId, Long topicId, Long listId, LocalDate today, int size) {
+        return progressRepository.findDue(userId, topicId, listId, today, ReviewResult.VAGUE, PageRequest.of(0, size))
+                .stream()
                 .map(mapper::toCard)
                 .toList();
     }

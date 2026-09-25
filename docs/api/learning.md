@@ -1,8 +1,7 @@
 # API học flashcard và ôn tập (Phase 3: A1, A2) — contract
 
 > Trạng thái: **frontend và backend đã làm theo tài liệu này** (backend: `LearningController` trong module
-> `vocabulary`), trừ `listId` sẽ có ở Phase 4 (hiện trả `404`). `npm run dev:mock` trong `frontend/` vẫn dùng được khi
-> cần dữ liệu giả. Quy ước chung (xác thực, lỗi, enum chữ hoa, `PageResponse`, `VocabularyItem`) giống
+> `vocabulary`; `listId` có từ Phase 4). `npm run dev:mock` trong `frontend/` vẫn dùng được khi cần dữ liệu giả. Quy ước chung (xác thực, lỗi, enum chữ hoa, `PageResponse`, `VocabularyItem`) giống
 > `docs/api/vocabulary.md`.
 
 ## Đánh giá thẻ: 3 mức (đã chốt 25/09/2026)
