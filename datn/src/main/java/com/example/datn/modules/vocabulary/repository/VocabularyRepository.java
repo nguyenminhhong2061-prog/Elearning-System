@@ -57,4 +57,22 @@ public interface VocabularyRepository extends JpaRepository<Vocabulary, Long> {
             @Param("userId") Long userId,
             @Param("learned") Collection<LearningStatus> learned,
             @Param("today") LocalDate today);
+
+    /**
+     * Words of a topic the user has not started (no progress row, or one still NEW), in the same easiest-first order as
+     * {@link #search}.
+     */
+    @Query("""
+            select v from Vocabulary v
+            where v.topicId = :topicId
+              and not exists (
+                  select 1 from UserVocabulary uv
+                  where uv.vocabularyId = v.id and uv.userId = :userId and uv.status <> :newStatus)
+            order by v.difficultyLevel, lower(v.word), v.id
+            """)
+    List<Vocabulary> findNewInTopic(
+            @Param("topicId") Long topicId,
+            @Param("userId") Long userId,
+            @Param("newStatus") LearningStatus newStatus,
+            Pageable pageable);
 }

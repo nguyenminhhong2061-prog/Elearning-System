@@ -310,11 +310,12 @@ class VocabularyApiTests {
         return ((Number) JsonPath.read(body, "$.id")).longValue();
     }
 
-    /** A user_vocabulary row, as the flashcard sessions of Phase 3 will write it. */
+    /** A user_vocabulary row; words already studied count one review. */
     private void progress(long userId, long vocabularyId, String status, LocalDate nextReviewAt) {
-        jdbcTemplate.update(
-                "insert into user_vocabulary (user_id, vocabulary_id, status, next_review_at) values (?, ?, ?, ?)",
-                userId, vocabularyId, status, nextReviewAt);
+        jdbcTemplate.update("""
+                insert into user_vocabulary (user_id, vocabulary_id, status, review_count, next_review_at)
+                values (?, ?, ?, ?, ?)
+                """, userId, vocabularyId, status, "new".equals(status) ? 0 : 1, nextReviewAt);
     }
 
     private String vocabularyJson(Long topicId, String word, String meaning, String level) {

@@ -1,8 +1,9 @@
 # API học flashcard và ôn tập (Phase 3: A1, A2) — contract
 
-> Trạng thái: **đã chốt cho frontend, backend chưa làm.** Frontend (`frontend/src/features/vocabulary/`) viết theo
-> tài liệu này; `npm run dev:mock` trong `frontend/` trả dữ liệu giả đúng định dạng. Quy ước chung (xác thực, lỗi,
-> enum chữ hoa, `PageResponse`, `VocabularyItem`) giống `docs/api/vocabulary.md`.
+> Trạng thái: **frontend và backend đã làm theo tài liệu này** (backend: `LearningController` trong module
+> `vocabulary`), trừ `listId` sẽ có ở Phase 4 (hiện trả `404`). `npm run dev:mock` trong `frontend/` vẫn dùng được khi
+> cần dữ liệu giả. Quy ước chung (xác thực, lỗi, enum chữ hoa, `PageResponse`, `VocabularyItem`) giống
+> `docs/api/vocabulary.md`.
 
 ## Đánh giá thẻ: 3 mức (đã chốt 25/09/2026)
 
@@ -97,7 +98,9 @@ Trả `200`:
 ```
 
 Mỗi thẻ được lưu **ngay khi đánh giá**, nên người học thoát giữa phiên vẫn giữ tiến độ các từ đã đánh giá (ngoại lệ
-của A1). `400` nếu `result` sai; `404` nếu từ không tồn tại hoặc người dùng không được thấy.
+của A1). `400` nếu `result` sai; `404` nếu từ không tồn tại hoặc người dùng không được thấy. `409` khi hai lần đánh
+giá **đầu tiên** của cùng một từ đến cùng lúc (ví dụ từ hai tab): ràng buộc `UNIQUE (user_id, vocabulary_id)` chặn lần
+thứ hai, đánh giá lại thì thành công (frontend hiện "Vui lòng đánh giá lại" cho mọi lỗi khi lưu).
 
 ### `GET /api/learning/summary` — nhắc ôn và thống kê
 
@@ -140,10 +143,37 @@ sai giá trị.
 
 Sau mỗi lần đánh giá, frontend làm mới dữ liệu chủ đề, danh sách và thống kê (số từ đã học thay đổi).
 
-## Việc backend Phase 3 cần làm
+## Cho module khác: sự kiện `WordReviewedEvent`
 
-1. Migration thêm cột bậc ôn (ví dụ `interval_days`) vào `user_vocabulary`.
-2. Entity `UserVocabulary` với converter chữ thường cho `status` và `last_review_result` (dùng `LowercaseEnumConverter`).
-3. Scheduler thuần logic theo bảng trên, có unit test (bậc, trạng thái, ngày theo giờ Việt Nam).
-4. Bốn endpoint trên, lấy người dùng qua `CurrentUser`; `history` có bộ lọc `status` và `reviewedToday`.
-5. Phát sự kiện `WordReviewedEvent` sau mỗi lần đánh giá để module Tiến độ (Nhân) tự cập nhật `user_progress`.
+Mỗi lần `POST /api/learning/reviews` thành công, module `vocabulary` phát `common.event.WordReviewedEvent`
+(`userId`, `vocabularyId`, `result`, `learningStatus`, `firstReview`, `studyDate`, `reviewedAt`). Module Tiến độ
+(Nhân) chỉ cần phụ thuộc `common`, không gọi vào `vocabulary`:
+
+```java
+@Component
+class WordReviewedListener {
+    // AFTER_COMMIT: chỉ đếm lần đánh giá đã lưu thật; lưu thất bại thì không cộng.
+    // Listener chạy sau khi transaction của vocabulary đã kết thúc, nên muốn ghi DB thì cần transaction mới.
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    void on(WordReviewedEvent event) {
+        if (event.firstReview()) {
+            // cộng 1 vào user_progress.words_learned_count của (event.userId(), event.studyDate())
+        }
+    }
+}
+```
+
+`studyDate` là ngày theo giờ Việt Nam, đúng khóa `(user_id, date)` của `user_progress`. `firstReview` là `true` ở lần
+đầu người học đánh giá từ đó, tức lúc từ bắt đầu được tính là "đã học".
+
+## Backend Phase 3 (đã làm)
+
+1. Migration `V202609252000__add_interval_days_to_user_vocabulary.sql`: cột `interval_days` (bậc ôn tính bằng ngày,
+   `NULL` khi chưa ôn), đã ghi vào `Database.md`.
+2. Entity `UserVocabulary` đủ cột, converter chữ thường cho `status` và `last_review_result`.
+3. `ReviewScheduler`: logic thuần, `ReviewSchedulerTests` dùng cùng các trường hợp với `frontend/mock/scheduler.test.js`.
+4. Bốn endpoint trên (`LearningController`, `LearningService`), người dùng lấy qua `CurrentUser`, "hôm nay" qua
+   `StudyCalendar` (giờ Việt Nam). Thống kê của `summary` tính trong một truy vấn; `learningCount`, `masteredCount`,
+   `reviewedToday` dùng đúng điều kiện của `history` nên các tổng luôn khớp.
+5. `WordReviewedEvent` ở `common.event` (xem mục trên).

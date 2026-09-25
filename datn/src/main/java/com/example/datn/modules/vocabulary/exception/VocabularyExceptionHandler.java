@@ -3,6 +3,7 @@ package com.example.datn.modules.vocabulary.exception;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -14,10 +15,27 @@ import java.time.Instant;
 @RestControllerAdvice(basePackages = "com.example.datn.modules.vocabulary")
 public class VocabularyExceptionHandler {
 
-    @ExceptionHandler({TopicNotFoundException.class, VocabularyNotFoundException.class})
+    @ExceptionHandler({TopicNotFoundException.class, VocabularyNotFoundException.class, ListNotFoundException.class})
     public ResponseEntity<ApiErrorResponse> handleNotFound(RuntimeException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ApiErrorResponse(Instant.now(), 404, exception.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidSessionRequestException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidSession(InvalidSessionRequestException exception) {
+        return badRequest(exception.getMessage());
+    }
+
+    @ExceptionHandler(ConcurrentReviewException.class)
+    public ResponseEntity<ApiErrorResponse> handleConcurrentReview(ConcurrentReviewException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ApiErrorResponse(Instant.now(), 409, exception.getMessage()));
+    }
+
+    /** A body that is not valid JSON or has a value of the wrong type, such as {@code "result": "MAYBE"}. */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiErrorResponse> handleUnreadableBody(HttpMessageNotReadableException exception) {
+        return badRequest("Request body is not valid");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
