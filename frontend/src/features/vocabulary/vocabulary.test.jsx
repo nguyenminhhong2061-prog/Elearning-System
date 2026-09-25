@@ -8,10 +8,12 @@ import { admin, installFakeBackend, learner, loginResponse } from '@/test/fakeBa
 
 // Data shaped exactly as docs/api/vocabulary.md describes it.
 const TOPICS = [
-  { id: 1, name: 'Kinh doanh', description: 'Từ vựng trong công việc', imageUrl: null, wordCount: 26, learnedCount: 12 },
-  { id: 2, name: 'Du lịch', description: null, imageUrl: null, wordCount: 12, learnedCount: 0 },
-  { id: 3, name: 'Thể thao', description: null, imageUrl: null, wordCount: 0, learnedCount: 0 },
+  { id: 1, name: 'Kinh doanh', description: 'Từ vựng trong công việc', imageUrl: null, wordCount: 26, learnedCount: 12, dueCount: 3 },
+  { id: 2, name: 'Du lịch', description: null, imageUrl: null, wordCount: 12, learnedCount: 0, dueCount: 0 },
+  { id: 3, name: 'Thể thao', description: null, imageUrl: null, wordCount: 0, learnedCount: 0, dueCount: 0 },
 ]
+
+const NOTHING_DUE = { dueToday: 0, learningCount: 0, masteredCount: 0, reviewedToday: 0, upcoming: [] }
 
 function word(id, text, meaning, overrides = {}) {
   return {
@@ -51,6 +53,7 @@ function pageOf(allItems, { page = 0, size = 20 } = {}) {
 function vocabularyRoutes(overrides = {}) {
   return {
     'GET /api/topics': () => ({ data: TOPICS }),
+    'GET /api/learning/summary': () => ({ data: NOTHING_DUE }),
     'GET /api/topics/1': () => ({ data: TOPICS[0] }),
     'GET /api/topics/3': () => ({ data: TOPICS[2] }),
     'GET /api/vocabulary': ({ params }) => {

@@ -18,7 +18,8 @@ Mọi endpoint cần đăng nhập (`Authorization: Bearer <token>`). Lỗi dùn
   "description": "Từ vựng dùng trong công việc và kinh doanh",
   "imageUrl": null,
   "wordCount": 26,
-  "learnedCount": 12
+  "learnedCount": 12,
+  "dueCount": 3
 }
 ```
 
@@ -27,6 +28,7 @@ Mọi endpoint cần đăng nhập (`Authorization: Bearer <token>`). Lỗi dùn
 | `description`, `imageUrl` | Có thể `null` |
 | `wordCount` | Số từ thuộc chủ đề mà người dùng hiện tại được thấy |
 | `learnedCount` | Số từ trong đó mà **người dùng hiện tại** đã học, tức có dòng `user_vocabulary` với `status` là `learning` hoặc `mastered`. Trước Phase 3 luôn là `0` |
+| `dueCount` | Số từ trong đó đã đến hạn ôn của người dùng hiện tại (`next_review_at` ≤ hôm nay, giờ Việt Nam). Dùng cho nút "Học N từ" (xem `docs/api/learning.md`) |
 
 ### VocabularyItem
 
@@ -101,7 +103,7 @@ Thân yêu cầu giữ nguyên như hiện tại. **Chỉ `ADMIN`**; learner nh�
 
 ## Việc backend Phase 2 cần làm để khớp contract
 
-1. Thêm `wordCount`, `learnedCount` vào `TopicResponse` (một truy vấn đếm theo nhóm, không N+1).
+1. Thêm `wordCount`, `learnedCount`, `dueCount` vào `TopicResponse` (một truy vấn đếm theo nhóm, không N+1).
 2. `learningStatus` cho từng từ theo người dùng hiện tại (`CurrentUser`), join `user_vocabulary`.
 3. `q`, `level`, phân trang cho `GET /api/vocabulary`; `PageResponse` trong `common`.
 4. `@PreAuthorize("hasRole('ADMIN')")` cho các endpoint ghi.

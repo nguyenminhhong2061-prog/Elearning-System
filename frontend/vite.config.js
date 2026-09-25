@@ -3,15 +3,15 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
-import { vocabularyMockApi } from './mock/vocabularyMockApi.js'
+import { mockApi } from './mock/mockApi.js'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
-    // `npm run dev:mock` (mode "mock") serves the vocabulary API from sample data until the backend has it.
-    plugins: [react(), tailwindcss(), mode === 'mock' && vocabularyMockApi()],
+    // `npm run dev:mock` (mode "mock") serves the module A API (docs/api/) from sample data until the backend has it.
+    plugins: [react(), tailwindcss(), mode === 'mock' && mockApi()],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -33,7 +33,7 @@ export default defineConfig(({ mode }) => {
       globals: true,
       setupFiles: './src/test/setup.js',
       css: false,
-      include: ['src/**/*.test.{js,jsx}'],
+      include: ['src/**/*.test.{js,jsx}', 'mock/**/*.test.js'],
     },
   }
 })

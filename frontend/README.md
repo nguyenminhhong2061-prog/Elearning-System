@@ -20,7 +20,7 @@ npm run dev        # http://localhost:5173
 | Lệnh | Tác dụng |
 |---|---|
 | `npm run dev` | Chạy server phát triển (tự nạp lại khi sửa code) |
-| `npm run dev:mock` | Như `dev`, nhưng API từ vựng (`/api/topics`, `/api/vocabulary`) trả **dữ liệu giả** trong `mock/`. Dùng khi backend chưa có các API đó; đăng nhập vẫn cần backend thật |
+| `npm run dev:mock` | Như `dev`, nhưng các API của module A mô tả trong `docs/api/` (từ vựng, học flashcard...) trả **dữ liệu giả** trong `mock/`, lưu trong bộ nhớ theo từng tài khoản (mất khi tắt server). Dùng khi backend chưa có các API đó; đăng nhập vẫn cần backend thật |
 | `npm run build` | Build bản production vào `dist/` |
 | `npm run preview` | Chạy thử bản đã build |
 | `npm run lint` | Kiểm tra code bằng oxlint |
@@ -60,7 +60,7 @@ Cấu hình tùy chọn (copy `.env.example` thành `.env.local`, file này khô
 ```
 frontend/
 ├── LinguaStep-design-source/  # bản thiết kế gốc (chỉ để tham khảo, xem mục Thiết kế)
-├── mock/                      # dữ liệu giả và API giả cho `npm run dev:mock` (không vào bản build)
+├── mock/                      # API giả cho `npm run dev:mock`: mockApi.js (plugin), routes/, store.js, scheduler.js (không vào bản build)
 └── src/
     ├── main.jsx               # điểm vào: BrowserRouter + App
     ├── index.css              # Tailwind, design token, @font-face
@@ -155,7 +155,7 @@ Mỗi tài khoản có cache riêng, nên đăng xuất rồi đăng nhập tài
 
 Chốt contract trước (ví dụ `docs/api/vocabulary.md` ở thư mục gốc), viết frontend theo đó, test bằng
 `installFakeBackend`, và muốn xem trên trình duyệt thì thêm API giả trong `mock/` rồi chạy `npm run dev:mock`
-(xem `mock/vocabularyMockApi.js`).
+(xem `mock/mockApi.js` và `mock/routes/`).
 
 ### Test
 

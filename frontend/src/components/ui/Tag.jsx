@@ -4,6 +4,7 @@ const VARIANTS = {
   brand: 'bg-brand-tint text-brand-dark',
   success: 'bg-success-bg text-success',
   danger: 'bg-danger-bg text-danger',
+  warning: 'bg-warning-bg text-warning',
   neutral: 'bg-canvas text-ink-soft',
 }
 

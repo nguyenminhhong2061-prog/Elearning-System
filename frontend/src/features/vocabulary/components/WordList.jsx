@@ -20,6 +20,14 @@ function LearnedMark({ status }) {
   )
 }
 
+function LevelTag(word) {
+  return (
+    <Tag variant="brand" title={`Trình độ ${word.difficultyLevel}`}>
+      {word.difficultyLevel}
+    </Tag>
+  )
+}
+
 const ROW = 'flex items-center gap-3 py-3.5'
 
 /**
@@ -31,8 +39,10 @@ const ROW = 'flex items-center gap-3 py-3.5'
  *   (the topic name in search results)
  * @param {(word: import('../types').VocabularyItem) => string | undefined} [props.linkTo] makes rows links
  * @param {object} [props.linkState] router state passed with those links
+ * @param {(word: import('../types').VocabularyItem) => import('react').ReactNode} [props.aside] right-hand content
+ *   of a row; the CEFR level by default
  */
-export function WordList({ words, describe, linkTo, linkState }) {
+export function WordList({ words, describe, linkTo, linkState, aside = LevelTag }) {
   return (
     <ul className="rounded-xl border border-line bg-white px-5 py-1.5">
       {words.map((word) => {
@@ -47,9 +57,7 @@ export function WordList({ words, describe, linkTo, linkState }) {
               </p>
               {detail && <p className="text-xs text-muted">{detail}</p>}
             </div>
-            <Tag variant="brand" title={`Trình độ ${word.difficultyLevel}`}>
-              {word.difficultyLevel}
-            </Tag>
+            {aside(word)}
           </>
         )
 

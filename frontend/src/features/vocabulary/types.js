@@ -8,6 +8,17 @@
  * @property {string | null} imageUrl
  * @property {number} wordCount words in the topic visible to the current user
  * @property {number} learnedCount of those, words the current user has learned (learning or mastered)
+ * @property {number} dueCount of those, words due for review today
+ */
+
+/**
+ * A word with the current user's review state (docs/api/learning.md).
+ * @typedef {VocabularyItem & {
+ *   lastReviewResult: 'FORGOT' | 'VAGUE' | 'REMEMBERED' | null,
+ *   reviewCount: number,
+ *   nextReviewAt: string | null,
+ *   lastReviewedAt: string | null,
+ * }} LearningCard
  */
 
 /**

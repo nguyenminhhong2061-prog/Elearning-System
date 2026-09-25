@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { Page } from '@/components/layout/Page'
 import { Card } from '@/components/ui/Card'
 import { LoadError } from '@/components/ui/LoadError'
 import { SearchField } from '@/components/ui/SearchField'
@@ -10,7 +9,8 @@ import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import { useTopics, useWordSearch, WORD_SEARCH_MIN_LENGTH } from '../api/queries'
 import { TopicCard, TopicCardSkeleton, TopicGrid } from '../components/TopicCard'
 import { WordList, WordListSkeleton } from '../components/WordList'
-import { formatCount, summarizeTopics } from '../topicProgress'
+import { VocabularyShell } from '../components/VocabularyShell'
+import { formatCount } from '../topicProgress'
 
 const SEARCH_DELAY_MS = 300
 
@@ -64,7 +64,8 @@ function WordSearchResults({ term, topics, backTo }) {
   )
 }
 
-export function TopicsPage() {
+/** "Chủ đề có sẵn" tab: the topic grid, with topic and word search. */
+export function TopicsTab() {
   const [searchParams, setSearchParams] = useSearchParams()
   const urlTerm = searchParams.get('q') ?? ''
   const [query, setQuery] = useState(urlTerm)
@@ -75,18 +76,20 @@ export function TopicsPage() {
   // filling the browser history.
   useEffect(() => {
     if (debouncedTerm === urlTerm) return
-    setSearchParams(debouncedTerm ? { q: debouncedTerm } : {}, { replace: true })
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous)
+        if (debouncedTerm) next.set('q', debouncedTerm)
+        else next.delete('q')
+        return next
+      },
+      { replace: true },
+    )
   }, [debouncedTerm, urlTerm, setSearchParams])
 
   const topicsQuery = useTopics()
   const topics = topicsQuery.data
   const backTo = term ? `/vocabulary?q=${encodeURIComponent(term)}` : '/vocabulary'
-
-  let summary = null
-  if (topics?.length) {
-    const { wordCount, learnedCount } = summarizeTopics(topics)
-    summary = `Đã học ${formatCount(learnedCount)} / ${formatCount(wordCount)} từ · ${topics.length} chủ đề`
-  }
 
   let body
   if (topicsQuery.isPending) {
@@ -137,26 +140,22 @@ export function TopicsPage() {
   }
 
   return (
-    <Page
+    <VocabularyShell
+      tab="topics"
       title="Từ vựng"
-      heading={
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-title font-bold text-ink">Từ vựng</h1>
-            {summary && <p className="text-label text-muted">{summary}</p>}
-          </div>
-          <SearchField
-            label="Tìm chủ đề hoặc từ"
-            placeholder="Tìm chủ đề hoặc từ…"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onClear={() => setQuery('')}
-            className="w-full sm:max-w-72.5"
-          />
-        </div>
+      showReminder
+      headerAside={
+        <SearchField
+          label="Tìm chủ đề hoặc từ"
+          placeholder="Tìm chủ đề hoặc từ…"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onClear={() => setQuery('')}
+          className="w-full sm:max-w-72.5"
+        />
       }
     >
       {body}
-    </Page>
+    </VocabularyShell>
   )
 }

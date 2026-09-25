@@ -1,33 +1,38 @@
 import { Link, useLocation, useParams } from 'react-router'
 import { Page } from '@/components/layout/Page'
-import { Button } from '@/components/ui/Button'
+import { Button, ButtonLink } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { LoadError } from '@/components/ui/LoadError'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useTopic, useTopicWords } from '../api/queries'
 import { WordList, WordListSkeleton } from '../components/WordList'
+import { studyableCount } from '../constants'
+import { backLinkTarget, parseId } from '../routeParams'
 import { formatCount } from '../topicProgress'
-
-const TOPICS_PATH = '/vocabulary'
-
-/** The id from the URL, or null when it is not a positive whole number (then nothing is fetched). */
-function parseTopicId(raw) {
-  if (!/^\d{1,15}$/.test(raw ?? '')) return null
-  const id = Number(raw)
-  return id > 0 ? id : null
-}
-
-/** Back to the topics page, keeping its search when the user came from one. */
-function backLinkTarget(state) {
-  const candidate = state?.backTo
-  return typeof candidate === 'string' && candidate.startsWith(`${TOPICS_PATH}?`) ? candidate : TOPICS_PATH
-}
 
 function BackLink({ to }) {
   return (
     <Link to={to} className="self-start text-label font-medium">
       ← Chủ đề
     </Link>
+  )
+}
+
+/** The design's "Học 20 từ →": due words plus words never studied, at most one session's worth. */
+function StudyAction({ topic }) {
+  const count = studyableCount(topic)
+  if (topic.wordCount === 0) return null
+  if (count === 0) {
+    return (
+      <p className="rounded-lg border border-dashed border-line px-4 py-3 text-label text-muted">
+        Bạn đã học hết chủ đề này. Các từ sẽ được nhắc ôn lại theo lịch.
+      </p>
+    )
+  }
+  return (
+    <ButtonLink to={`/vocabulary/topics/${topic.id}/study`} className="w-full">
+      Học {formatCount(count)} từ →
+    </ButtonLink>
   )
 }
 
@@ -64,7 +69,7 @@ function TopicWords({ words: query }) {
 export function TopicDetailPage() {
   const params = useParams()
   const location = useLocation()
-  const topicId = parseTopicId(params.topicId)
+  const topicId = parseId(params.topicId)
   const backTo = backLinkTarget(location.state)
 
   const topicQuery = useTopic(topicId)
@@ -129,7 +134,10 @@ export function TopicDetailPage() {
           message="Không tải được chủ đề. Vui lòng thử lại."
         />
       ) : (
-        <TopicWords words={wordsQuery} />
+        <>
+          {topic && <StudyAction topic={topic} />}
+          <TopicWords words={wordsQuery} />
+        </>
       )}
     </Page>
   )

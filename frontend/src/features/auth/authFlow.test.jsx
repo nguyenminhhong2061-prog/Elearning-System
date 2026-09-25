@@ -223,9 +223,8 @@ describe('session on start-up', () => {
     renderApp('/')
 
     await heading(/Chào Hồng/)
-    expect(backend.calls).toEqual([
-      { key: 'GET /api/users/me', body: undefined, authorization: 'Bearer stored-token' },
-    ])
+    // The first request confirms the stored token; the home page may then load its own data.
+    expect(backend.calls[0]).toEqual({ key: 'GET /api/users/me', body: undefined, authorization: 'Bearer stored-token' })
   })
 
   it('falls back to the login page, with an explanation, when the server rejects the stored token', async () => {

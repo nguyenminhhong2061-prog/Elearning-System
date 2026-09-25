@@ -7,7 +7,8 @@ import { ChangePasswordPage } from '@/features/auth/pages/ChangePasswordPage'
 import { LoginPage } from '@/features/auth/pages/LoginPage'
 import { RegisterPage } from '@/features/auth/pages/RegisterPage'
 import { TopicDetailPage } from '@/features/vocabulary/pages/TopicDetailPage'
-import { TopicsPage } from '@/features/vocabulary/pages/TopicsPage'
+import { StudySessionPage } from '@/features/vocabulary/pages/StudySessionPage'
+import { VocabularyPage } from '@/features/vocabulary/pages/VocabularyPage'
 import { ComingSoonPage } from '@/pages/ComingSoonPage'
 import { HomePage } from '@/pages/HomePage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
@@ -36,8 +37,10 @@ export function AppRoutes() {
 
           {/* Module A: vocabulary. */}
           <Route path="vocabulary">
-            <Route index element={<TopicsPage />} />
+            <Route index element={<VocabularyPage />} />
+            <Route path="review" element={<StudySessionPage mode="due" />} />
             <Route path="topics/:topicId" element={<TopicDetailPage />} />
+            <Route path="topics/:topicId/study" element={<StudySessionPage mode="topic" />} />
           </Route>
 
           {/* Sections owned by other modules. Replace the placeholder when the module's pages exist. */}
