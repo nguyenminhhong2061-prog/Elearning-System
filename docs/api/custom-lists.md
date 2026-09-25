@@ -69,6 +69,7 @@ Quy tắc:
 
 1. Entity `CustomVocabularyList`, `CustomVocabularyListItem` (khóa kép `list_id`, `vocabulary_id`) trong module
    `vocabulary`; kiểm tra chủ sở hữu qua `CurrentUser`.
-2. `GET /api/vocabulary` và phiên học chỉ trả từ hệ thống (`created_by` là admin hoặc `NULL`) cùng từ do chính người
-   dùng tạo.
+2. `GET /api/vocabulary` và phiên học chỉ trả từ hệ thống (`created_by` là `NULL`) cùng từ do chính người dùng tạo:
+   `created_by IS NULL OR created_by = :userId`. Từ hệ thống luôn có `created_by` là `NULL`, kể cả khi admin thêm qua
+   API (chốt 25/09/2026), nên luật này không cần tra role trong bảng `users` của module khác.
 3. Các endpoint trên; test cho quyền (danh sách người khác trả `404`) và cho giao dịch khi tạo.

@@ -1,7 +1,9 @@
 package com.example.datn.modules.vocabulary.dto.response;
 
 import com.example.datn.common.enums.CefrLevel;
+import com.example.datn.modules.vocabulary.enums.LearningStatus;
 
+/** A word with the current user's learning status (docs/api/vocabulary.md). */
 public record VocabularyResponse(
         Long id,
         Long topicId,
@@ -12,5 +14,6 @@ public record VocabularyResponse(
         String phonetic,
         String audioUrl,
         String imageUrl,
-        CefrLevel difficultyLevel) {
+        CefrLevel difficultyLevel,
+        LearningStatus learningStatus) {
 }

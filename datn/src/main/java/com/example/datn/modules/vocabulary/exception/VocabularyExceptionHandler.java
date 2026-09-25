@@ -1,10 +1,13 @@
 package com.example.datn.modules.vocabulary.exception;
 
+import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.Instant;
 
@@ -24,7 +27,26 @@ public class VocabularyExceptionHandler {
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
                 .orElse("Request validation failed");
 
-        return ResponseEntity.badRequest()
-                .body(new ApiErrorResponse(Instant.now(), 400, message));
+        return badRequest(message);
+    }
+
+    /** A query parameter that cannot be converted, such as {@code level=Z9} or {@code page=abc}. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
+        return badRequest(exception.getName() + ": invalid value '" + exception.getValue() + "'");
+    }
+
+    /** A query parameter outside its constraints, such as {@code size=500}. */
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ApiErrorResponse> handleParameterValidation(HandlerMethodValidationException exception) {
+        String message = exception.getAllErrors().stream()
+                .findFirst()
+                .map(MessageSourceResolvable::getDefaultMessage)
+                .orElse("Request validation failed");
+        return badRequest(message);
+    }
+
+    private static ResponseEntity<ApiErrorResponse> badRequest(String message) {
+        return ResponseEntity.badRequest().body(new ApiErrorResponse(Instant.now(), 400, message));
     }
 }
