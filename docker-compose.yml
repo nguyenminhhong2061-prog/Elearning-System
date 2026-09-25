@@ -1,0 +1,29 @@
+# Local PostgreSQL for development.
+# Start:  docker compose up -d
+# Reset:  docker compose down -v   (deletes all local data; Flyway rebuilds the schema on next app start)
+#
+# The defaults below match the defaults in datn/src/main/resources/application.properties,
+# so no .env file is needed locally. Keep the Postgres major version in line with the Neon project.
+# The container is published on host port 5433 (not 5432) so it does not clash with a PostgreSQL
+# installed directly on the machine, which would otherwise answer on 5432 and reject our credentials.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: datn-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-datn}
+      POSTGRES_USER: ${POSTGRES_USER:-datn}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datn}
+      TZ: UTC
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - datn-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-datn} -d ${POSTGRES_DB:-datn}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  datn-pgdata:
