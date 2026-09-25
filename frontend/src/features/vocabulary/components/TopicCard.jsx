@@ -45,6 +45,22 @@ export function TopicCardSkeleton() {
   )
 }
 
+/** The design's dashed "Tạo danh sách riêng" card at the end of the topic grid (A3). */
+export function CreateListCard({ onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-h-37.5 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-line bg-surface-alt transition-colors hover:border-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+    >
+      <span aria-hidden="true" className="flex size-7.5 items-center justify-center rounded-full bg-brand-tint text-[17px] font-semibold text-brand-dark">
+        +
+      </span>
+      <span className="text-label font-semibold text-brand-dark">Tạo danh sách riêng</span>
+    </button>
+  )
+}
+
 /** Card grid of the design: as many 220px+ columns as fit. */
 export function TopicGrid({ children }) {
   return <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">{children}</div>

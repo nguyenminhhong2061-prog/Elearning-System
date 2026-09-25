@@ -1,14 +1,8 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getLearningHistory, getLearningSummary, getStudySession, submitReview } from './learningApi'
-import { vocabularyKeys } from './queries'
+import { learningKeys, listKeys, vocabularyKeys } from './keys'
 
-export const learningKeys = {
-  all: ['learning'],
-  summary: () => [...learningKeys.all, 'summary'],
-  history: () => [...learningKeys.all, 'history'],
-}
-
-// Deliberately outside both roots above: invalidating progress after each review must not refetch the session that
+// Deliberately outside the roots of keys.js: invalidating progress after each review must not refetch the session that
 // is being studied, which would reshuffle the cards under the learner's hands.
 const sessionKey = (source, round) => ['study-session', source, round]
 
@@ -43,7 +37,7 @@ export function useStudySession(source, round, { enabled = true } = {}) {
   })
 }
 
-/** Saves one rating, then marks every count and learning status as out of date. */
+/** Saves one rating, then marks every count and learning status (topics, lists, statistics) as out of date. */
 export function useSubmitReview() {
   const queryClient = useQueryClient()
 
@@ -52,6 +46,7 @@ export function useSubmitReview() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: vocabularyKeys.all })
       queryClient.invalidateQueries({ queryKey: learningKeys.all })
+      queryClient.invalidateQueries({ queryKey: listKeys.all })
     },
   })
 }

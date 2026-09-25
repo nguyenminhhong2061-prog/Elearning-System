@@ -1,5 +1,6 @@
 import { useSearchParams } from 'react-router'
 import { HistoryTab } from './HistoryTab'
+import { ListsTab } from './ListsTab'
 import { TopicsTab } from './TopicsTab'
 
 /**
@@ -8,5 +9,8 @@ import { TopicsTab } from './TopicsTab'
  */
 export function VocabularyPage() {
   const [searchParams] = useSearchParams()
-  return searchParams.get('tab') === 'history' ? <HistoryTab /> : <TopicsTab />
+  const tab = searchParams.get('tab')
+  if (tab === 'history') return <HistoryTab />
+  if (tab === 'lists') return <ListsTab />
+  return <TopicsTab />
 }
