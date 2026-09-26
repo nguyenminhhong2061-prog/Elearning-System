@@ -4,6 +4,11 @@
 > đã viết theo tài liệu này và chạy được với dữ liệu giả (`npm run dev:mock`). Backend chưa có. Module B do Lý Quang
 > Đạt phụ trách; ngày 26/09/2026 Hồng nhận làm phần giao diện. Muốn đổi chỗ nào thì sửa tài liệu này trước, rồi sửa
 > frontend (`api/exercisesApi.js`) và dữ liệu giả (`frontend/mock/routes/exercises.js`) cho khớp.
+>
+> **Cập nhật 27/09/2026 (Hồng chốt): làm tiếp bài dở.** Mở lại một bài ngữ pháp hoặc phát âm đang làm dở thì làm tiếp
+> từ câu chưa trả lời, không bắt đầu lại (thẻ "Tiếp tục" trên trang chủ của thiết kế cần điều này). Các chỗ đổi: mục
+> "Nguyên tắc", `progress.inProgress` của danh sách bài, `POST /api/exercises/{lessonId}/attempts` và endpoint mới
+> `GET /api/exercise-attempts/current`.
 
 Mọi endpoint cần đăng nhập (`Authorization: Bearer <token>`). Lỗi dùng định dạng chung
 `{ "timestamp": "...", "status": 404, "message": "..." }`. Giá trị enum trong JSON viết **chữ hoa** (DB lưu chữ thường,
@@ -15,9 +20,22 @@ xem bẫy "enum chữ thường" trong README). Dùng các bảng có sẵn tron
 
 - **Server chấm điểm.** Dữ liệu bài học gửi xuống trình duyệt **không** chứa đáp án (`is_correct`,
   `question_accepted_answers`, `explanation`). Đáp án và giải thích chỉ trả về sau khi người học đã trả lời câu đó.
-- **Mỗi lần làm bài là một `exercise_attempts`.** Mở một bài là bắt đầu một lượt mới; lượt cũ còn `in_progress` của
-  cùng người và cùng bài chuyển sang `abandoned`. Thoát giữa chừng thì các câu đã trả lời vẫn nằm trong
-  `question_responses`, nhưng điểm chỉ được tính khi lượt kết thúc (`POST .../complete`).
+- **Mỗi lần làm bài là một `exercise_attempts`, và bài ngữ pháp, phát âm làm tiếp được.** Mỗi người có tối đa một lượt
+  `in_progress` cho mỗi bài. Mở bài mà lượt đó còn **làm tiếp được** thì server trả lại chính lượt đó cùng những gì đã
+  làm; nếu không thì tạo lượt mới (lượt `in_progress` cũ, nếu có, chuyển `abandoned`). "Làm lại từ đầu" luôn tạo lượt
+  mới. Thoát giữa chừng thì các câu đã trả lời vẫn nằm trong `question_responses`; điểm chỉ được tính khi lượt kết thúc
+  (`POST .../complete`).
+- **Một lượt `in_progress` làm tiếp được** khi đủ bốn điều kiện:
+  1. bài là `GRAMMAR` hoặc `PRONUNCIATION`. **Bài nghe không làm tiếp**: đáp án bài nghe chỉ gửi lên khi nộp cả bài, nên
+     server không biết người học đã chọn gì; bài nghe lại ngắn và thường phải nghe lại từ đầu;
+  2. người học đã trả lời ít nhất một câu (ngữ pháp) hoặc ghi âm ít nhất một mục (phát âm). Mở bài rồi thoát ngay thì
+     không có gì để làm tiếp, lần sau mở là lượt mới;
+  3. hoạt động cuối cùng của lượt (lần trả lời hoặc lần chấm ghi âm gần nhất) cách đây **không quá 7 ngày**;
+  4. bài không bị sửa sau khi lượt bắt đầu: `exercise_lessons.updated_at <= exercise_attempts.started_at`. Trigger chỉ
+     cập nhật `updated_at` khi sửa chính dòng bài học, nên khi sửa câu hỏi, lựa chọn hay mục phát âm của bài thì service
+     cũng phải cập nhật `updated_at` của bài.
+
+  Lượt không còn làm tiếp được thì coi như đã bỏ: không hiện ở đâu, và lần mở bài tới chuyển nó sang `abandoned`.
 - Ngữ pháp chấm **từng câu ngay khi trả lời** (nghiệp vụ B1: "chấm ngay, hiện đúng/sai kèm giải thích"). Nghe hiểu
   **nộp cả bài một lần** (B2: "trả lời, nộp, chấm điểm, hiện đáp án đúng và bản dịch"). Phát âm chấm **từng lần ghi âm**.
 - Chỉ bài `publication_status = 'published'` và có ít nhất một câu hỏi (ngữ pháp, nghe) hoặc một mục (phát âm) mới
@@ -50,7 +68,12 @@ xem bẫy "enum chữ thường" trong README). Dùng các bảng có sẵn tron
     "difficulty": "MEDIUM",
     "estimatedMinutes": 8,
     "itemCount": 10,
-    "progress": { "attemptCount": 2, "bestScorePercent": 80, "lastCompletedAt": "2026-09-25T09:12:00Z" }
+    "progress": {
+      "attemptCount": 2,
+      "bestScorePercent": 80,
+      "lastCompletedAt": "2026-09-25T09:12:00Z",
+      "inProgress": { "attemptId": 57, "doneCount": 4, "lastActivityAt": "2026-09-26T14:10:00Z" }
+    }
   }
 ]
 ```
@@ -59,7 +82,8 @@ xem bẫy "enum chữ thường" trong README). Dùng các bảng có sẵn tron
 |---|---|
 | `description`, `topic`, `estimatedMinutes` | Có thể `null` |
 | `itemCount` | Số câu hỏi (ngữ pháp, nghe) hoặc số mục luyện (phát âm) |
-| `progress` | Của **người dùng hiện tại**, chỉ tính lượt `completed`. `attemptCount = 0`, `bestScorePercent = null`, `lastCompletedAt = null` khi chưa hoàn thành lần nào |
+| `progress` | Của **người dùng hiện tại**. `attemptCount`, `bestScorePercent`, `lastCompletedAt` chỉ tính lượt `completed`: `0`, `null`, `null` khi chưa hoàn thành lần nào |
+| `progress.inProgress` | Lượt đang dở **làm tiếp được** của bài này (xem "Nguyên tắc"), `null` nếu không có. `doneCount`: số câu đã trả lời (ngữ pháp) hoặc số mục đã ghi âm ít nhất một lần (phát âm); giao diện hiện nhãn "Đang làm dở · 4/10 câu". Bài nghe luôn `null` |
 
 Sắp xếp "cơ bản đến nâng cao" (B1): `cefr_level` A1 → C2, rồi `sort_order`, rồi `id`. Giao diện nhóm theo trình độ.
 
@@ -121,10 +145,55 @@ Sắp xếp "cơ bản đến nâng cao" (B1): `cefr_level` A1 → C2, rồi `so
 
 ## Lượt làm bài
 
-### `POST /api/exercises/{lessonId}/attempts` — bắt đầu
+### `POST /api/exercises/{lessonId}/attempts` — bắt đầu hoặc làm tiếp
 
-Không có body. Trả `201` `{ "attemptId": 55, "startedAt": "2026-09-26T02:00:00Z" }`. Lượt `in_progress` trước đó của
-cùng người, cùng bài chuyển sang `abandoned`. Giao diện gọi endpoint này ngay khi mở bài và khi bấm "Làm lại".
+Không có body. Giao diện gọi endpoint này ngay khi mở bài, và gọi kèm `?restart=true` khi người học bấm "Làm lại từ
+đầu" hoặc "Làm lại" trên màn kết quả.
+
+- Có lượt `in_progress` **làm tiếp được** (xem "Nguyên tắc") và không gửi `restart=true`: trả `200` với chính lượt đó,
+  `resumed: true`.
+- Ngược lại: lượt `in_progress` cũ (nếu có) chuyển `abandoned`, tạo lượt mới và trả `201`, `resumed: false`.
+
+```json
+{
+  "attemptId": 57,
+  "startedAt": "2026-09-25T02:00:00Z",
+  "resumed": true,
+  "responses": [
+    { "questionId": 11, "correct": true, "optionId": 102, "answer": null, "correctOptionId": 102, "correctAnswer": "has lived", "explanation": "…" }
+  ],
+  "pronunciation": [ { "itemId": 801, "tryCount": 2, "bestScore": 86 } ]
+}
+```
+
+| Trường | Ý nghĩa |
+|---|---|
+| `responses` | Các câu đã trả lời trong lượt (ngữ pháp), theo thứ tự câu hỏi của bài, cùng dạng phần tử `review` của `.../complete`. Lượt mới: `[]` |
+| `pronunciation` | Các mục đã ghi âm trong lượt (phát âm): số lần ghi (`tryCount`) và điểm tổng cao nhất (`bestScore`). Không trả lại bản ghi hay chi tiết từng từ. Lượt mới hoặc kỹ năng khác: `[]` |
+
+Giao diện mở bài ngữ pháp ở câu đầu tiên chưa trả lời, bài phát âm ở mục đầu tiên chưa ghi âm; các câu đã trả lời hiện
+lại đáp án và giải thích như lúc vừa chấm. Đã làm hết mà chưa kết thúc thì mở ở câu, mục cuối để người học bấm "Xem kết
+quả".
+
+### `GET /api/exercise-attempts/current` — lượt đang dở gần nhất
+
+Cho thẻ "Tiếp tục" trên trang chủ (`docs/api/progress.md`). Trả lượt `in_progress` **làm tiếp được** có hoạt động cuối
+gần nhất của người dùng, ở mọi bài:
+
+```json
+{
+  "current": {
+    "attemptId": 57,
+    "lesson": { "id": 3, "skill": "GRAMMAR", "title": "Thì hiện tại hoàn thành", "cefrLevel": "B1", "itemCount": 10 },
+    "doneCount": 4,
+    "lastActivityAt": "2026-09-26T14:10:00Z"
+  }
+}
+```
+
+Không có lượt nào: `{ "current": null }` (không phải `404`); giao diện khi đó gợi ý bài kế tiếp. `doneCount` như trong
+`progress.inProgress`. Đường dẫn `current` không đụng các endpoint `/api/exercise-attempts/{attemptId}/…` vì
+`attemptId` luôn là số.
 
 Các endpoint `/api/exercise-attempts/{attemptId}/…` bên dưới trả `404` nếu lượt không tồn tại hoặc thuộc người khác,
 `409` nếu lượt không còn `in_progress` (đã nộp hoặc đã bị bỏ).
@@ -237,6 +306,9 @@ Backend gửi file cho dịch vụ AI, lưu một dòng `pronunciation_attempts`
 3. File audio: đặt trong `src/main/resources/static/media/…` (Spring phục vụ luôn, hỗ trợ Range) hoặc một kho lưu trữ
    ngoài. Nếu đặt trong `static/`, cần mở quyền `permitAll` cho `/media/**` trong `SecurityConfig` (thẻ `<audio>` không gửi
    được header `Authorization`).
-4. Chấm điểm là hàm thuần (so khớp đáp án, tính phần trăm), dễ viết unit test.
+4. Chấm điểm là hàm thuần (so khớp đáp án, tính phần trăm), dễ viết unit test. Luật "làm tiếp được" (kỹ năng, 7 ngày,
+   `updated_at` của bài) cũng nên là một hàm thuần nhận thời điểm hiện tại, để test không phụ thuộc đồng hồ.
+   "Hoạt động cuối" là giá trị lớn nhất của `question_responses.answered_at`, `pronunciation_attempts.assessed_at` và
+   `exercise_attempts.started_at` của lượt; không cần thêm cột.
 5. `userId` lấy qua `common.security.CurrentUser`. Nếu module Tiến độ (D) cần kết quả bài tập, phát một sự kiện ở
    `common.event` (như `WordReviewedEvent` của module A), đừng để module khác đọc thẳng bảng.

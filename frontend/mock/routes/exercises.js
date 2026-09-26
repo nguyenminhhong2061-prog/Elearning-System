@@ -7,6 +7,9 @@ import { listeningAudioUrl } from '../media.js'
 
 const SKILLS = ['GRAMMAR', 'LISTENING', 'PRONUNCIATION']
 const MAX_RECORDING_BYTES = 1024 * 1024
+// Only these skills can be picked up again; listening answers reach the server only with the whole test.
+const RESUMABLE_SKILLS = ['GRAMMAR', 'PRONUNCIATION']
+const RESUME_WINDOW_MS = 7 * 86_400_000
 
 const attempts = new Map() // attemptId -> attempt
 let nextAttemptId = 1
@@ -21,26 +24,55 @@ const SEEDED_HISTORY = [
   [12, 67, 4],
   [22, 74, 1],
 ]
+// Unfinished attempts, so "Tiếp tục" and "Đang làm dở" show right away. [lessonId, answered or recorded, hours since
+// the last activity]. Lesson 4's is older than 7 days: it cannot be resumed and must not show anywhere.
+const SEEDED_UNFINISHED = [
+  [3, 2, 20], // Thì hiện tại hoàn thành: 2 of 6 answered, one right and one wrong
+  [23, 2, 72], // Trọng âm từ 2 âm tiết: 2 of 6 items recorded
+  [4, 1, 9 * 24],
+]
 const seededUsers = new Set()
+
+function newAttempt(userId, lessonId, startedAt) {
+  const attempt = {
+    id: nextAttemptId++,
+    userId,
+    lessonId,
+    status: 'IN_PROGRESS',
+    responses: new Map(),
+    recordings: new Map(),
+    playbackRate: 1,
+    startedAt,
+    lastActivityAt: startedAt,
+    finishedAt: null,
+    scorePercent: null,
+  }
+  attempts.set(attempt.id, attempt)
+  return attempt
+}
+
+/** A right answer at even positions and a wrong one at odd positions, as the learner would have sent it. */
+function seededAnswer(question, position) {
+  if (question.type === 'FILL_BLANK') return { questionId: question.id, answer: position % 2 === 0 ? question.accepted[0] : 'xyz' }
+  const wrong = question.options.find((option) => option.id !== question.correctOptionId)
+  return { questionId: question.id, optionId: position % 2 === 0 ? question.correctOptionId : wrong.id }
+}
 
 function ensureHistory(userId) {
   if (seededUsers.has(userId)) return
   seededUsers.add(userId)
   for (const [lessonId, scorePercent, daysAgo] of SEEDED_HISTORY) {
     const finishedAt = new Date(Date.now() - daysAgo * 86_400_000)
-    const id = nextAttemptId++
-    attempts.set(id, {
-      id,
-      userId,
-      lessonId,
-      status: 'COMPLETED',
-      responses: new Map(),
-      recordings: new Map(),
-      playbackRate: 1,
-      startedAt: new Date(finishedAt.getTime() - 5 * 60_000).toISOString(),
-      finishedAt: finishedAt.toISOString(),
-      scorePercent,
-    })
+    const attempt = newAttempt(userId, lessonId, new Date(finishedAt.getTime() - 5 * 60_000).toISOString())
+    Object.assign(attempt, { status: 'COMPLETED', finishedAt: finishedAt.toISOString(), scorePercent })
+  }
+  for (const [lessonId, done, hoursAgo] of SEEDED_UNFINISHED) {
+    const lastActivity = new Date(Date.now() - hoursAgo * 3_600_000)
+    const attempt = newAttempt(userId, lessonId, new Date(lastActivity.getTime() - 10 * 60_000).toISOString())
+    attempt.lastActivityAt = lastActivity.toISOString()
+    const lesson = findLesson(lessonId)
+    lesson.questions.slice(0, done).forEach((question, position) => attempt.responses.set(question.id, grade(question, seededAnswer(question, position))))
+    lesson.pronunciationItems.slice(0, done).forEach((item, position) => attempt.recordings.set(item.id, [62 + position * 10, 71 + position * 10]))
   }
 }
 
@@ -63,6 +95,50 @@ function requireLesson(match) {
   const lesson = findLesson(Number(match[1]))
   if (!lesson) throw new HttpError(404, 'Lesson not found')
   return lesson
+}
+
+function doneCount(attempt, lesson) {
+  return lesson.skill === 'PRONUNCIATION' ? attempt.recordings.size : attempt.responses.size
+}
+
+/**
+ * The rule of docs/api/exercises.md: an unfinished grammar or pronunciation attempt with something done in it, active
+ * in the last 7 days. (The backend also checks that the lesson was not edited after the attempt began; the sample
+ * lessons never change.)
+ */
+export function isResumable(attempt, lesson, now = Date.now()) {
+  return (
+    attempt.status === 'IN_PROGRESS' &&
+    RESUMABLE_SKILLS.includes(lesson.skill) &&
+    doneCount(attempt, lesson) > 0 &&
+    now - new Date(attempt.lastActivityAt).getTime() <= RESUME_WINDOW_MS
+  )
+}
+
+function unfinishedAttempt(userId, lessonId) {
+  return [...attempts.values()].find((attempt) => attempt.userId === userId && attempt.lessonId === lessonId && attempt.status === 'IN_PROGRESS')
+}
+
+function inProgressOf(userId, lesson) {
+  const attempt = unfinishedAttempt(userId, lesson.id)
+  if (!attempt || !isResumable(attempt, lesson)) return null
+  return { attemptId: attempt.id, doneCount: doneCount(attempt, lesson), lastActivityAt: attempt.lastActivityAt }
+}
+
+/** What opening a lesson returns: the attempt, and what was already done in it when it is picked up again. */
+function startPayload(attempt, lesson, resumed) {
+  return {
+    attemptId: attempt.id,
+    startedAt: attempt.startedAt,
+    resumed,
+    responses: lesson.questions.filter((question) => attempt.responses.has(question.id)).map((question) => reviewItem(attempt.responses.get(question.id))),
+    pronunciation: lesson.pronunciationItems
+      .filter((item) => attempt.recordings.has(item.id))
+      .map((item) => {
+        const scores = attempt.recordings.get(item.id)
+        return { itemId: item.id, tryCount: scores.length, bestScore: Math.max(...scores) }
+      }),
+  }
 }
 
 function requireOpenAttempt(userId, match) {
@@ -121,7 +197,14 @@ function recordResponse(attempt, lesson, input) {
   if (attempt.responses.has(question.id)) throw new HttpError(409, 'Question already answered in this attempt')
   const graded = grade(question, input)
   attempt.responses.set(question.id, graded)
+  attempt.lastActivityAt = new Date().toISOString()
   return graded
+}
+
+/** A graded response as the review lists it: without the points. */
+function reviewItem(response) {
+  const { awardedPoints: _points, ...item } = response
+  return item
 }
 
 function completedAttempts(userId, lessonId) {
@@ -131,11 +214,13 @@ function completedAttempts(userId, lessonId) {
 function progressOf(userId, lessonId) {
   ensureHistory(userId)
   const done = completedAttempts(userId, lessonId)
-  if (done.length === 0) return { attemptCount: 0, bestScorePercent: null, lastCompletedAt: null }
+  const inProgress = inProgressOf(userId, findLesson(lessonId))
+  if (done.length === 0) return { attemptCount: 0, bestScorePercent: null, lastCompletedAt: null, inProgress }
   return {
     attemptCount: done.length,
     bestScorePercent: Math.max(...done.map((attempt) => attempt.scorePercent)),
     lastCompletedAt: done.at(-1).finishedAt,
+    inProgress,
   }
 }
 
@@ -241,6 +326,7 @@ function assessRecording(attempt, lesson, itemId, body) {
   const tries = attempt.recordings.get(item.id) ?? []
   const assessment = fakeAssessment(item, tries.length + 1, wav.samples)
   attempt.recordings.set(item.id, [...tries, assessment.overallScore])
+  attempt.lastActivityAt = new Date().toISOString()
   return assessment
 }
 
@@ -278,10 +364,7 @@ function finish(attempt, lesson, body) {
   } else {
     const review = lesson.questions.map((question) => {
       const response = attempt.responses.get(question.id)
-      if (response) {
-        const { awardedPoints: _points, ...item } = response
-        return item
-      }
+      if (response) return reviewItem(response)
       return { questionId: question.id, correct: false, optionId: null, answer: null, ...answerKey(question) } // unanswered
     })
     const totalPoints = lesson.questions.reduce((sum, question) => sum + question.points, 0)
@@ -332,26 +415,36 @@ export const exerciseRoutes = [
   {
     method: 'POST',
     pattern: /^\/api\/exercises\/(\d+)\/attempts$/,
-    status: 201,
-    handle({ userId, match }) {
+    // 200 when an unfinished attempt is picked up again, 201 when a new one is created.
+    status: (result) => (result.resumed ? 200 : 201),
+    handle({ userId, match, searchParams }) {
       const lesson = requireLesson(match)
-      for (const attempt of attempts.values()) {
-        if (attempt.userId === userId && attempt.lessonId === lesson.id && attempt.status === 'IN_PROGRESS') attempt.status = 'ABANDONED'
+      ensureHistory(userId)
+      const unfinished = unfinishedAttempt(userId, lesson.id)
+      if (unfinished && isResumable(unfinished, lesson) && searchParams.get('restart') !== 'true') return startPayload(unfinished, lesson, true)
+      if (unfinished) unfinished.status = 'ABANDONED'
+      return startPayload(newAttempt(userId, lesson.id, new Date().toISOString()), lesson, false)
+    },
+  },
+  {
+    method: 'GET',
+    pattern: /^\/api\/exercise-attempts\/current$/,
+    handle({ userId }) {
+      ensureHistory(userId)
+      const candidates = [...attempts.values()]
+        .filter((attempt) => attempt.userId === userId && isResumable(attempt, findLesson(attempt.lessonId)))
+        .toSorted((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt))
+      const attempt = candidates[0]
+      if (!attempt) return { current: null }
+      const lesson = findLesson(attempt.lessonId)
+      return {
+        current: {
+          attemptId: attempt.id,
+          lesson: { id: lesson.id, skill: lesson.skill, title: lesson.title, cefrLevel: lesson.cefrLevel, itemCount: itemCount(lesson) },
+          doneCount: doneCount(attempt, lesson),
+          lastActivityAt: attempt.lastActivityAt,
+        },
       }
-      const attempt = {
-        id: nextAttemptId++,
-        userId,
-        lessonId: lesson.id,
-        status: 'IN_PROGRESS',
-        responses: new Map(),
-        recordings: new Map(),
-        playbackRate: 1,
-        startedAt: new Date().toISOString(),
-        finishedAt: null,
-        scorePercent: null,
-      }
-      attempts.set(attempt.id, attempt)
-      return { attemptId: attempt.id, startedAt: attempt.startedAt }
     },
   },
   {

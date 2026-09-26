@@ -71,10 +71,11 @@ function LessonPlayer({ lessonId }) {
 
   if (lesson.error?.status === 404) return <LessonNotFound />
   if (lesson.isError) {
-    // Opening a lesson loads it and starts an attempt at the same time; when both failed, one retry redoes both.
+    // Opening a lesson loads it and opens an attempt at the same time; when both failed, one retry redoes both. Retrying
+    // still picks up the unfinished attempt: a network error must not throw the learner's progress away.
     const retry = () => {
       lesson.refetch()
-      if (attempt.attemptId === null && !attempt.starting) attempt.restart()
+      if (attempt.attemptId === null && !attempt.starting) attempt.retry()
     }
     return (
       <Page title="Bài tập" width="focus">
@@ -86,7 +87,7 @@ function LessonPlayer({ lessonId }) {
   if (attempt.attemptId === null) {
     return (
       <Page title={lesson.data.title} width="focus">
-        <LoadError error={attempt.error} onRetry={attempt.restart} message="Không bắt đầu được bài tập." />
+        <LoadError error={attempt.error} onRetry={attempt.retry} message="Không bắt đầu được bài tập." />
       </Page>
     )
   }
@@ -113,6 +114,7 @@ function LessonPlayer({ lessonId }) {
         key={attempt.round}
         lesson={data}
         attemptId={attempt.attemptId}
+        progress={attempt.progress}
         nextLesson={nextLessonOf(siblings.data, lessonId)}
         onRestart={attempt.restart}
         restarting={attempt.starting}
@@ -134,9 +136,9 @@ function LessonPlayer({ lessonId }) {
 }
 
 /**
- * /exercises/lessons/:lessonId: one lesson of any skill. Opening it starts an attempt; the screen then depends on the
- * skill (grammar question by question, a listening test, or pronunciation practice). Keyed by lesson so moving to
- * "Bài tiếp theo" starts afresh.
+ * /exercises/lessons/:lessonId: one lesson of any skill. Opening it picks up the unfinished attempt (grammar,
+ * pronunciation) or starts one; the screen then depends on the skill (grammar question by question, a listening test,
+ * or pronunciation practice). Keyed by lesson so moving to "Bài tiếp theo" opens that lesson afresh.
  */
 export function LessonPage() {
   const lessonId = parseId(useParams().lessonId)

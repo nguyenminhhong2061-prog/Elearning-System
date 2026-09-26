@@ -174,3 +174,27 @@ describe('pronunciation exercise', () => {
     expect(screen.getByRole('button', { name: 'Luyện lại' })).toBeInTheDocument()
   })
 })
+
+describe('picking up an unfinished pronunciation lesson', () => {
+  it('keeps the best scores already earned and opens at the first item not recorded', async () => {
+    app = renderApp(
+      '/exercises/lessons/21',
+      pronunciationRoutes({
+        'POST /api/exercises/21/attempts': () => ({
+          status: 200,
+          data: { attemptId: ATTEMPT_ID, startedAt: '2026-09-25T02:00:00Z', resumed: true, responses: [], pronunciation: [{ itemId: 801, tryCount: 2, bestScore: 74 }] },
+        }),
+      }),
+    )
+    const user = userEvent.setup()
+
+    expect(await screen.findByText('Câu 2/2')).toBeInTheDocument()
+    expect(screen.getByText(/Giữ lại/)).toHaveTextContent('Giữ lại 1/2 mục đã luyện và điểm cao nhất.')
+
+    await user.click(screen.getByRole('button', { name: 'Kết thúc' }))
+
+    const scores = await screen.findByRole('list', { name: 'Điểm tốt nhất từng mục' })
+    expect(within(scores).getByText('74 điểm')).toBeInTheDocument()
+    expect(within(scores).getByText('Bỏ qua')).toBeInTheDocument()
+  })
+})
