@@ -84,6 +84,17 @@
       transform: translateY(0);
     }
   }
+
+  /* Loading placeholders stay invisible for 0.3s, so content that arrives quickly does not flash a spinner first. */
+  --animate-fade-in-late: fade-in 0.2s ease 0.3s both;
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
 }
 
 @layer base {

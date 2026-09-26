@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import App from '@/app/App'
 import { tokenStorage } from '@/api/tokenStorage'
 import { installFakeBackend, learner, loginResponse } from '@/test/fakeBackend'
+import '@/test/preloadPages'
 
 let backend
 

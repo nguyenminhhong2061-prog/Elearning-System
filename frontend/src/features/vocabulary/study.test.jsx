@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '@/app/App'
 import { tokenStorage } from '@/api/tokenStorage'
 import { installFakeBackend, learner } from '@/test/fakeBackend'
+import '@/test/preloadPages'
 
 // Flashcard sessions (A1) and the review reminder (A2), against the contract in docs/api/learning.md.
 

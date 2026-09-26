@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import App from '@/app/App'
 import { tokenStorage } from '@/api/tokenStorage'
 import { installFakeBackend, learner } from '@/test/fakeBackend'
+import '@/test/preloadPages'
 
 // Vocabulary games and the leaderboard (A4), against docs/api/games.md.
 
