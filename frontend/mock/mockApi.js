@@ -7,11 +7,13 @@ import { exerciseRoutes } from './routes/exercises.js'
 import { gameRoutes } from './routes/games.js'
 import { learningRoutes } from './routes/learning.js'
 import { findList, listRoutes } from './routes/lists.js'
+import { progressRoutes } from './routes/progress.js'
 import { vocabularyRoutes } from './routes/vocabulary.js'
 import { userState } from './store.js'
 
 // Vite dev-server plugin used by `npm run dev:mock`: it answers the endpoints documented in docs/api/ with sample data
-// (module A, which the backend now has too, and module B: exercises and the AI assistant, which it does not have yet),
+// (module A, which the backend now has too; module B, exercises and the AI assistant, and module D, the progress home
+// page, which it does not have yet),
 // and serves the generated listening audio (media.js). Every other /api request (login, /users/me...) still goes to
 // the real backend through the proxy. It never runs in tests or in the production build.
 
@@ -24,6 +26,7 @@ const ROUTES = [
   ...gameRoutes,
   ...exerciseRoutes,
   ...chatRoutes,
+  ...progressRoutes,
 ]
 
 function findRoute(method, pathname) {
@@ -41,7 +44,7 @@ async function handle(req, res, route, match, url) {
   await delay(LATENCY_MS)
 
   // Scenario chosen on the /__mock page (module B only): extra latency, or an error/empty reply instead.
-  const effect = scenarioEffect(scenarioOf(req), req.method, url.pathname)
+  const effect = scenarioEffect(scenarioOf(req), req.method, url.pathname, url.searchParams)
   if (effect.extraDelayMs) await delay(effect.extraDelayMs)
   if (effect.reply) {
     if (effect.reply.message) return sendError(res, effect.reply.status, effect.reply.message)

@@ -401,8 +401,10 @@ describe('sidebar', () => {
     renderApp('/')
 
     await heading(/Chào Hồng/)
-    expect(screen.getByText('B1')).toBeInTheDocument()
-    expect(screen.queryByText('Chưa xác định')).not.toBeInTheDocument()
+    // The home page shows the levels too (the level journey), so look in the sidebar only.
+    const sidebar = screen.getByRole('complementary')
+    expect(within(sidebar).getByText('B1')).toBeInTheDocument()
+    expect(within(sidebar).queryByText('Chưa xác định')).not.toBeInTheDocument()
   })
 
   it('closes the phone menu with Escape (focus back on its button) and after following a link', async () => {

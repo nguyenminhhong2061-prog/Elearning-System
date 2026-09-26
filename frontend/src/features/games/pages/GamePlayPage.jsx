@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { Spinner } from '@/components/ui/Spinner'
 import { parseId } from '@/features/vocabulary/routeParams'
 import { formatCount } from '@/features/vocabulary/topicProgress'
+import { useStudyTime } from '@/features/progress/useStudyTime'
 import { playGame } from '../api/gamesApi'
 import { useGames, useSubmitRound } from '../api/gamesQueries'
 import { formatClock } from '../clock'
@@ -49,6 +50,7 @@ function Layout({ title, children }) {
  * ends; leaving earlier sends nothing, so that round's score is not saved.
  */
 export function GamePlayPage() {
+  useStudyTime()
   const params = useParams()
   const gameId = parseId(params.gameId)
   const navigate = useNavigate()

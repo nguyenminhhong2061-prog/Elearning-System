@@ -87,8 +87,10 @@ frontend/
     │   ├── auth/              # đăng nhập, đăng ký, đổi mật khẩu, AuthProvider, useAuth, route guard
     │   ├── vocabulary/        # module A: chủ đề, học flashcard (study/), nhắc ôn, lịch sử, danh sách riêng (lists/)
     │   ├── games/             # module A (A4): trò chơi từ vựng và bảng xếp hạng
-    │   └── exercises/         # module B (giao diện): ngữ pháp (grammar/), nghe (listening/), phát âm
+    │   ├── exercises/         # module B (giao diện): ngữ pháp (grammar/), nghe (listening/), phát âm
     │                          # (pronunciation/), trợ lý AI (chat/); API theo docs/api/exercises.md, chatbot.md
+    │   └── progress/          # module D (giao diện): trang chủ Tiến độ (D1), biểu đồ vẽ bằng SVG, không thư viện;
+    │                          # ghi thời gian học (useStudyTime); API theo docs/api/progress.md
     ├── pages/                 # trang chung: HomePage, ComingSoonPage, NotFoundPage, ForbiddenPage
     ├── lib/                   # hàm tiện ích nhỏ
     └── test/                  # setup.js, fakeBackend.js (giả lập backend cho test)

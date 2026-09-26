@@ -1,9 +1,11 @@
+import { addDays, todayInVietnam } from '../src/lib/dates.js'
 import { resetChatData } from './routes/chat.js'
 import { resetExerciseData } from './routes/exercises.js'
+import { gradingSkillsReply, newLearnerReply, resetProgressData } from './routes/progress.js'
 
-// Scenarios of `npm run dev:mock` for module B (exercises and the AI assistant), so that loading, empty and error
-// screens can be seen without a backend. The chosen scenario lives in a cookie, so it applies to every tab of the
-// browser; http://localhost:5173/__mock shows the control page.
+// Scenarios of `npm run dev:mock` for module B (exercises and the AI assistant) and the home page (module D), so that
+// loading, empty and error screens can be seen without a backend. The chosen scenario lives in a cookie, so it applies
+// to every tab of the browser; http://localhost:5173/__mock shows the control page.
 
 const COOKIE = 'mockScenario'
 
@@ -14,9 +16,25 @@ export const SCENARIOS = [
   { id: 'load-error', label: 'Lỗi tải', description: 'Tải danh sách, nội dung bài và bắt đầu bài trả lỗi 500: xem thông báo lỗi và nút "Thử lại".' },
   { id: 'save-error', label: 'Lỗi lưu bài', description: 'Chấm câu và nộp bài trả lỗi 500 (bài vẫn mở được). Chuyển về "Bình thường" rồi bấm lại để thấy thử lại được.' },
   { id: 'ai-down', label: 'AI lỗi', description: 'Chấm phát âm và trợ lý AI trả lỗi 503: xem thông báo "chưa chấm được" và "không thể trả lời lúc này".' },
+  { id: 'new-learner', label: 'Người mới', description: 'Trang chủ của người chưa học gì: số liệu bằng 0, biểu đồ trống, chưa có điểm kỹ năng và thành tích, không có bài đang dở.' },
+  { id: 'grading', label: 'Đang chấm Nói, Viết', description: 'Bài kiểm tra tổng hợp gần nhất đang chờ AI chấm phần Nói và Viết: xem biểu đồ kỹ năng "Đang chấm".' },
 ]
 
-const MODULE_B = /^\/api\/(exercises|exercise-attempts|chat)(\/|$)/
+// Endpoints the scenarios may change: module B and module D. Module A is left alone, except the learning summary the
+// home page shows, which "Người mới" empties.
+const AFFECTED = /^\/api\/(exercises|exercise-attempts|chat|progress)(\/|$)/
+
+/** The learning summary (module A) of someone who has not learned a word yet. */
+function emptyLearningSummary() {
+  const today = todayInVietnam()
+  return {
+    dueToday: 0,
+    learningCount: 0,
+    masteredCount: 0,
+    reviewedToday: 0,
+    upcoming: Array.from({ length: 7 }, (_, index) => ({ date: addDays(today, index + 1), count: 0 })),
+  }
+}
 
 /** The scenario chosen on the control page ("normal" when none or an unknown one). */
 export function scenarioOf(req) {
@@ -26,10 +44,13 @@ export function scenarioOf(req) {
 
 /**
  * What a scenario changes for one API request: extra waiting time, or a reply that replaces the normal one
- * ({ status, body } or { status, message } for an error). Only module B endpoints are affected.
+ * ({ status, body } or { status, message } for an error). Only the AFFECTED endpoints change.
  */
-export function scenarioEffect(scenario, method, pathname) {
-  if (!MODULE_B.test(pathname)) return {}
+export function scenarioEffect(scenario, method, pathname, searchParams = new URLSearchParams()) {
+  if (scenario === 'new-learner' && method === 'GET' && pathname === '/api/learning/summary') {
+    return { reply: { status: 200, body: emptyLearningSummary() } }
+  }
+  if (!AFFECTED.test(pathname)) return {}
   const is = (verb, pattern) => method === verb && pattern.test(pathname)
   switch (scenario) {
     case 'slow':
@@ -38,7 +59,10 @@ export function scenarioEffect(scenario, method, pathname) {
       if (is('GET', /^\/api\/exercises$/)) return { reply: { status: 200, body: [] } }
       return is('GET', /^\/api\/exercise-attempts\/current$/) ? { reply: { status: 200, body: { current: null } } } : {}
     case 'load-error':
-      return is('GET', /^\/api\/exercises(\/\d+)?$/) || is('POST', /^\/api\/exercises\/\d+\/attempts$/) || is('GET', /^\/api\/exercise-attempts\/current$/)
+      return is('GET', /^\/api\/exercises(\/\d+)?$/) ||
+        is('POST', /^\/api\/exercises\/\d+\/attempts$/) ||
+        is('GET', /^\/api\/exercise-attempts\/current$/) ||
+        is('GET', /^\/api\/progress\//)
         ? { reply: { status: 500, message: 'Simulated server error (mock scenario "load-error")' } }
         : {}
     case 'save-error':
@@ -49,6 +73,13 @@ export function scenarioEffect(scenario, method, pathname) {
       return is('POST', /^\/api\/exercise-attempts\/\d+\/pronunciation\/\d+$/) || is('POST', /^\/api\/chat\/sessions\/\d+\/messages$/)
         ? { reply: { status: 503, message: 'Simulated AI outage (mock scenario "ai-down")' } }
         : {}
+    case 'new-learner': {
+      if (is('GET', /^\/api\/exercise-attempts\/current$/)) return { reply: { status: 200, body: { current: null } } }
+      const body = method === 'GET' ? newLearnerReply(pathname, searchParams) : undefined
+      return body ? { reply: { status: 200, body } } : {}
+    }
+    case 'grading':
+      return is('GET', /^\/api\/progress\/skills$/) ? { reply: { status: 200, body: gradingSkillsReply() } } : {}
     default:
       return {}
   }
@@ -57,6 +88,7 @@ export function scenarioEffect(scenario, method, pathname) {
 // --- Control page --------------------------------------------------------------------------------------------------
 
 const APP_LINKS = [
+  ['/', 'Trang chủ Tiến độ (module D): số liệu, biểu đồ, điểm kỹ năng, thành tích, thẻ "Tiếp tục"'],
   ['/exercises', 'Danh sách bài ngữ pháp (đủ 6 trình độ A1 đến C2)'],
   ['/exercises?skill=listening', 'Danh sách bài nghe'],
   ['/exercises?skill=pronunciation', 'Danh sách bài phát âm'],
@@ -86,6 +118,10 @@ const CHECKLIST = [
   ['Micro bị chặn', 'Bấm biểu tượng ổ khóa cạnh thanh địa chỉ, chặn Micro, tải lại trang rồi bấm ghi âm.'],
   ['Chấm phát âm, trợ lý AI lỗi', 'Chọn "AI lỗi"; hoặc gõ tin nhắn có "#503" (AI lỗi) hay "#429" (gửi quá nhanh).'],
   ['Trợ lý: gợi ý và giải thích', 'Hỏi về một câu trước khi trả lời (chỉ gợi ý), rồi hỏi lại sau khi đã trả lời (giải thích đầy đủ).'],
+  ['Trang chủ: người mới', 'Chọn "Người mới": lời chào và nút bắt đầu, biểu đồ trống, radar trống, thẻ "Học tiếp" thay cho "Tiếp tục". Hành trình trình độ trống cần trình độ rỗng trong DB (xem lệnh bên dưới).'],
+  ['Trang chủ: đang chấm Nói, Viết', 'Chọn "Đang chấm Nói, Viết": radar chỉ có Nghe, Đọc và nhãn "Đang chấm".'],
+  ['Trang chủ: biểu đồ Ngày, Tuần, Tháng', 'Đổi khoảng thời gian và chỉ số. "Điểm kiểm tra": kỳ không làm bài để trống (—), không vẽ cột 0.'],
+  ['Trang chủ: thời gian học', 'Mở một bài tập hoặc phiên flashcard, thao tác trong hơn 1 phút rồi quay về trang chủ: cột hôm nay có thêm phút học và streak được giữ.'],
   ['Nhãn "Trình độ của bạn"', 'Cần trình độ trong DB thật (xem lệnh bên dưới), rồi tải lại trang.'],
 ]
 
@@ -180,6 +216,7 @@ export function serveControlPanel(req, res) {
   if (url.pathname === '/__mock/reset') {
     resetExerciseData()
     resetChatData()
+    resetProgressData()
     redirect(res, '/__mock?reset=1')
     return true
   }
