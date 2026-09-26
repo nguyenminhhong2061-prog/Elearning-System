@@ -1,11 +1,19 @@
 import { Page } from '@/components/layout/Page'
 import { Avatar } from '@/components/ui/Avatar'
-import { Card } from '@/components/ui/Card'
 import { useAuth } from '@/features/auth/context/useAuth'
-import { DueReviewCard } from '@/features/vocabulary/components/DueReview'
+import { Achievements } from '@/features/progress/components/Achievements'
+import { ActivityChart } from '@/features/progress/components/ActivityChart'
+import { ContinueCard } from '@/features/progress/components/ContinueCard'
+import { LevelJourney } from '@/features/progress/components/LevelJourney'
+import { ProgressStats } from '@/features/progress/components/ProgressStats'
+import { SkillRadar } from '@/features/progress/components/SkillRadar'
+import { WelcomeBanner } from '@/features/progress/components/WelcomeBanner'
 import { getGivenName } from '@/lib/personName'
 
-/** Landing page after login ("Tiến độ" in the sidebar). The progress module fills in the real content later. */
+/**
+ * Landing page after login ("Tiến độ" in the sidebar), module D1 (docs/api/progress.md). Each block loads on its own,
+ * so a slow or failing one does not hold back the others.
+ */
 export function HomePage() {
   const { user } = useAuth()
 
@@ -19,12 +27,17 @@ export function HomePage() {
         </div>
       }
     >
-      {/* Review reminder of the vocabulary module (A2); hidden when nothing is due. */}
-      <DueReviewCard className="sm:max-w-75" />
-      <Card className="flex flex-col gap-1.5">
-        <h2 className="text-lg font-semibold text-ink">Tiến độ học tập</h2>
-        <p className="text-sm text-muted">Thống kê và biểu đồ tiến độ của bạn sẽ hiển thị tại đây.</p>
-      </Card>
+      <WelcomeBanner />
+      <ProgressStats />
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)]">
+        <ActivityChart />
+        <SkillRadar />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <LevelJourney />
+        <Achievements />
+      </div>
+      <ContinueCard />
     </Page>
   )
 }

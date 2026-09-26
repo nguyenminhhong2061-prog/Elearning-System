@@ -1,4 +1,5 @@
 import { CEFR_LEVELS } from '../../src/api/constants.js'
+import { todayInVietnam } from '../../src/lib/dates.js'
 import { HttpError } from '../http.js'
 import { MOCK_LESSONS } from '../exerciseFixtures.js'
 import { listeningAudioUrl } from '../media.js'
@@ -64,7 +65,7 @@ function ensureHistory(userId) {
   for (const [lessonId, scorePercent, daysAgo] of SEEDED_HISTORY) {
     const finishedAt = new Date(Date.now() - daysAgo * 86_400_000)
     const attempt = newAttempt(userId, lessonId, new Date(finishedAt.getTime() - 5 * 60_000).toISOString())
-    Object.assign(attempt, { status: 'COMPLETED', finishedAt: finishedAt.toISOString(), scorePercent })
+    Object.assign(attempt, { status: 'COMPLETED', finishedAt: finishedAt.toISOString(), scorePercent, seeded: true })
   }
   for (const [lessonId, done, hoursAgo] of SEEDED_UNFINISHED) {
     const lastActivity = new Date(Date.now() - hoursAgo * 3_600_000)
@@ -80,6 +81,13 @@ function ensureHistory(userId) {
 export function resetExerciseData() {
   attempts.clear()
   seededUsers.clear()
+}
+
+/** Lessons the learner finished on `date` (Vietnam time) in this mock, for the progress mock's "today". */
+export function exerciseCompletionsOn(userId, date) {
+  return [...attempts.values()].filter(
+    (attempt) => attempt.userId === userId && attempt.status === 'COMPLETED' && !attempt.seeded && todayInVietnam(new Date(attempt.finishedAt)) === date,
+  ).length
 }
 
 export function findLesson(id) {

@@ -66,6 +66,9 @@
   --color-review-vague: #C2410C;
   --color-review-remembered: #15803D;
 
+  /* Streak number on the home page: the design's orange (#F97316, 2.8:1 on white) darkened to pass 3:1 as large text. */
+  --color-streak: #C2410C;
+
   /* Outline of buttons on dark surfaces (session complete card). */
   --color-sidebar-line: #3A4A46;
 

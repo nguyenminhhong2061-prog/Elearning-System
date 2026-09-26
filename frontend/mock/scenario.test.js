@@ -13,10 +13,28 @@ describe('scenarioOf', () => {
 })
 
 describe('scenarioEffect', () => {
-  it('changes only module B endpoints', () => {
+  it('changes only module B and D endpoints', () => {
     expect(scenarioEffect('load-error', 'GET', '/api/topics')).toEqual({})
     expect(scenarioEffect('slow', 'GET', '/api/learning/summary')).toEqual({})
     expect(scenarioEffect('slow', 'POST', '/api/chat/sessions')).toEqual({ extraDelayMs: 2500 })
+    expect(scenarioEffect('load-error', 'GET', '/api/progress/summary').reply.status).toBe(500)
+    expect(scenarioEffect('load-error', 'POST', '/api/progress/study-time')).toEqual({})
+  })
+
+  it('shows the home page of someone who has learned nothing for "new-learner"', () => {
+    expect(scenarioEffect('new-learner', 'GET', '/api/learning/summary').reply.body).toMatchObject({ dueToday: 0, learningCount: 0, masteredCount: 0 })
+    expect(scenarioEffect('new-learner', 'GET', '/api/exercise-attempts/current').reply.body).toEqual({ current: null })
+    expect(scenarioEffect('new-learner', 'GET', '/api/progress/skills').reply.body).toEqual({ latest: null })
+    const week = scenarioEffect('new-learner', 'GET', '/api/progress/activity', new URLSearchParams({ period: 'WEEK' })).reply.body
+    expect(week.items).toHaveLength(12)
+    expect(week.totals).toEqual({ wordsLearned: 0, exercisesCompleted: 0, testsCompleted: 0, studyMinutes: 0, averageTestScore: null })
+    expect(scenarioEffect('new-learner', 'GET', '/api/progress/badges').reply.body.every((badge) => badge.earnedAt === null)).toBe(true)
+    expect(scenarioEffect('new-learner', 'GET', '/api/topics')).toEqual({})
+  })
+
+  it('leaves speaking and writing ungraded for "grading"', () => {
+    const { latest } = scenarioEffect('grading', 'GET', '/api/progress/skills').reply.body
+    expect(latest).toMatchObject({ status: 'SUBMITTED', overallScore: null, level: null, skills: { speaking: { score: null }, listening: { score: 56 } } })
   })
 
   it('empties the lesson lists but still opens lessons', () => {

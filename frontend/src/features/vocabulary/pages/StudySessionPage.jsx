@@ -5,6 +5,7 @@ import { ButtonLink } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { LoadError } from '@/components/ui/LoadError'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { useStudyTime } from '@/features/progress/useStudyTime'
 import { useStudySession } from '../api/learningQueries'
 import { parseId, VOCABULARY_PATH } from '../routeParams'
 import { FlashcardSession } from '../study/FlashcardSession'
@@ -38,6 +39,7 @@ function Message({ title, backTo, backLabel, children }) {
  * @param {{ mode: 'topic' | 'list' | 'due' }} props
  */
 export function StudySessionPage({ mode }) {
+  useStudyTime()
   const config = MODES[mode]
   const params = useParams()
   const id = config.param ? parseId(params[config.param]) : null

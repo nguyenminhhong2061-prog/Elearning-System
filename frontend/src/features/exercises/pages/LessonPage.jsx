@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/Card'
 import { LoadError } from '@/components/ui/LoadError'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { parseId } from '@/features/vocabulary/routeParams'
+import { useStudyTime } from '@/features/progress/useStudyTime'
 import { useLesson, useLessons } from '../api/exercisesQueries'
 import { ChatAssistant } from '../chat/ChatAssistant'
 import { ExerciseHeading } from '../components/ExerciseHeading'
@@ -63,6 +64,7 @@ function LessonLoading() {
 }
 
 function LessonPlayer({ lessonId }) {
+  useStudyTime()
   const lesson = useLesson(lessonId)
   const attempt = useAttempt(lessonId)
   const siblings = useLessons(lesson.data?.skill ?? null)
