@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import App from '@/app/App'
 import { tokenStorage } from '@/api/tokenStorage'
 import { installFakeBackend, learner } from '@/test/fakeBackend'
+import '@/test/preloadPages'
 
 // Personal lists (A3), against docs/api/custom-lists.md.
 

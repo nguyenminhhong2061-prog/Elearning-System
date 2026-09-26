@@ -6,6 +6,7 @@ import App from '@/app/App'
 import { tokenStorage } from '@/api/tokenStorage'
 import { addDays, todayInVietnam } from '@/lib/dates'
 import { installFakeBackend, learner } from '@/test/fakeBackend'
+import '@/test/preloadPages'
 
 // The "Lịch sử học" tab (A2: schedule and history), against docs/api/learning.md.
 

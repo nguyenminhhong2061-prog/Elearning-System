@@ -77,12 +77,13 @@ frontend/
     ├── app/
     │   ├── App.jsx            # AuthProvider + QueryProvider + routes
     │   ├── QueryProvider.jsx  # cache TanStack Query, mỗi tài khoản một cache riêng
-    │   └── router.jsx         # NƠI DUY NHẤT khai báo route
+    │   └── router.jsx         # NƠI DUY NHẤT khai báo route; mỗi trang là một file JS riêng (lazyPage)
     ├── api/                   # dùng chung: httpClient, ApiError, tokenStorage, hằng số enum, JSDoc typedef
     ├── components/
     │   ├── ui/                # Button, TextField, PasswordField, SearchField, Alert, LoadError, Card, Tag,
     │   │                      # Skeleton, Avatar, Spinner, Logo
-    │   └── layout/            # AppLayout (thanh bên), Page, AuthLayout, navItems.js
+    │   └── layout/            # AppLayout (thanh bên), Page, AuthLayout, navItems.js, RouteBoundary (đang tải,
+    │                          # lỗi của trang)
     ├── features/
     │   ├── auth/              # đăng nhập, đăng ký, đổi mật khẩu, AuthProvider, useAuth, route guard
     │   ├── vocabulary/        # module A: chủ đề, học flashcard (study/), nhắc ôn, lịch sử, danh sách riêng (lists/)
@@ -90,7 +91,7 @@ frontend/
     │   └── exercises/         # module B (giao diện): ngữ pháp (grammar/), nghe (listening/), phát âm
     │                          # (pronunciation/), trợ lý AI (chat/); API theo docs/api/exercises.md, chatbot.md
     ├── pages/                 # trang chung: HomePage, ComingSoonPage, NotFoundPage, ForbiddenPage
-    ├── lib/                   # hàm tiện ích nhỏ
+    ├── lib/                   # hàm tiện ích nhỏ; lazyPage.js (tải trang khi cần, tự tải lại sau khi deploy)
     └── test/                  # setup.js, fakeBackend.js (giả lập backend cho test)
 ```
 
@@ -112,7 +113,17 @@ File chứa JSX phải có đuôi `.jsx`, file logic thuần dùng `.js`. Mỗi 
    }
    ```
 
-2. Đăng ký route trong `src/app/router.jsx`, bên trong nhóm `AppLayout` (thay `ComingSoonPage` của mục tương ứng).
+2. Khai báo trang bằng `lazyPage` ở đầu `src/app/router.jsx` (không `import` trang trực tiếp), rồi đăng ký route
+   bên trong nhóm `AppLayout` (thay `ComingSoonPage` của mục tương ứng):
+
+   ```jsx
+   const GrammarListPage = lazyPage(() => import('@/features/exercises/pages/GrammarListPage'), 'GrammarListPage')
+   ```
+
+   Như vậy mỗi trang là một file JS riêng, chỉ tải khi người dùng mở trang đó lần đầu, và file chính không phình ra
+   theo số trang. `RouteBoundary` trong `AppLayout` lo phần đang tải (vòng quay trong vùng nội dung, thanh bên giữ
+   nguyên) và phần lỗi (trang không tải được hoặc bị lỗi khi hiển thị). Layout mới (ví dụ khu Admin) cũng phải bọc
+   `<Outlet />` bằng `<RouteBoundary>`.
 3. Nếu cần, sửa mục của mình trong `src/components/layout/navItems.js` (thanh bên).
 
 Trang chỉ dành cho admin: bọc bằng `<Route element={<ProtectedRoute roles={[ROLES.ADMIN]} />}>`. Đây chỉ là để

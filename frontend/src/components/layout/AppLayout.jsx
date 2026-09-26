@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Outlet } from 'react-router'
 import { Logo } from '@/components/ui/Logo'
+import { RouteBoundary } from './RouteBoundary'
 import { SidebarContent } from './Sidebar'
 
 /**
@@ -77,7 +78,9 @@ export function AppLayout() {
       </header>
 
       <main id="main-content" tabIndex={-1} className="min-w-0 p-[clamp(16px,4vw,32px)] outline-none md:px-[clamp(16px,4vw,40px)]">
-        <Outlet />
+        <RouteBoundary>
+          <Outlet />
+        </RouteBoundary>
       </main>
     </div>
   )
