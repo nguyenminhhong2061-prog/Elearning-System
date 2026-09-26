@@ -60,7 +60,7 @@ async function handle(req, res, route, match, url) {
       searchParams: url.searchParams,
       body,
     })
-    const status = route.status ?? (result === undefined ? 204 : 200)
+    const status = typeof route.status === 'function' ? route.status(result) : (route.status ?? (result === undefined ? 204 : 200))
     send(res, status, result)
   } catch (error) {
     if (error instanceof HttpError) return sendError(res, error.status, error.message)

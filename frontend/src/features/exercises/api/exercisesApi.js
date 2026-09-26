@@ -20,10 +20,20 @@ export async function getLesson(lessonId) {
   return data
 }
 
-/** Starts a new attempt; the server abandons the learner's unfinished one for this lesson. */
-export async function startAttempt(lessonId) {
-  const { data } = await httpClient.post(`/api/exercises/${lessonId}/attempts`)
+/**
+ * Opens a lesson: the server picks up the learner's unfinished attempt (grammar, pronunciation) when it can, or starts a
+ * new one. `restart` always starts a new one ("Làm lại từ đầu").
+ * @returns {Promise<import('../types').AttemptStart>}
+ */
+export async function startAttempt(lessonId, { restart = false } = {}) {
+  const { data } = await httpClient.post(`/api/exercises/${lessonId}/attempts`, null, restart ? { params: { restart: true } } : undefined)
   return data
+}
+
+/** The unfinished attempt the learner worked on last, for "Tiếp tục" on the home page. @returns {Promise<import('../types').CurrentAttempt | null>} */
+export async function getCurrentAttempt() {
+  const { data } = await httpClient.get('/api/exercise-attempts/current')
+  return data.current
 }
 
 /**

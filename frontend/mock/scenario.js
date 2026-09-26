@@ -35,9 +35,10 @@ export function scenarioEffect(scenario, method, pathname) {
     case 'slow':
       return { extraDelayMs: 2500 }
     case 'empty':
-      return is('GET', /^\/api\/exercises$/) ? { reply: { status: 200, body: [] } } : {}
+      if (is('GET', /^\/api\/exercises$/)) return { reply: { status: 200, body: [] } }
+      return is('GET', /^\/api\/exercise-attempts\/current$/) ? { reply: { status: 200, body: { current: null } } } : {}
     case 'load-error':
-      return is('GET', /^\/api\/exercises(\/\d+)?$/) || is('POST', /^\/api\/exercises\/\d+\/attempts$/)
+      return is('GET', /^\/api\/exercises(\/\d+)?$/) || is('POST', /^\/api\/exercises\/\d+\/attempts$/) || is('GET', /^\/api\/exercise-attempts\/current$/)
         ? { reply: { status: 500, message: 'Simulated server error (mock scenario "load-error")' } }
         : {}
     case 'save-error':
@@ -60,6 +61,8 @@ const APP_LINKS = [
   ['/exercises?skill=listening', 'Danh sách bài nghe'],
   ['/exercises?skill=pronunciation', 'Danh sách bài phát âm'],
   ['/exercises/lessons/1', 'Ngữ pháp "Thì hiện tại đơn" (đã có lịch sử tốt nhất 80%)'],
+  ['/exercises/lessons/3', 'Ngữ pháp "Thì hiện tại hoàn thành" (đang làm dở 2/6 câu: mở ra là làm tiếp từ câu 3)'],
+  ['/exercises/lessons/23', 'Phát âm "Trọng âm từ 2 âm tiết" (đang làm dở 2/6 mục)'],
   ['/exercises/lessons/7', 'Ngữ pháp C2 "Thức giả định" (bài cuối: nút "Về danh sách" thay cho "Bài tiếp theo")'],
   ['/exercises/lessons/14', 'Nghe C1 "Bài giảng ngắn về giấc ngủ" (phụ đề dài, không có tên người nói)'],
   ['/exercises/lessons/25', 'Phát âm C1 "Câu dài và ngữ điệu" (tô màu từng từ, từ bị bỏ sót)'],
@@ -73,6 +76,7 @@ const CHECKLIST = [
   ['Lỗi tải và nút "Thử lại"', 'Chọn "Lỗi tải", mở danh sách hoặc một bài. Chuyển về "Bình thường" rồi bấm "Thử lại".'],
   ['Lỗi khi chấm câu hoặc nộp bài', 'Chọn "Lỗi lưu bài", mở một bài rồi bấm "Kiểm tra" (ngữ pháp) hoặc "Nộp bài" (nghe).'],
   ['"Kỷ lục mới!"', 'Làm đúng hết bài "Thì hiện tại đơn" (lịch sử có sẵn là 80%). Lần đầu hoàn thành một bài thì không hiện.'],
+  ['Làm tiếp bài dở', 'Mở bài "Thì hiện tại hoàn thành" hoặc "Trọng âm từ 2 âm tiết": vào thẳng câu, mục chưa làm, câu cũ còn đáp án. Bấm "Làm lại từ đầu" để làm từ câu 1. Bài "Câu điều kiện loại 2" có lượt dở quá 7 ngày nên không hiện "Đang làm dở".'],
   ['"Câu cần xem lại"', 'Làm sai ít nhất một câu ngữ pháp rồi bấm "Xem kết quả".'],
   ['Phản hồi không có giải thích', 'Bài C1 "Đảo ngữ", câu 6.'],
   ['Điểm phát âm đỏ, cam, xanh', 'Mỗi mục có điểm lần đầu khác nhau (45 đến 84), mỗi lần "Thử lại" cộng 9 điểm.'],

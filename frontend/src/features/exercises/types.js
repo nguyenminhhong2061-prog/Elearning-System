@@ -9,6 +9,8 @@
  * @property {number} attemptCount completed attempts only
  * @property {number | null} bestScorePercent
  * @property {string | null} lastCompletedAt
+ * @property {{ attemptId: number, doneCount: number, lastActivityAt: string } | null} [inProgress] an attempt that can
+ *   be picked up; doneCount = questions answered or items recorded
  *
  * @typedef {object} LessonSummary
  * @property {number} id
@@ -100,6 +102,19 @@
  * @property {string} recognizedText
  * @property {Array<{ word: string, accuracyScore: number, errorType: WordErrorType }>} words
  * @property {string[]} tips
+ *
+ * @typedef {object} AttemptProgress what was already done in an attempt when the lesson was opened
+ * @property {boolean} resumed true when an unfinished attempt was picked up
+ * @property {ReviewItem[]} responses questions answered (grammar)
+ * @property {Array<{ itemId: number, tryCount: number, bestScore: number }>} pronunciation items recorded
+ *
+ * @typedef {AttemptProgress & { attemptId: number, startedAt: string }} AttemptStart
+ *
+ * @typedef {object} CurrentAttempt
+ * @property {number} attemptId
+ * @property {{ id: number, skill: Skill, title: string, cefrLevel: import('@/api/types').CefrLevel, itemCount: number }} lesson
+ * @property {number} doneCount
+ * @property {string} lastActivityAt
  *
  * @typedef {object} ChatReply
  * @property {number} id

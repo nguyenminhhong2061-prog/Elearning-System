@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { describeApiError } from '@/api/errorMessages'
 import { Page } from '@/components/layout/Page'
@@ -5,12 +6,13 @@ import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { TextField } from '@/components/ui/TextField'
 import { answerQuestion } from '../api/exercisesApi'
-import { useCompleteAttempt } from '../api/exercisesQueries'
+import { markAttemptsStale, useCompleteAttempt } from '../api/exercisesQueries'
 import { AnswerFeedback } from '../components/AnswerFeedback'
 import { ChoiceOptions } from '../components/ChoiceOptions'
 import { ExerciseHeading } from '../components/ExerciseHeading'
 import { QuestionProgress } from '../components/QuestionProgress'
 import { ResultCard } from '../components/ResultCard'
+import { ResumeNotice } from '../components/ResumeNotice'
 import { ScoreRing } from '../components/ScoreRing'
 import { GrammarReview } from './GrammarReview'
 
@@ -27,13 +29,26 @@ function hasChoice(question, choice) {
 }
 
 /**
+ * Where a picked-up attempt stands: the answers already graded (review items carry the same fields as a grading
+ * result) and the first question still open, or the last one when every question was answered.
+ */
+function resumeState(questions, responses) {
+  const graded = new Map(responses.map((item) => [item.questionId, item]))
+  const choices = new Map(responses.map((item) => [item.questionId, { optionId: item.optionId, answer: item.answer ?? '' }]))
+  const firstOpen = questions.findIndex((question) => !graded.has(question.id))
+  const index = firstOpen === -1 ? questions.length - 1 : firstOpen
+  return { graded, choices, index, choice: choices.get(questions[index].id) ?? EMPTY_CHOICE }
+}
+
+/**
  * B1, grammar: one question at a time. The learner picks or types an answer and presses "Kiểm tra"; the server grades
  * it at once and returns the right answer and the explanation. After the last question the attempt is completed and
- * the score shown, with the questions to review.
+ * the score shown, with the questions to review. A picked-up attempt opens at the first question not answered yet.
  *
  * @param {object} props
  * @param {import('../types').Lesson} props.lesson
  * @param {number} props.attemptId
+ * @param {import('../types').AttemptProgress} props.progress what was already done when the attempt was picked up
  * @param {{ id: number, title: string } | null} props.nextLesson
  * @param {() => void} props.onRestart
  * @param {boolean} props.restarting
@@ -41,16 +56,18 @@ function hasChoice(question, choice) {
  * @param {(context: { questionId?: number }) => void} props.onChatContext
  * @param {() => void} props.onAskAssistant
  */
-export function GrammarExercise({ lesson, attemptId, nextLesson, onRestart, restarting, restartError, onChatContext, onAskAssistant }) {
+export function GrammarExercise({ lesson, attemptId, progress, nextLesson, onRestart, restarting, restartError, onChatContext, onAskAssistant }) {
   const questions = lesson.questions
-  const [index, setIndex] = useState(0)
-  const [choice, setChoice] = useState(EMPTY_CHOICE)
-  const [choices, setChoices] = useState(() => new Map()) // questionId -> what the learner answered
-  const [graded, setGraded] = useState(() => new Map()) // questionId -> ResponseResult
+  const [resumed] = useState(() => resumeState(questions, progress.responses))
+  const [index, setIndex] = useState(resumed.index)
+  const [choice, setChoice] = useState(resumed.choice)
+  const [choices, setChoices] = useState(resumed.choices) // questionId -> what the learner answered
+  const [graded, setGraded] = useState(resumed.graded) // questionId -> ResponseResult
   const [checking, setChecking] = useState(false)
   const [checkError, setCheckError] = useState(null)
   const [hintShown, setHintShown] = useState(false)
   const complete = useCompleteAttempt(attemptId)
+  const queryClient = useQueryClient()
   const nextButton = useRef(null)
   const resultHeading = useRef(null)
 
@@ -81,6 +98,7 @@ export function GrammarExercise({ lesson, attemptId, nextLesson, onRestart, rest
       const response = await answerQuestion(attemptId, toResponse(question, choice))
       setChoices((previous) => new Map(previous).set(question.id, choice))
       setGraded((previous) => new Map(previous).set(question.id, response))
+      markAttemptsStale(queryClient)
     } catch (error) {
       setCheckError(describeApiError(error, 'Chưa gửi được câu trả lời. Hãy thử lại.'))
     } finally {
@@ -174,6 +192,14 @@ export function GrammarExercise({ lesson, attemptId, nextLesson, onRestart, rest
         />
       }
     >
+      {progress.resumed && (
+        <ResumeNotice
+          detail={`${progress.responses.length}/${questions.length} câu đã trả lời`}
+          onRestart={onRestart}
+          restarting={restarting}
+          restartError={restartError}
+        />
+      )}
       <QuestionProgress outcomes={outcomes} current={index} />
 
       <form

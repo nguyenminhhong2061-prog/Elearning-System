@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { describeApiError } from '@/api/errorMessages'
 import { Page } from '@/components/layout/Page'
@@ -6,9 +7,10 @@ import { Spinner } from '@/components/ui/Spinner'
 import { Tag } from '@/components/ui/Tag'
 import { pronounce } from '@/lib/speech'
 import { assessPronunciation } from '../api/exercisesApi'
-import { useCompleteAttempt } from '../api/exercisesQueries'
+import { markAttemptsStale, useCompleteAttempt } from '../api/exercisesQueries'
 import { ExerciseHeading } from '../components/ExerciseHeading'
 import { ResultCard } from '../components/ResultCard'
+import { ResumeNotice } from '../components/ResumeNotice'
 import { ScoreRing } from '../components/ScoreRing'
 import { MAX_RECORDING_MS, MIN_RECORDING_MS, scoreBand } from '../constants'
 import { formatPlayTime } from '../time'
@@ -55,22 +57,30 @@ function itemLabel(item) {
   return item.text.trim().split(/\s+/).length >= 3 ? 'Câu' : 'Từ'
 }
 
+/** The first item not recorded yet in a picked-up attempt, or the last one when every item was. */
+function firstOpenItem(items, practiced) {
+  const index = items.findIndex((item) => !practiced.has(item.id))
+  return index === -1 ? items.length - 1 : index
+}
+
 /**
  * B3, pronunciation: one word or sentence at a time on the design's dark card. The learner hears the model, records
  * themselves, and the server (an AI speech service) returns a score with tips. They may try again as often as they
- * like, skip an item, or go on; at the end the attempt is completed with each item's best score.
+ * like, skip an item, or go on; at the end the attempt is completed with each item's best score. A picked-up attempt
+ * keeps the best scores already earned and opens at the first item not recorded yet.
  *
  * @param {object} props see GrammarExercise
  */
-export function PronunciationExercise({ lesson, attemptId, nextLesson, onRestart, restarting, restartError, onChatContext }) {
+export function PronunciationExercise({ lesson, attemptId, progress, nextLesson, onRestart, restarting, restartError, onChatContext }) {
   const items = lesson.pronunciationItems
-  const [index, setIndex] = useState(0)
+  const [best, setBest] = useState(() => new Map(progress.pronunciation.map((item) => [item.itemId, item.bestScore]))) // itemId -> best overall score
+  const [index, setIndex] = useState(() => firstOpenItem(items, best))
   const [assessing, setAssessing] = useState(false)
   const [assessment, setAssessment] = useState(null)
   const [assessError, setAssessError] = useState(null)
-  const [best, setBest] = useState(() => new Map()) // itemId -> best overall score
   const [recordingUrl, setRecordingUrl] = useState(null)
   const complete = useCompleteAttempt(attemptId)
+  const queryClient = useQueryClient()
   const supported = isRecordingSupported()
   const summaryArea = useRef(null)
 
@@ -90,6 +100,7 @@ export function PronunciationExercise({ lesson, attemptId, nextLesson, onRestart
         const result = await assessPronunciation(attemptId, item.id, wav)
         setAssessment(result)
         setBest((previous) => new Map(previous).set(item.id, Math.max(previous.get(item.id) ?? 0, result.overallScore)))
+        markAttemptsStale(queryClient)
       } catch (error) {
         setAssessError(assessmentErrorMessage(error))
       } finally {
@@ -257,6 +268,14 @@ export function PronunciationExercise({ lesson, attemptId, nextLesson, onRestart
         />
       }
     >
+      {progress.resumed && (
+        <ResumeNotice
+          detail={`${progress.pronunciation.length}/${items.length} mục đã luyện và điểm cao nhất`}
+          onRestart={onRestart}
+          restarting={restarting}
+          restartError={restartError}
+        />
+      )}
       <section
         aria-label={`${itemLabel(item)} ${index + 1} trên ${items.length}`}
         className="flex animate-screen-in flex-col items-center gap-5 rounded-2xl bg-sidebar-deep p-9 text-center"

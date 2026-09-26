@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
-import { ATTEMPT_ID, baseRoutes, GRAMMAR_LESSON, gradeGrammar, renderApp } from './testFixtures'
+import { ATTEMPT_ID, baseRoutes, GRAMMAR_LESSON, gradeGrammar, LESSONS, renderApp } from './testFixtures'
 
 // Lesson lists and the grammar exercise (B1), against docs/api/exercises.md.
 
@@ -170,6 +170,7 @@ describe('grammar exercise', () => {
 
     expect(await screen.findByText('Câu 1/1')).toBeInTheDocument()
     expect(app.callsTo('POST /api/exercises/3/attempts')).toHaveLength(2)
+    expect(app.callsTo('POST /api/exercises/3/attempts')[1].params).toEqual({ restart: true })
     expect(screen.getByRole('radio', { name: 'has lived' })).not.toBeChecked()
     expect(screen.queryByText('✓ Chính xác!')).not.toBeInTheDocument()
   })
@@ -190,6 +191,8 @@ describe('grammar exercise', () => {
     await user.click(screen.getByRole('button', { name: 'Thử lại' }))
 
     expect(await screen.findByText('Câu 1/2')).toBeInTheDocument()
+    // A failed opening must not throw away an unfinished attempt: retrying still asks to pick it up.
+    expect(app.callsTo('POST /api/exercises/3/attempts').every((call) => call.params === undefined)).toBe(true)
   })
 
   it('says the lesson does not exist for an unknown id', async () => {
@@ -203,5 +206,63 @@ describe('grammar exercise', () => {
 
     expect(await screen.findByText('Bài tập này không tồn tại hoặc chưa được mở.')).toBeInTheDocument()
     await waitFor(() => expect(screen.getByRole('link', { name: '← Về danh sách bài tập' })).toHaveAttribute('href', '/exercises'))
+  })
+})
+
+describe('picking up an unfinished lesson', () => {
+  const ATTEMPTS = 'POST /api/exercises/3/attempts'
+  const RESPONSES = `POST /api/exercise-attempts/${ATTEMPT_ID}/responses`
+  const resumed = { status: 200, data: { attemptId: ATTEMPT_ID, startedAt: '2026-09-25T02:00:00Z', resumed: true, responses: [RESULT.review[0]], pronunciation: [] } }
+
+  it('opens at the first question not answered and keeps the earlier answers', async () => {
+    app = renderApp('/exercises/lessons/3', grammarRoutes({ [ATTEMPTS]: () => resumed }))
+    const user = userEvent.setup()
+
+    expect(await screen.findByText('Câu 2/2')).toBeInTheDocument()
+    expect(screen.getByText(/Giữ lại/)).toHaveTextContent('Làm tiếp từ lần trước. Giữ lại 1/2 câu đã trả lời.')
+    expect(screen.getByRole('progressbar', { name: 'Tiến độ bài làm' })).toHaveAttribute('aria-valuetext', 'Đã trả lời 1 / 2 câu')
+
+    await user.type(screen.getByLabelText('Đáp án của bạn'), 'seen')
+    await user.click(screen.getByRole('button', { name: 'Kiểm tra' }))
+    await user.click(await screen.findByRole('button', { name: 'Xem kết quả' }))
+
+    expect(await screen.findByRole('heading', { name: 'Hoàn thành bài tập' })).toBeInTheDocument()
+    expect(app.callsTo(RESPONSES).map((call) => call.body)).toEqual([{ questionId: 32, answer: 'seen' }])
+    expect(screen.queryByText(/Làm tiếp từ lần trước/)).not.toBeInTheDocument()
+  })
+
+  it('shows the last question already graded when every question was answered', async () => {
+    const allAnswered = { ...resumed, data: { ...resumed.data, responses: RESULT.review } }
+    app = renderApp('/exercises/lessons/3', grammarRoutes({ [ATTEMPTS]: () => allAnswered }))
+
+    expect(await screen.findByText('Câu 2/2')).toBeInTheDocument()
+    expect(screen.getByLabelText('Đáp án của bạn')).toHaveValue('seen')
+    expect(screen.getByRole('button', { name: 'Xem kết quả' })).toBeEnabled()
+  })
+
+  it('starts over from the first question with "Làm lại từ đầu"', async () => {
+    app = renderApp(
+      '/exercises/lessons/3',
+      grammarRoutes({
+        [ATTEMPTS]: ({ params }) =>
+          params?.restart ? { status: 201, data: { attemptId: ATTEMPT_ID, startedAt: '2026-09-27T02:00:00Z', resumed: false, responses: [], pronunciation: [] } } : resumed,
+      }),
+    )
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Làm lại từ đầu' }))
+
+    expect(await screen.findByText('Câu 1/2')).toBeInTheDocument()
+    expect(screen.queryByText(/Làm tiếp từ lần trước/)).not.toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'lives' })).not.toBeChecked()
+    expect(app.callsTo(ATTEMPTS).map((call) => call.params)).toEqual([undefined, { restart: true }])
+  })
+
+  it('marks the lessons that can be picked up in the list', async () => {
+    const inProgress = { attemptId: 57, doneCount: 1, lastActivityAt: '2026-09-26T14:10:00Z' }
+    const lessons = LESSONS.GRAMMAR.map((lesson) => (lesson.id === 3 ? { ...lesson, progress: { ...lesson.progress, inProgress } } : lesson))
+    app = renderApp('/exercises', baseRoutes({ 'GET /api/exercises': () => ({ data: lessons }) }))
+
+    expect(await screen.findByRole('link', { name: /Thì hiện tại hoàn thành/ })).toHaveTextContent('Đang làm dở · 1/2 câu')
+    expect(screen.getByRole('link', { name: /Câu bị động/ })).not.toHaveTextContent('Đang làm dở')
   })
 })

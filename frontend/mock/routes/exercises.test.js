@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { encodeWav } from '../../src/features/exercises/pronunciation/wav.js'
 import { HttpError } from '../http.js'
 import { MOCK_LESSONS } from '../exerciseFixtures.js'
-import { exerciseRoutes, fakeAssessment, grade, normalizeAnswer, readWav, resetExerciseData } from './exercises'
+import { exerciseRoutes, fakeAssessment, grade, isResumable, normalizeAnswer, readWav, resetExerciseData } from './exercises'
 
 // Grading rules of docs/api/exercises.md, as the mock applies them (the backend must behave the same way).
 
@@ -105,5 +105,71 @@ describe('sample data for trying every screen', () => {
     expect(first.words.some((word) => word.errorType === 'MISPRONUNCIATION')).toBe(true)
     expect(first.tips[0]).toContain('bị bỏ sót')
     expect(fakeAssessment(sentence, 2, tone).words.some((word) => word.errorType === 'OMISSION')).toBe(false)
+  })
+})
+
+describe('picking up unfinished attempts', () => {
+  const route = (method, path) => exerciseRoutes.find((candidate) => candidate.method === method && candidate.pattern.test(path))
+  const call = (method, path, input) => {
+    const found = route(method, path)
+    return { found, result: found.handle({ searchParams: new URLSearchParams(), body: {}, ...input, match: found.pattern.exec(path) }) }
+  }
+  const open = (userId, lessonId, restart = false) => {
+    const { found, result } = call('POST', `/api/exercises/${lessonId}/attempts`, { userId, searchParams: new URLSearchParams(restart ? { restart: 'true' } : {}) })
+    return { status: found.status(result), ...result }
+  }
+  const answer = (userId, attemptId, body) => call('POST', `/api/exercise-attempts/${attemptId}/responses`, { userId, body }).result
+  const current = (userId) => call('GET', '/api/exercise-attempts/current', { userId }).result.current
+  const listLessons = (userId, skill) => call('GET', '/api/exercises', { userId, searchParams: new URLSearchParams({ skill }) }).result
+  const firstQuestion = (lessonId) => MOCK_LESSONS.find((lesson) => lesson.id === lessonId).questions[0]
+
+  it('picks up the attempt with its answers until "restart" starts over', () => {
+    const first = open('u-resume', 3)
+    expect(first).toMatchObject({ status: 200, resumed: true })
+    expect(first.responses.map((item) => item.correct)).toEqual([true, false])
+    expect(first.responses[0]).not.toHaveProperty('awardedPoints')
+    expect(open('u-resume', 3).attemptId).toBe(first.attemptId)
+
+    const fresh = open('u-resume', 3, true)
+    expect(fresh).toMatchObject({ status: 201, resumed: false, responses: [] })
+    expect(fresh.attemptId).not.toBe(first.attemptId)
+  })
+
+  it('does not pick up an attempt with nothing done in it', () => {
+    const empty = open('u-empty', 3, true)
+    const reopened = open('u-empty', 3)
+    expect(reopened).toMatchObject({ status: 201, resumed: false })
+    expect(reopened.attemptId).not.toBe(empty.attemptId)
+
+    const question = firstQuestion(3)
+    answer('u-empty', reopened.attemptId, question.options.length ? { questionId: question.id, optionId: question.options[0].id } : { questionId: question.id, answer: 'x' })
+    expect(open('u-empty', 3)).toMatchObject({ attemptId: reopened.attemptId, resumed: true })
+  })
+
+  it('never picks up a listening attempt', () => {
+    const started = open('u-listen', 11)
+    const question = firstQuestion(11)
+    answer('u-listen', started.attemptId, { questionId: question.id, optionId: question.options[0].id })
+    expect(open('u-listen', 11)).toMatchObject({ status: 201, resumed: false })
+  })
+
+  it('forgets attempts idle for more than 7 days', () => {
+    expect(listLessons('u-idle', 'GRAMMAR').find((lesson) => lesson.id === 4).progress.inProgress).toBeNull()
+    expect(open('u-idle', 4)).toMatchObject({ status: 201, resumed: false })
+
+    const attempt = { status: 'IN_PROGRESS', responses: new Map([[1, {}]]), recordings: new Map(), lastActivityAt: '2026-09-20T00:00:00Z' }
+    expect(isResumable(attempt, { skill: 'GRAMMAR' }, Date.parse('2026-09-27T00:00:00Z'))).toBe(true)
+    expect(isResumable(attempt, { skill: 'GRAMMAR' }, Date.parse('2026-09-27T00:00:00.001Z'))).toBe(false)
+  })
+
+  it('lists what can be picked up and offers the latest one as "current"', () => {
+    expect(listLessons('u-current', 'GRAMMAR').find((lesson) => lesson.id === 3).progress.inProgress).toMatchObject({ doneCount: 2 })
+    expect(listLessons('u-current', 'PRONUNCIATION').find((lesson) => lesson.id === 23).progress.inProgress).toMatchObject({ doneCount: 2 })
+    expect(current('u-current')).toMatchObject({ lesson: { id: 3, title: 'Thì hiện tại hoàn thành', itemCount: 6 }, doneCount: 2 })
+
+    const attemptId = current('u-current').attemptId
+    call('POST', `/api/exercise-attempts/${attemptId}/complete`, { userId: 'u-current', body: { responses: [] } })
+    expect(current('u-current')).toMatchObject({ lesson: { id: 23 } })
+    expect(current('u-nobody-yet')).toMatchObject({ lesson: { id: 3 } })
   })
 })

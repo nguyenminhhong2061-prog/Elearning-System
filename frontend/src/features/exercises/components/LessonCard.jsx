@@ -10,8 +10,8 @@ function describeSize(lesson) {
 }
 
 /**
- * One lesson of the list, as the design's white card: title and difficulty, then its size. Below, the learner's best
- * score as a bar ("mức độ hoàn thành" of B1), or "Chưa làm".
+ * One lesson of the list, as the design's white card: title and difficulty, then its size, and "Đang làm dở" when an
+ * attempt can be picked up. Below, the learner's best score as a bar ("mức độ hoàn thành" of B1), or "Chưa làm".
  *
  * @param {{ lesson: import('../types').LessonSummary }} props
  */
@@ -31,6 +31,11 @@ export function LessonCard({ lesson }) {
       </span>
       {lesson.description && <span className="line-clamp-2 text-label text-muted">{lesson.description}</span>}
       <span className="text-label text-muted">{describeSize(lesson)}</span>
+      {lesson.progress.inProgress && (
+        <Tag variant="warning" className="self-start">
+          Đang làm dở · {lesson.progress.inProgress.doneCount}/{lesson.itemCount} {SKILL_INFO[lesson.skill].unit}
+        </Tag>
+      )}
       <span className="mt-auto flex items-center gap-2.5 pt-1.5">
         {done ? (
           <>
