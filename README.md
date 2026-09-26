@@ -29,17 +29,37 @@ npm install
 
 ### Mỗi lần chạy: mở Docker Desktop, rồi 2 cửa sổ terminal
 
-Mở **Docker Desktop** trước và chờ đến khi nó báo engine đang chạy. Các lệnh dưới đây viết cho **PowerShell**
-(terminal mặc định của IntelliJ và VS Code trên Windows); thay `C:\duong-dan\DATN` bằng thư mục repo trên máy bạn.
+Mở **Docker Desktop** trước và chờ đến khi nó báo engine đang chạy.
+
+**Trước khi gõ lệnh, xem mình đang dùng terminal nào**, vì cú pháp đặt biến môi trường khác nhau và gõ nhầm sẽ báo lỗi:
+
+| Dấu nhắc lệnh trông như | Terminal | Dùng khối lệnh |
+|---|---|---|
+| `Ten@MAY MINGW64 ~/Desktop/DATN $` | **Git Bash** | Git Bash |
+| `PS C:\Users\...\DATN>` | **PowerShell** | PowerShell |
+
+Thay `~/Desktop/DATN` (hoặc `C:\duong-dan\DATN`) bằng thư mục repo trên máy bạn.
 
 **Terminal 1: backend** (để nguyên cửa sổ này, đóng lại là backend tắt)
+
+Git Bash:
+
+```bash
+cd ~/Desktop/DATN
+docker compose up -d
+cd datn
+export JWT_SECRET="chuoi-bi-mat-khi-dev-dai-it-nhat-32-ky-tu-0123456789"
+./mvnw spring-boot:run
+```
+
+PowerShell:
 
 ```powershell
 cd C:\duong-dan\DATN
 docker compose up -d
 cd datn
 $env:JWT_SECRET = "chuoi-bi-mat-khi-dev-dai-it-nhat-32-ky-tu-0123456789"
-.\mvnw spring-boot:run
+./mvnw spring-boot:run
 ```
 
 - `docker compose up -d` bật Postgres 16 ở cổng **5433**. Lần đầu sẽ tải image. Postgres đã chạy rồi thì lệnh này
@@ -47,27 +67,22 @@ $env:JWT_SECRET = "chuoi-bi-mat-khi-dev-dai-it-nhat-32-ky-tu-0123456789"
 - Backend sẵn sàng khi terminal hiện dòng `Started DatnApplication in ... seconds`, tại `http://localhost:8080`.
   Lần chạy đầu Maven tải thư viện nên lâu hơn. Flyway tự tạo bảng và dữ liệu mẫu.
 - Vì sao đặt `JWT_SECRET`: nếu để trống, mỗi lần khởi động backend sinh một khóa mới, token cũ mất hiệu lực và
-  bạn bị đăng xuất. `$env:` chỉ có tác dụng trong cửa sổ terminal đó.
+  bạn bị đăng xuất. Biến chỉ có tác dụng trong cửa sổ terminal vừa đặt, mở cửa sổ mới thì đặt lại.
 - Giá trị mặc định trong `application.properties` đã khớp `docker-compose.yml` (database, user, mật khẩu đều là
   `datn`, cổng 5433), nên không cần tạo file `.env`.
 
-**Terminal 2: frontend**
+**Terminal 2: frontend** (giống nhau ở Git Bash và PowerShell)
 
-```powershell
-cd C:\duong-dan\DATN\frontend
+```bash
+cd ~/Desktop/DATN/frontend
 npm run dev
 ```
 
 Mở **http://localhost:5173**, bấm "Đăng ký" để tạo tài khoản learner (hoặc đăng nhập tài khoản đã có trong DB
-cục bộ). Tài khoản admin: đặt thêm `$env:ADMIN_EMAIL` và `$env:ADMIN_PASSWORD` trước `.\mvnw spring-boot:run`, backend
-tạo tài khoản đó lúc khởi động nếu email chưa có.
+cục bộ). Tài khoản admin: đặt thêm `ADMIN_EMAIL` và `ADMIN_PASSWORD` (cùng cách đặt `JWT_SECRET`) trước khi chạy
+backend; backend tạo tài khoản đó lúc khởi động nếu email chưa có.
 
-Dùng terminal khác PowerShell:
-
-| Việc | Git Bash | Command Prompt (cmd) |
-|---|---|---|
-| Đặt khóa JWT | `export JWT_SECRET="..."` | `set JWT_SECRET=...` |
-| Chạy backend | `./mvnw spring-boot:run` | `mvnw spring-boot:run` |
+Command Prompt (cmd): đặt biến bằng `set JWT_SECRET=...` rồi chạy `mvnw spring-boot:run`.
 
 Chạy backend bằng nút Run của IntelliJ (lớp `DatnApplication`) cũng được: vẫn phải bật Docker và
 `docker compose up -d` trước; đặt `JWT_SECRET` trong *Run → Edit Configurations → Environment variables*.
@@ -95,14 +110,16 @@ module B chưa có. Chỉ chạy một chế độ một lúc (cùng cổng 5173
 
 ### Lỗi thường gặp
 
-Các lỗi `ENOENT`, `'.\mvnw' is not recognized`, `Connection to localhost:5433 refused`,
+Các lỗi gõ nhầm cú pháp Git Bash và PowerShell, `ENOENT`, `'.\mvnw' is not recognized`, `Connection to localhost:5433 refused`,
 `Port 8080 was already in use`, `http proxy error` và trang Bài tập báo lỗi đã được tái hiện trên máy khi viết mục
 này; các dòng còn lại là lỗi hay gặp khác.
 
 | Thông báo | Nguyên nhân | Cách sửa |
 |---|---|---|
+| `bash: :JWT_SECRET: command not found` và `bash: .mvnw: command not found` | Gõ lệnh **PowerShell** trong **Git Bash** | Dùng khối Git Bash: `export JWT_SECRET="..."` và `./mvnw spring-boot:run` (dấu `/`, không phải `\`) |
+| `The term 'export' is not recognized ...` | Gõ lệnh **Git Bash** trong **PowerShell** | Dùng khối PowerShell: `$env:JWT_SECRET = "..."` |
 | `npm error code ENOENT` … `path ...\DATN\package.json` | Chạy `npm` ở thư mục gốc repo | `cd frontend` rồi chạy lại |
-| `The term '.\mvnw' is not recognized ...` | Không đứng trong thư mục `datn` | `cd datn` rồi chạy lại |
+| PowerShell: `The term '.\mvnw' is not recognized ...`; Git Bash: `./mvnw: No such file or directory` | Không đứng trong thư mục `datn` | `cd datn` rồi chạy lại |
 | `Connection to localhost:5433 refused` (khi khởi động backend) | Postgres chưa chạy: Docker Desktop tắt, hoặc chưa `docker compose up -d` | Mở Docker Desktop, chạy `docker compose up -d` ở thư mục gốc, rồi chạy lại backend |
 | `docker compose` báo `... dockerDesktopLinuxEngine ... cannot find the file specified` | Docker Desktop chưa mở | Mở Docker Desktop, chờ engine chạy, chạy lại lệnh |
 | `Web server failed to start. Port 8080 was already in use.` | Một backend khác đang chạy (terminal khác, IntelliJ, hoặc tiến trình java còn sót) | Dùng backend đang chạy, hoặc `netstat -ano \| findstr :8080` để lấy PID rồi `Stop-Process -Id <PID>` |
