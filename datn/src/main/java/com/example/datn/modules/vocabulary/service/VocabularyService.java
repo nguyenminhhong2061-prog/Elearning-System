@@ -1,18 +1,30 @@
 package com.example.datn.modules.vocabulary.service;
 
+import com.example.datn.common.dto.PageResponse;
+import com.example.datn.common.enums.CefrLevel;
+import com.example.datn.common.security.CurrentUser;
 import com.example.datn.modules.vocabulary.dto.request.CreateVocabularyRequest;
 import com.example.datn.modules.vocabulary.dto.request.UpdateVocabularyRequest;
 import com.example.datn.modules.vocabulary.dto.response.VocabularyResponse;
+import com.example.datn.modules.vocabulary.entity.UserVocabulary;
 import com.example.datn.modules.vocabulary.entity.Vocabulary;
+import com.example.datn.modules.vocabulary.enums.LearningStatus;
 import com.example.datn.modules.vocabulary.exception.TopicNotFoundException;
 import com.example.datn.modules.vocabulary.exception.VocabularyNotFoundException;
 import com.example.datn.modules.vocabulary.mapper.VocabularyMapper;
 import com.example.datn.modules.vocabulary.repository.TopicRepository;
+import com.example.datn.modules.vocabulary.repository.UserVocabularyRepository;
 import com.example.datn.modules.vocabulary.repository.VocabularyRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -20,20 +32,27 @@ public class VocabularyService {
 
     private final VocabularyRepository repository;
     private final TopicRepository topicRepository;
+    private final UserVocabularyRepository userVocabularyRepository;
     private final VocabularyMapper mapper;
+    private final CurrentUser currentUser;
 
     public VocabularyService(
             VocabularyRepository repository,
             TopicRepository topicRepository,
-            VocabularyMapper mapper) {
+            UserVocabularyRepository userVocabularyRepository,
+            VocabularyMapper mapper,
+            CurrentUser currentUser) {
         this.repository = repository;
         this.topicRepository = topicRepository;
+        this.userVocabularyRepository = userVocabularyRepository;
         this.mapper = mapper;
+        this.currentUser = currentUser;
     }
 
     public VocabularyResponse create(CreateVocabularyRequest request) {
         requireTopicIfPresent(request.topicId());
-        // createdBy stays null until authentication exists to tell us who the caller is.
+        // System words keep created_by NULL, whichever admin adds them. A non-null created_by marks a learner's own
+        // word, visible only to that learner (Phase 4), so visibility never depends on the creator's current role.
         Vocabulary vocabulary = new Vocabulary(
                 request.topicId(),
                 null,
@@ -44,18 +63,39 @@ public class VocabularyService {
                 request.audioUrl(),
                 request.imageUrl(),
                 request.difficultyLevel());
-        return mapper.toResponse(repository.save(vocabulary));
+        return mapper.toResponse(repository.save(vocabulary), LearningStatus.NEW);
     }
 
+    /**
+     * One page of the words the current user can see (system words and their own) matching the optional filters,
+     * easiest first (see VocabularyRepository#search).
+     */
     @Transactional(readOnly = true)
-    public List<VocabularyResponse> findAll(Long topicId) {
-        List<Vocabulary> result = topicId == null ? repository.findAll() : repository.findAllByTopicId(topicId);
-        return result.stream().map(mapper::toResponse).toList();
+    public PageResponse<VocabularyResponse> search(Long topicId, String q, CefrLevel level, int page, int size) {
+        Page<Vocabulary> words = repository.search(
+                currentUser.id(), topicId, level, toLikePattern(q), PageRequest.of(page, size));
+        return toPage(words);
     }
 
+    /** A word another learner typed in is "not found" for everyone else, like a missing word. */
     @Transactional(readOnly = true)
     public VocabularyResponse findById(Long id) {
-        return mapper.toResponse(findEntity(id));
+        Vocabulary vocabulary = findEntity(id);
+        if (!vocabulary.isVisibleTo(currentUser.id())) {
+            throw new VocabularyNotFoundException(id);
+        }
+        return toResponse(vocabulary);
+    }
+
+    /** VocabularyItem responses of a page of words, with the current user's statuses read in one query. */
+    public PageResponse<VocabularyResponse> toPage(Page<Vocabulary> words) {
+        Map<Long, LearningStatus> statuses = statusesOf(words.getContent().stream().map(Vocabulary::getId).toList());
+        return PageResponse.from(words, word -> toResponse(word, statuses));
+    }
+
+    /** The VocabularyItem response of one word, with the current user's status. */
+    public VocabularyResponse toResponse(Vocabulary vocabulary) {
+        return toResponse(vocabulary, statusesOf(List.of(vocabulary.getId())));
     }
 
     public VocabularyResponse update(Long id, UpdateVocabularyRequest request) {
@@ -70,7 +110,7 @@ public class VocabularyService {
                 request.audioUrl(),
                 request.imageUrl(),
                 request.difficultyLevel());
-        return mapper.toResponse(vocabulary);
+        return toResponse(vocabulary);
     }
 
     public void delete(Long id) {
@@ -85,5 +125,33 @@ public class VocabularyService {
         if (topicId != null && !topicRepository.existsById(topicId)) {
             throw new TopicNotFoundException(topicId);
         }
+    }
+
+    private VocabularyResponse toResponse(Vocabulary vocabulary, Map<Long, LearningStatus> statuses) {
+        return mapper.toResponse(vocabulary, statuses.getOrDefault(vocabulary.getId(), LearningStatus.NEW));
+    }
+
+    /** The current user's status of each given word, in one query; words never studied are missing (NEW). */
+    private Map<Long, LearningStatus> statusesOf(Collection<Long> vocabularyIds) {
+        if (vocabularyIds.isEmpty()) {
+            return Map.of();
+        }
+        return userVocabularyRepository.findAllByUserIdAndVocabularyIdIn(currentUser.id(), vocabularyIds).stream()
+                .collect(Collectors.toMap(UserVocabulary::getVocabularyId, UserVocabulary::getStatus));
+    }
+
+    /**
+     * "Contains q, ignoring case" as a LIKE pattern, or null when q is blank. '%' and '_' typed by the user are
+     * escaped (with '!', see the query) so that they match themselves instead of acting as wildcards.
+     */
+    static String toLikePattern(String q) {
+        if (q == null || q.isBlank()) {
+            return null;
+        }
+        String escaped = q.strip().toLowerCase(Locale.ROOT)
+                .replace("!", "!!")
+                .replace("%", "!%")
+                .replace("_", "!_");
+        return "%" + escaped + "%";
     }
 }

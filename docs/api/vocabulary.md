@@ -1,8 +1,8 @@
 # API kho từ vựng (Phase 2) — contract
 
-> Trạng thái: **đã chốt cho frontend, backend chưa làm.** Frontend (`frontend/src/features/vocabulary/`) viết theo
-> tài liệu này. Backend Phase 2 phải trả đúng định dạng dưới đây; khác chỗ nào thì sửa tài liệu và frontend cùng lúc.
-> Chạy thử giao diện khi backend chưa xong: `npm run dev:mock` trong `frontend/` (dữ liệu giả theo đúng contract).
+> Trạng thái: **frontend và backend đã làm theo tài liệu này** (backend: module `vocabulary`, test
+> `VocabularyApiTests` và `VocabularyPostgresIntegrationTests`). Khác chỗ nào thì sửa tài liệu, frontend và backend
+> cùng lúc. `npm run dev:mock` trong `frontend/` vẫn dùng được khi cần dữ liệu giả.
 
 Mọi endpoint cần đăng nhập (`Authorization: Bearer <token>`). Lỗi dùng định dạng chung
 `{ "timestamp": "...", "status": 404, "message": "..." }`. Giá trị enum trong JSON viết **chữ hoa**.
@@ -74,6 +74,9 @@ Trả `200` với một `Topic`; `404` nếu không có.
 
 ### `GET /api/vocabulary`
 
+Chỉ gồm các từ người dùng được thấy: từ hệ thống (`createdBy` là `null`) và từ chính họ tự nhập vào danh sách riêng
+(Phase 4, `docs/api/custom-lists.md`). `GET /api/vocabulary/{id}` trả `404` với từ tự nhập của người khác.
+
 | Tham số | Mặc định | Ý nghĩa |
 |---|---|---|
 | `topicId` | không lọc | Chỉ lấy từ của chủ đề này |
@@ -88,13 +91,14 @@ chỉ có trang đã tải, nên nếu tự sắp xếp thì từ A1 ở trang s
 `A1`…`C2` xếp theo chữ cái cũng đúng thứ tự trình độ, nên `ORDER BY difficulty_level, lower(word), id` là đủ.
 Trả `200` với `PageResponse<VocabularyItem>`; `400` nếu `level`, `page` hoặc `size` không hợp lệ.
 
-> **Thay đổi không tương thích:** hiện endpoint này trả mảng. Từ Phase 2 trả `PageResponse`. Chỉ `VocabularyApiTests`
-> của module `vocabulary` đang dùng nên cần sửa cùng lúc.
+> **Thay đổi không tương thích (đã áp dụng ở Phase 2):** trước Phase 2 endpoint này trả mảng, nay trả `PageResponse`.
+> Module khác gọi endpoint này phải đọc `items`.
 
 ### Ghi dữ liệu (`POST`, `PUT`, `DELETE` trên `/api/topics` và `/api/vocabulary`)
 
 Thân yêu cầu giữ nguyên như hiện tại. **Chỉ `ADMIN`**; learner nhận `403`. Frontend Phase 2 không có màn quản trị
-(demo dùng Swagger/Postman; module Admin chưa phân công).
+(demo dùng Swagger/Postman; module Admin chưa phân công). Từ do admin thêm là từ hệ thống nên `createdBy` luôn là
+`null`; `createdBy` khác `null` chỉ dành cho từ người học tự nhập (xem `docs/api/custom-lists.md`).
 
 ## Frontend dùng như thế nào
 
@@ -104,10 +108,14 @@ Thân yêu cầu giữ nguyên như hiện tại. **Chỉ `ADMIN`**; learner nh�
 | Tìm từ trên màn Từ vựng (từ 2 ký tự) | `GET /api/vocabulary?q=...&size=10` |
 | Chi tiết chủ đề | `GET /api/topics/{id}` và `GET /api/vocabulary?topicId={id}&size=20&page=...` (nút "Xem thêm từ") |
 
-## Việc backend Phase 2 cần làm để khớp contract
+## Backend Phase 2 (đã làm)
 
-1. Thêm `wordCount`, `learnedCount`, `dueCount` vào `TopicResponse` (một truy vấn đếm theo nhóm, không N+1).
-2. `learningStatus` cho từng từ theo người dùng hiện tại (`CurrentUser`), join `user_vocabulary`.
-3. `q`, `level`, phân trang và thứ tự từ dễ đến khó cho `GET /api/vocabulary`; `PageResponse` trong `common`.
+1. `wordCount`, `learnedCount`, `dueCount` trong `TopicResponse`: một truy vấn `GROUP BY` cho mọi chủ đề
+   (`VocabularyRepository.countByTopic`), không N+1. "Hôm nay" tính theo giờ Việt Nam (`StudyCalendar`).
+2. `learningStatus` theo người dùng hiện tại: một truy vấn `user_vocabulary` cho cả trang. Entity `UserVocabulary`
+   nằm trong module `vocabulary` (cả module A ở một module, tránh phụ thuộc vòng); Phase 2 chỉ đọc.
+3. `q` (thoát ký tự `%` và `_`), `level`, phân trang, thứ tự A1 → C2; `PageResponse` ở `common.dto`.
 4. `@PreAuthorize("hasRole('ADMIN')")` cho các endpoint ghi.
-5. Migration seed 8–10 chủ đề, mỗi chủ đề 20–30 từ (có thể lấy từ `frontend/mock/vocabularyFixtures.js`).
+5. Dữ liệu seed: `V202609251600__seed_topics_and_vocabulary.sql` (6 chủ đề, 74 từ, sinh từ
+   `frontend/mock/vocabularyFixtures.js`) và `V202609251700__seed_more_vocabulary.sql` (thêm 106 từ và 2 chủ đề).
+   Tổng cộng 8 chủ đề, 180 từ, mỗi chủ đề 22–26 từ. Dữ liệu giả của frontend giữ bộ nhỏ vì test frontend dựa vào nó.

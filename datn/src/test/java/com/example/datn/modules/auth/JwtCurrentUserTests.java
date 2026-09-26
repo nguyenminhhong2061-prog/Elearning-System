@@ -1,6 +1,8 @@
 package com.example.datn.modules.auth;
 
+import com.example.datn.common.enums.CefrLevel;
 import com.example.datn.modules.auth.security.JwtCurrentUser;
+import com.example.datn.modules.user.service.UserService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
@@ -11,13 +13,18 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class JwtCurrentUserTests {
 
-    private final JwtCurrentUser currentUser = new JwtCurrentUser();
+    private final UserService userService = mock(UserService.class);
+
+    private final JwtCurrentUser currentUser = new JwtCurrentUser(userService);
 
     @AfterEach
     void clearContext() {
@@ -37,6 +44,14 @@ class JwtCurrentUserTests {
         authenticateAs("7", "ROLE_ADMIN");
 
         assertThat(currentUser.isAdmin()).isTrue();
+    }
+
+    @Test
+    void currentLevelIsReadFromTheUserRecordOfTheTokenSubject() {
+        authenticateAs("42", "ROLE_LEARNER");
+        when(userService.findCurrentLevel(42L)).thenReturn(Optional.of(CefrLevel.B1));
+
+        assertThat(currentUser.currentLevel()).contains(CefrLevel.B1);
     }
 
     @Test

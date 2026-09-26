@@ -65,6 +65,7 @@ Quan hệ: users 1-n user_level_history. Module dùng: Tiến độ, Kiểm tra 
 - review_count INT
 - next_review_at DATE -- quyết định "từ cần ôn hôm nay"
 - last_reviewed_at, first_learned_at
+- interval_days INT NULL -- bậc ôn hiện tại tính bằng ngày (1, 3, 7, 14, 30), NULL khi chưa ôn lần nào. Thêm ở migration `V202609252000` (Phase 3) vì không suy ra được bậc từ các cột khác ("Chưa nhớ" đưa về bậc đầu)
 
 ## custom_vocabulary_lists
 

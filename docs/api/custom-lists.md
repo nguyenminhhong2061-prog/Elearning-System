@@ -1,7 +1,7 @@
 # API danh sách từ riêng (Phase 4: A3) — contract
 
-> Trạng thái: **đã chốt cho frontend, backend chưa làm.** Frontend (`frontend/src/features/vocabulary/`) viết theo
-> tài liệu này; `npm run dev:mock` trong `frontend/` trả dữ liệu giả đúng định dạng. Quy ước chung (xác thực, lỗi,
+> Trạng thái: **frontend và backend đã làm theo tài liệu này** (backend: `CustomListController` trong module
+> `vocabulary`). `npm run dev:mock` trong `frontend/` vẫn dùng được khi cần dữ liệu giả. Quy ước chung (xác thực, lỗi,
 > enum chữ hoa, `PageResponse`, `VocabularyItem`) giống `docs/api/vocabulary.md`.
 
 Nghiệp vụ A3: người học tạo danh sách, đặt tên, thêm từ (chọn từ kho có sẵn **hoặc tự nhập**), và danh sách xuất hiện
@@ -48,6 +48,8 @@ backend dùng `current_level` của người học, chưa có thì `A1` (cột `
 Quy tắc:
 
 - `name`: bắt buộc, cắt khoảng trắng, tối đa 150 ký tự (`400` nếu sai). Không bắt buộc duy nhất.
+- Một lần tạo nhận tối đa 100 `vocabularyIds` và 100 `newWords` (`400` nếu hơn), để một yêu cầu không ghi được số dòng
+  tùy ý.
 - Tạo danh sách là **một giao dịch**: danh sách, các từ có sẵn trong `vocabularyIds` (trùng thì bỏ qua) và các từ
   tự nhập trong `newWords` cùng được lưu, hoặc không có gì được lưu. `vocabularyIds` chứa từ không tồn tại hoặc người
   dùng không được thấy thì trả `400`.
@@ -65,10 +67,15 @@ Quy tắc:
 | Chi tiết danh sách (đổi tên, xóa, bỏ từ, thêm từ trong kho hoặc tự nhập) | các endpoint còn lại |
 | "Học danh sách này →" | `GET /api/learning/session?listId=` |
 
-## Việc backend Phase 4 cần làm
+## Backend Phase 4 (đã làm)
 
-1. Entity `CustomVocabularyList`, `CustomVocabularyListItem` (khóa kép `list_id`, `vocabulary_id`) trong module
-   `vocabulary`; kiểm tra chủ sở hữu qua `CurrentUser`.
-2. `GET /api/vocabulary` và phiên học chỉ trả từ hệ thống (`created_by` là admin hoặc `NULL`) cùng từ do chính người
-   dùng tạo.
-3. Các endpoint trên; test cho quyền (danh sách người khác trả `404`) và cho giao dịch khi tạo.
+1. Entity `CustomVocabularyList` và `CustomVocabularyListItem` (khóa kép `@EmbeddedId`) trong module `vocabulary`.
+   Mọi thao tác đi qua `CustomListService.requireOwnList`: danh sách của người khác trả `404` như danh sách không có.
+2. Luật hiển thị `created_by IS NULL OR created_by = :userId` áp cho mọi truy vấn đọc từ: `GET /api/vocabulary`,
+   `GET /api/vocabulary/{id}` (`404` với từ riêng của người khác), số đếm của chủ đề và danh sách, phiên học, đánh giá
+   thẻ. Từ hệ thống luôn có `created_by` là `NULL`, kể cả khi admin thêm qua API (chốt 25/09/2026), nên luật này không
+   cần tra role trong bảng `users` của module khác.
+3. Từ tự nhập không ghi trình độ lấy `CurrentUser.currentLevel()` (đọc `users.current_level`), chưa có thì `A1`.
+4. Tạo danh sách: kiểm tra hết đầu vào rồi mới ghi, cả hàm trong một transaction. Xóa danh sách xóa các mục trước
+   (không dựa vào `ON DELETE CASCADE`, để giống nhau trên mọi DB), giữ lại từ tự nhập và tiến độ học.
+5. Test: `CustomListApiTests` (quyền, giao dịch, hiển thị từ riêng), `CustomListPostgresIntegrationTests`.

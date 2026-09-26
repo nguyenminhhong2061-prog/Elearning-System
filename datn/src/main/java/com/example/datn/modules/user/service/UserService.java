@@ -1,5 +1,6 @@
 package com.example.datn.modules.user.service;
 
+import com.example.datn.common.enums.CefrLevel;
 import com.example.datn.modules.user.dto.response.UserResponse;
 import com.example.datn.modules.user.entity.User;
 import com.example.datn.modules.user.enums.UserRole;
@@ -48,6 +49,12 @@ public class UserService {
 
     public void updatePasswordHash(Long id, String passwordHash) {
         findEntity(id).changePasswordHash(passwordHash);
+    }
+
+    /** The user's CEFR level, empty when it has not been set yet or the user does not exist. */
+    @Transactional(readOnly = true)
+    public Optional<CefrLevel> findCurrentLevel(Long id) {
+        return repository.findById(id).map(User::getCurrentLevel);
     }
 
     @Transactional(readOnly = true)

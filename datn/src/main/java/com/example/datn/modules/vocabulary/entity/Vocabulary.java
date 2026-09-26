@@ -110,6 +110,14 @@ public class Vocabulary {
         return difficultyLevel;
     }
 
+    /**
+     * System words (created_by NULL) are visible to everyone; a word a learner typed in is visible only to that
+     * learner (docs/api/custom-lists.md).
+     */
+    public boolean isVisibleTo(Long userId) {
+        return createdBy == null || createdBy.equals(userId);
+    }
+
     public void update(
             Long topicId,
             String word,
