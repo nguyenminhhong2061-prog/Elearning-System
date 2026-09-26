@@ -169,7 +169,7 @@ class WordReviewedListener {
 ## Backend Phase 3 (đã làm)
 
 1. Migration `V202609252000__add_interval_days_to_user_vocabulary.sql`: cột `interval_days` (bậc ôn tính bằng ngày,
-   `NULL` khi chưa ôn), đã ghi vào `Database.md`.
+   `NULL` khi chưa ôn), đã ghi vào `docs/starter/Database.md`.
 2. Entity `UserVocabulary` đủ cột, converter chữ thường cho `status` và `last_review_result`.
 3. `ReviewScheduler`: logic thuần, `ReviewSchedulerTests` dùng cùng các trường hợp với `frontend/mock/scheduler.test.js`.
 4. Bốn endpoint trên (`LearningController`, `LearningService`), người dùng lấy qua `CurrentUser`, "hôm nay" qua
