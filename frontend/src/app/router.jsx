@@ -1,6 +1,8 @@
 import { Route, Routes } from 'react-router'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AuthLayout } from '@/components/layout/AuthLayout'
+import { ExercisesPage } from '@/features/exercises/pages/ExercisesPage'
+import { LessonPage } from '@/features/exercises/pages/LessonPage'
 import { GuestRoute } from '@/features/auth/guards/GuestRoute'
 import { GamePlayPage } from '@/features/games/pages/GamePlayPage'
 import { GamesPage } from '@/features/games/pages/GamesPage'
@@ -50,8 +52,13 @@ export function AppRoutes() {
             <Route path="games/:gameId" element={<GamePlayPage />} />
           </Route>
 
+          {/* Module B: exercises and the AI assistant (API contract: docs/api/exercises.md, docs/api/chatbot.md). */}
+          <Route path="exercises">
+            <Route index element={<ExercisesPage />} />
+            <Route path="lessons/:lessonId" element={<LessonPage />} />
+          </Route>
+
           {/* Sections owned by other modules. Replace the placeholder when the module's pages exist. */}
-          <Route path="exercises/*" element={<ComingSoonPage title="Bài tập" />} />
           <Route path="tests/*" element={<ComingSoonPage title="Kiểm tra" />} />
           <Route path="plan/*" element={<ComingSoonPage title="Kế hoạch" />} />
         </Route>

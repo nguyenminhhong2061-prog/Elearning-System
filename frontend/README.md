@@ -11,21 +11,29 @@ giao diện **tiếng Việt**. Code và comment viết bằng tiếng Anh, gi�
 
 ## Chạy
 
+Hướng dẫn đầy đủ, chạy cả backend và frontend trên Windows, kèm bảng lỗi thường gặp: mục **"Chạy dự án trên máy"**
+trong [README gốc](../README.md#chạy-dự-án-trên-máy). Tóm tắt phần frontend (backend phải đang chạy):
+
 ```bash
 cd frontend
-npm install
+npm install        # lần đầu, và mỗi khi package.json thay đổi
 npm run dev        # http://localhost:5173
 ```
 
 | Lệnh | Tác dụng |
 |---|---|
-| `npm run dev` | Chạy server phát triển (tự nạp lại khi sửa code) |
-| `npm run dev:mock` | Như `dev`, nhưng các API của module A mô tả trong `docs/api/` (từ vựng, học flashcard...) trả **dữ liệu giả** trong `mock/`, lưu trong bộ nhớ theo từng tài khoản (mất khi tắt server). Dùng khi backend chưa có các API đó; đăng nhập vẫn cần backend thật |
+| `npm run dev` | Chạy server phát triển (tự nạp lại khi sửa code), mọi API gọi backend thật |
+| `npm run dev:mock` | Như `dev`, nhưng các API mô tả trong `docs/api/` (module A và module B: bài tập, trợ lý AI) trả **dữ liệu giả** trong `mock/`, lưu trong bộ nhớ theo từng tài khoản (mất khi tắt server). Dùng khi backend chưa có các API đó; đăng nhập vẫn cần backend thật. Sửa file trong `mock/` thì phải tắt và chạy lại lệnh |
 | `npm run build` | Build bản production vào `dist/` |
 | `npm run preview` | Chạy thử bản đã build |
 | `npm run lint` | Kiểm tra code bằng oxlint |
 | `npm test` | Chạy toàn bộ test một lần (Vitest + React Testing Library) |
 | `npm run test:watch` | Chạy test và tự chạy lại khi sửa |
+
+**Dữ liệu giả của module Bài tập:** khi chạy `npm run dev:mock`, mở `http://localhost:5173/__mock` để chọn tình
+huống (mạng chậm, danh sách trống, lỗi tải, lỗi lưu, AI lỗi) và xem danh sách các màn cần thử. Tình huống lưu trong
+cookie `mockScenario` nên áp dụng cho mọi tab. Code ở `mock/scenario.js`, dữ liệu mẫu ở `mock/exerciseFixtures.js`
+(bài `id` 99 cố tình không có câu hỏi và không hiện trong danh sách), lịch sử làm bài mẫu ở `mock/routes/exercises.js`.
 
 Muốn có tài khoản admin để thử: chạy backend với `ADMIN_EMAIL` và `ADMIN_PASSWORD` (xem README gốc).
 Tài khoản đăng ký qua giao diện luôn là learner.
@@ -60,7 +68,9 @@ Cấu hình tùy chọn (copy `.env.example` thành `.env.local`, file này khô
 ```
 frontend/
 ├── LinguaStep-design-source/  # bản thiết kế gốc (chỉ để tham khảo, xem mục Thiết kế)
-├── mock/                      # API giả cho `npm run dev:mock`: mockApi.js (plugin), routes/, store.js, scheduler.js (không vào bản build)
+├── mock/                      # API giả cho `npm run dev:mock`: mockApi.js (plugin), routes/, store.js, scheduler.js,
+│                              # exerciseFixtures.js, media.js (audio bài nghe), scenario.js (trang /__mock)
+│                              # (không vào bản build)
 └── src/
     ├── main.jsx               # điểm vào: BrowserRouter + App
     ├── index.css              # Tailwind, design token, @font-face
@@ -76,7 +86,9 @@ frontend/
     ├── features/
     │   ├── auth/              # đăng nhập, đăng ký, đổi mật khẩu, AuthProvider, useAuth, route guard
     │   ├── vocabulary/        # module A: chủ đề, học flashcard (study/), nhắc ôn, lịch sử, danh sách riêng (lists/)
-    │   └── games/             # module A (A4): trò chơi từ vựng và bảng xếp hạng
+    │   ├── games/             # module A (A4): trò chơi từ vựng và bảng xếp hạng
+    │   └── exercises/         # module B (giao diện): ngữ pháp (grammar/), nghe (listening/), phát âm
+    │                          # (pronunciation/), trợ lý AI (chat/); API theo docs/api/exercises.md, chatbot.md
     ├── pages/                 # trang chung: HomePage, ComingSoonPage, NotFoundPage, ForbiddenPage
     ├── lib/                   # hàm tiện ích nhỏ
     └── test/                  # setup.js, fakeBackend.js (giả lập backend cho test)

@@ -1,7 +1,7 @@
 # API trò chơi từ vựng và bảng xếp hạng (Phase 5: A4) — contract
 
 > Trạng thái: **frontend và backend đã làm theo tài liệu này** (backend: `GameController` trong module `vocabulary`).
-> Ngày 25/09/2026 người dùng quyết định A4 thuộc module của Hồng và tự nhận phần bảng trò chơi mà `Database.md` bản sau
+> Ngày 25/09/2026 người dùng quyết định A4 thuộc module của Hồng và tự nhận phần bảng trò chơi mà `docs/starter/Database.md` bản sau
 > họp còn ghi cho Nhân (**cần báo Nhân** để không làm trùng). `npm run dev:mock` trong `frontend/` vẫn dùng được khi cần
 > dữ liệu giả. Quy ước chung (xác thực, lỗi, enum chữ hoa) giống `docs/api/vocabulary.md`.
 

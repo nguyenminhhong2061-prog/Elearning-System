@@ -1,46 +1,362 @@
-# DATN — Nền tảng học tiếng Anh cá nhân hóa theo AI
+# DATN — LinguaStep: học tiếng Anh theo năng lực, có AI hỗ trợ
 
-Backend Spring Boot (Java 21) + PostgreSQL. Schema do Flyway quản lý. Frontend React (Vite) nằm trong `frontend/`,
-xem [frontend/README.md](frontend/README.md) để biết cách chạy.
+Đồ án tốt nghiệp PTIT (Khoa CNTT1): **"Xây dựng hệ thống quản lý học tiếng Anh theo năng lực ứng dụng công nghệ AI hỗ
+trợ giải thích và gợi ý lộ trình học"**. Nền tảng web cho người học theo trình độ CEFR (A1 đến C2): học từ vựng bằng
+flashcard và lặp lại ngắt quãng, làm bài tập ngữ pháp, nghe, phát âm có chatbot AI giải thích, làm bài kiểm tra, theo
+dõi tiến độ và kế hoạch học cá nhân; admin quản lý nội dung, người dùng và thống kê.
 
-## Yêu cầu
+**Mới vào nhóm? Bắt đầu ở mục [Bắt đầu nhanh cho thành viên mới](#bắt-đầu-nhanh-cho-thành-viên-mới).**
 
-- **JDK 21** (`java -version` phải ra 21.x, `JAVA_HOME` trỏ tới JDK 21)
-- **Docker Desktop** đang chạy (dùng cho Postgres cục bộ và cho test Testcontainers)
-- Không cần cài Maven (dùng `./mvnw`) và không cần cài PostgreSQL
+## Mục lục
 
-## Chạy backend
+1. [Bắt đầu nhanh cho thành viên mới](#bắt-đầu-nhanh-cho-thành-viên-mới)
+2. [Công nghệ](#công-nghệ)
+3. [Phân công và trạng thái](#phân-công-và-trạng-thái)
+4. [Cấu trúc thư mục](#cấu-trúc-thư-mục)
+5. [Chạy dự án trên máy](#chạy-dự-án-trên-máy)
+6. [Quy trình làm việc nhóm](#quy-trình-làm-việc-nhóm)
+7. [Kiến trúc và quy ước code](#kiến-trúc-và-quy-ước-code)
+8. [Chạy test](#chạy-test)
+9. [Xác thực (Auth)](#xác-thực-auth)
+10. [Cơ sở dữ liệu và migration](#cơ-sở-dữ-liệu-và-migration)
+11. [Dùng Neon (demo / staging)](#dùng-neon-demo--staging)
+12. [Bảo mật và dữ liệu nhạy cảm](#bảo-mật-và-dữ-liệu-nhạy-cảm-đọc-trước-khi-commit)
+13. [Lưu ý từ module A cho các module khác](#lưu-ý-từ-module-a-từ-vựng-cho-các-module-khác)
+
+## Bắt đầu nhanh cho thành viên mới
+
+Làm lần lượt năm bước dưới đây; mất khoảng một buổi.
+
+### Bước 1. Đọc tài liệu nền tảng trong `docs/starter/`
+
+Đọc theo thứ tự này, vì tài liệu sau dùng khái niệm của tài liệu trước:
+
+| Thứ tự | Tài liệu | Đọc để biết |
+|---|---|---|
+| 1 | [Mô tả hệ thống bằng ngôn ngữ tự nhiên](docs/starter/Mô%20tả%20hệ%20thống%20bằng%20ngôn%20ngữ%20tự%20nhiên.md) | Hệ thống làm gì, ai dùng, nghiệp vụ từng module A đến E kèm các trường hợp ngoại lệ. Đọc kỹ module của bạn. |
+| 2 | [Database](docs/starter/Database.md) | Toàn bộ bảng và kiểu dữ liệu, bảng nào thuộc module nào, các quyết định đã chốt ở buổi họp 23/09/2026. Đây là nguồn chuẩn về schema. |
+| 3 | [Cấu trúc module mẫu](docs/starter/ARCHITECTURE_SAMPLE.md) | Một module backend gồm những thư mục nào (`controller`, `service`, `repository`...) và luồng xử lý một request, dựa trên module mẫu `sample`. |
+
+Sau đó đọc tiếp tài liệu của phần mình làm:
+
+- Làm backend một module: contract API của module đó trong [`docs/api/`](docs/api/) (xem [bảng](#tài-liệu-trong-docs)), mục
+  [Kiến trúc và quy ước code](#kiến-trúc-và-quy-ước-code) và [Lưu ý từ module A](#lưu-ý-từ-module-a-từ-vựng-cho-các-module-khác).
+- Làm frontend: [frontend/README.md](frontend/README.md) (công nghệ, cấu trúc, design system, cách gọi API).
+
+### Bước 2. Cài công cụ
+
+| Phần mềm | Kiểm tra | Ghi chú |
+|---|---|---|
+| **Git** (kèm Git Bash) | `git --version` | Trên Windows, Git Bash là terminal được dùng trong các hướng dẫn |
+| **JDK 21** | `java -version` ra `21.x` | `JAVA_HOME` phải trỏ tới JDK 21 |
+| **Docker Desktop** | `docker version` có phần `Server` | Chạy Postgres trên máy và test Testcontainers |
+| **Node 22** và npm 10 | `node -v`, `npm -v` | Cho frontend |
+| IntelliJ IDEA (khuyên dùng) | | Mở cả thư mục repo. Nếu backend chưa được nhận, chuột phải `datn/pom.xml` → *Add as Maven Project*; *File → Project Structure* đặt SDK là 21 |
+
+Không cần cài Maven (dùng `mvnw` có sẵn) và không cần cài PostgreSQL.
+
+### Bước 3. Lấy code về
+
+Nhờ chủ repo mời vào repository trên GitHub, rồi:
 
 ```bash
-# 1. Bật Postgres cục bộ (lần đầu sẽ tải image)
-docker compose up -d
+git clone git@github.com:nguyenminhhong2061-prog/DATN.git   # cần SSH key đã thêm vào GitHub
+cd DATN/frontend
+npm install                                                  # cài thư viện frontend (lần đầu)
+```
 
-# 2. Chạy ứng dụng (Flyway tự tạo schema ở lần chạy đầu)
+Chưa có SSH key thì clone bằng HTTPS: `git clone https://github.com/nguyenminhhong2061-prog/DATN.git`.
+
+### Bước 4. Chạy thử toàn bộ dự án
+
+Làm theo mục [Chạy dự án trên máy](#chạy-dự-án-trên-máy). Xong khi mở được `http://localhost:5173`, đăng ký một tài
+khoản và thấy trang Từ vựng có các chủ đề.
+
+### Bước 5. Tạo nhánh đầu tiên
+
+Đọc [Quy trình làm việc nhóm](#quy-trình-làm-việc-nhóm) và [Bảo mật](#bảo-mật-và-dữ-liệu-nhạy-cảm-đọc-trước-khi-commit)
+trước lần commit đầu tiên, rồi:
+
+```bash
+git switch main
+git pull
+git switch -c feature/ten-viec-ngan-gon
+```
+
+## Công nghệ
+
+| Phần | Công nghệ |
+|---|---|
+| Backend | Java 21, Spring Boot 4.1.1, Spring Data JPA (Hibernate), Spring Security (JWT HS256, BCrypt), Flyway |
+| Cơ sở dữ liệu | PostgreSQL 16: Docker trên máy cá nhân, Neon cho demo |
+| Frontend | React 19, Vite, **JavaScript** (không TypeScript), Tailwind CSS 4, React Router 7, TanStack Query 5, axios |
+| Test | JUnit 5, MockMvc, H2, Testcontainers (backend); Vitest, React Testing Library (frontend) |
+| Thiết kế giao diện | Bản thiết kế LinguaStep trong `frontend/LinguaStep-design-source/` |
+
+## Phân công và trạng thái
+
+Cập nhật 27/09/2026. Chi tiết phần việc của từng người: `docs/Báo cáo và phân công công việc/Phân chia công việc.docx`.
+
+| Module | Nội dung | Backend | Frontend |
+|---|---|---|---|
+| Đăng nhập, đăng ký | Đăng ký, đăng nhập, đăng xuất, đổi mật khẩu | Nguyễn Minh Hồng (xong) | Nguyễn Minh Hồng (xong) |
+| A. Học từ vựng | Chủ đề, flashcard, lặp lại ngắt quãng, danh sách từ riêng, trò chơi và bảng xếp hạng | Nguyễn Minh Hồng (xong) | Nguyễn Minh Hồng (xong) |
+| B. Bài tập và chatbot AI | Ngữ pháp, nghe hiểu, phát âm, trợ lý AI giải thích | Lý Quang Đạt (chưa có) | Nguyễn Minh Hồng (xong, đang chạy bằng dữ liệu giả) |
+| C. Kiểm tra | Kiểm tra định kỳ, kiểm tra tổng hợp 4 kỹ năng | Khuất Huy Nhân (chưa có) | Nguyễn Minh Hồng (chưa làm) |
+| D. Tiến độ và kế hoạch | Biểu đồ, huy hiệu, kế hoạch học, nhắc nhở | Khuất Huy Nhân (chưa có) | Nguyễn Minh Hồng (chưa làm) |
+| E. Admin | Quản lý nội dung, người dùng, thống kê | Chưa phân công | Nguyễn Minh Hồng (chưa làm) |
+
+**Toàn bộ giao diện (thư mục `frontend/`) do một người làm.** Người làm backend không cần sửa `frontend/`; hai bên
+thống nhất với nhau qua contract API trong `docs/api/` (xem [Quy trình làm việc nhóm](#quy-trình-làm-việc-nhóm)).
+
+## Cấu trúc thư mục
+
+```
+DATN/
+├── README.md                 # tài liệu này
+├── docker-compose.yml        # Postgres 16 cho máy cá nhân (cổng 5433)
+├── .env.example              # mẫu biến môi trường, không chứa giá trị thật
+├── datn/                     # BACKEND Spring Boot
+│   ├── pom.xml, mvnw         # Maven (dùng mvnw, không cần cài Maven)
+│   └── src/
+│       ├── main/java/com/example/datn/
+│       │   ├── DatnApplication.java
+│       │   ├── common/       # dùng chung mọi module: CurrentUser, PageResponse, sự kiện, CefrLevel...
+│       │   └── modules/      # mỗi chức năng một module: auth, user, vocabulary, sample (module mẫu)
+│       ├── main/resources/
+│       │   ├── application.properties
+│       │   └── db/migration/ # migration Flyway (V1__init.sql là schema gốc)
+│       └── test/             # test H2 (nhanh) và test Postgres (Testcontainers)
+├── frontend/                 # FRONTEND React, xem frontend/README.md
+│   ├── src/                  # app/ (route), api/, components/, features/<module>/, pages/
+│   ├── mock/                 # API giả cho `npm run dev:mock` (không vào bản build)
+│   └── LinguaStep-design-source/   # bản thiết kế giao diện (chỉ để tham khảo)
+└── docs/                     # TÀI LIỆU
+    ├── starter/              # đọc đầu tiên: nghiệp vụ, database, cấu trúc module
+    ├── api/                  # contract API từng module
+    └── Báo cáo và phân công công việc/   # phiếu giao đề tài, báo cáo, tài liệu B1 đến B3, phân chia công việc
+```
+
+### Tài liệu trong `docs/`
+
+| Tài liệu | Nội dung | Trạng thái |
+|---|---|---|
+| `starter/Mô tả hệ thống bằng ngôn ngữ tự nhiên.md` | Mục đích, actor, nghiệp vụ và đối tượng dữ liệu từng module | Tài liệu yêu cầu |
+| `starter/Database.md` | Đặc tả database toàn hệ thống | **Nguồn chuẩn** về schema; đổi bảng thì sửa file này |
+| `starter/ARCHITECTURE_SAMPLE.md` | Ý nghĩa từng thư mục của một module backend | Mẫu cho module mới |
+| `api/vocabulary.md` | Chủ đề, từ vựng, tìm kiếm, phân trang (module A) | Đã có backend |
+| `api/learning.md` | Phiên flashcard, đánh giá thẻ, lịch ôn, lịch sử học (module A) | Đã có backend |
+| `api/custom-lists.md` | Danh sách từ riêng (module A) | Đã có backend |
+| `api/games.md` | Trò chơi từ vựng và bảng xếp hạng (module A) | Đã có backend |
+| `api/exercises.md` | Bài tập ngữ pháp, nghe, phát âm (module B) | Đề xuất, chờ người làm backend B duyệt |
+| `api/chatbot.md` | Trợ lý AI giải thích bài tập (module B) | Đề xuất, chờ người làm backend B duyệt |
+| `Báo cáo và phân công công việc/` | Tài liệu của đồ án: phiếu giao đề tài, báo cáo, B1 thu thập yêu cầu, B2 phân tích, B3 thiết kế, phân chia công việc | Tài liệu tham khảo |
+
+## Chạy dự án trên máy
+
+> Đã chạy thử theo đúng các bước dưới đây ngày 26/09/2026 trên Windows 10 (Git Bash và PowerShell), với JDK 21.0.12,
+> Node 22.20 và Docker Desktop 29: backend khởi động, frontend lên, đăng ký và đăng nhập qua giao diện được, trang
+> Từ vựng lấy dữ liệu từ backend thật.
+
+Cần các công cụ ở [Bước 2](#bước-2-cài-công-cụ). Cài thư viện frontend **lần đầu** và **mỗi khi
+`frontend/package.json` thay đổi** sau khi pull:
+
+```bash
+cd frontend
+npm install
+```
+
+### Mỗi lần chạy: mở Docker Desktop, rồi 2 cửa sổ terminal
+
+Mở **Docker Desktop** trước và chờ đến khi nó báo engine đang chạy.
+
+**Trước khi gõ lệnh, xem mình đang dùng terminal nào**, vì cú pháp đặt biến môi trường khác nhau và gõ nhầm sẽ báo lỗi:
+
+| Dấu nhắc lệnh trông như | Terminal | Dùng khối lệnh |
+|---|---|---|
+| `Ten@MAY MINGW64 ~/Desktop/DATN $` | **Git Bash** | Git Bash |
+| `PS C:\Users\...\DATN>` | **PowerShell** | PowerShell |
+
+Thay `~/Desktop/DATN` (hoặc `C:\duong-dan\DATN`) bằng thư mục repo trên máy bạn.
+
+**Terminal 1: backend** (để nguyên cửa sổ này, đóng lại là backend tắt)
+
+Git Bash:
+
+```bash
+cd ~/Desktop/DATN
+docker compose up -d
 cd datn
+export JWT_SECRET="chuoi-bi-mat-khi-dev-dai-it-nhat-32-ky-tu-0123456789"
 ./mvnw spring-boot:run
 ```
 
-Ứng dụng chạy tại `http://localhost:8080`. Giá trị mặc định trong `application.properties` khớp với
-`docker-compose.yml` (database `datn`, user `datn`, mật khẩu `datn`, cổng `5433`), nên không cần tạo file `.env`.
+PowerShell:
+
+```powershell
+cd C:\duong-dan\DATN
+docker compose up -d
+cd datn
+$env:JWT_SECRET = "chuoi-bi-mat-khi-dev-dai-it-nhat-32-ky-tu-0123456789"
+./mvnw spring-boot:run
+```
+
+- `docker compose up -d` bật Postgres 16 ở cổng **5433**. Lần đầu sẽ tải image. Postgres đã chạy rồi thì lệnh này
+  không làm gì.
+- Backend sẵn sàng khi terminal hiện dòng `Started DatnApplication in ... seconds`, tại `http://localhost:8080`.
+  Lần chạy đầu Maven tải thư viện nên lâu hơn. Flyway tự tạo bảng và dữ liệu mẫu.
+- Vì sao đặt `JWT_SECRET`: nếu để trống, mỗi lần khởi động backend sinh một khóa mới, token cũ mất hiệu lực và
+  bạn bị đăng xuất. Biến chỉ có tác dụng trong cửa sổ terminal vừa đặt, mở cửa sổ mới thì đặt lại.
+- Giá trị mặc định trong `application.properties` đã khớp `docker-compose.yml` (database, user, mật khẩu đều là
+  `datn`, cổng 5433), nên không cần tạo file `.env`.
+
+**Terminal 2: frontend** (giống nhau ở Git Bash và PowerShell)
+
+```bash
+cd ~/Desktop/DATN/frontend
+npm run dev
+```
+
+Mở **http://localhost:5173**, bấm "Đăng ký" để tạo tài khoản learner (hoặc đăng nhập tài khoản đã có trong DB
+cục bộ). Tài khoản admin: đặt thêm `ADMIN_EMAIL` và `ADMIN_PASSWORD` (cùng cách đặt `JWT_SECRET`) trước khi chạy
+backend; backend tạo tài khoản đó lúc khởi động nếu email chưa có.
+
+Command Prompt (cmd): đặt biến bằng `set JWT_SECRET=...` rồi chạy `mvnw spring-boot:run`.
+
+Chạy backend bằng nút Run của IntelliJ (lớp `DatnApplication`) cũng được: vẫn phải bật Docker và
+`docker compose up -d` trước; đặt `JWT_SECRET` trong *Run → Edit Configurations → Environment variables*.
+
+### Hai chế độ của frontend
+
+| Lệnh | Dữ liệu | Dùng khi |
+|---|---|---|
+| `npm run dev` | Mọi API gọi **backend thật** | Kiểm tra các phần đã có backend: đăng nhập, Từ vựng, học flashcard, danh sách riêng, trò chơi |
+| `npm run dev:mock` | API mô tả trong `docs/api/` trả **dữ liệu giả** (`frontend/mock/`); chỉ đăng nhập, đăng ký đi qua backend thật (backend vẫn phải chạy) | Xem giao diện các phần backend **chưa có**, như Bài tập (module B) |
+
+Ở `npm run dev`, trang **Bài tập** báo "Không tải được danh sách bài tập": đây là **bình thường**, vì backend
+module B chưa có. Chỉ chạy một chế độ một lúc (cùng cổng 5173): Ctrl+C rồi chạy lệnh kia.
+
+**Thử hết các màn của module Bài tập:** chạy `npm run dev:mock`, đăng nhập, rồi mở **http://localhost:5173/__mock**.
+Trang này chọn tình huống (bình thường, mạng chậm, chưa có bài, lỗi tải, lỗi lưu bài, AI lỗi), có đường dẫn tới các
+màn đặc biệt và bảng "muốn xem màn nào thì làm gì". Dữ liệu mẫu có đủ 6 trình độ A1 đến C2, lịch sử làm bài sẵn cho
+mỗi tài khoản, câu điền từ, bài nghe dài, câu phát âm có từ đọc sai hoặc bỏ sót.
+
+### Kiểm tra nhanh đã chạy đúng chưa
+
+- Mở `http://localhost:8080/api/users/me`: trả JSON lỗi 401 nghĩa là backend đang chạy (chỉ là chưa đăng nhập).
+- Mở `http://localhost:5173`: thấy trang đăng nhập nghĩa là frontend đang chạy.
+
+### Tắt
+
+- Nhấn **Ctrl+C** ở từng terminal.
+- `docker compose stop`: dừng Postgres, **giữ** dữ liệu. `docker compose down -v` thì **xóa sạch** DB cục bộ, chỉ
+  dùng khi muốn làm lại từ đầu.
+
+### Lỗi thường gặp
+
+Các lỗi gõ nhầm cú pháp Git Bash và PowerShell, `ENOENT`, `'.\mvnw' is not recognized`, `Connection to localhost:5433 refused`,
+`Port 8080 was already in use`, `http proxy error` và trang Bài tập báo lỗi đã được tái hiện trên máy khi viết mục
+này; các dòng còn lại là lỗi hay gặp khác.
+
+| Thông báo | Nguyên nhân | Cách sửa |
+|---|---|---|
+| `bash: :JWT_SECRET: command not found` và `bash: .mvnw: command not found` | Gõ lệnh **PowerShell** trong **Git Bash** | Dùng khối Git Bash: `export JWT_SECRET="..."` và `./mvnw spring-boot:run` (dấu `/`, không phải `\`) |
+| `The term 'export' is not recognized ...` | Gõ lệnh **Git Bash** trong **PowerShell** | Dùng khối PowerShell: `$env:JWT_SECRET = "..."` |
+| `npm error code ENOENT` … `path ...\DATN\package.json` | Chạy `npm` ở thư mục gốc repo | `cd frontend` rồi chạy lại |
+| PowerShell: `The term '.\mvnw' is not recognized ...`; Git Bash: `./mvnw: No such file or directory` | Không đứng trong thư mục `datn` | `cd datn` rồi chạy lại |
+| `Connection to localhost:5433 refused` (khi khởi động backend) | Postgres chưa chạy: Docker Desktop tắt, hoặc chưa `docker compose up -d` | Mở Docker Desktop, chạy `docker compose up -d` ở thư mục gốc, rồi chạy lại backend |
+| `docker compose` báo `... dockerDesktopLinuxEngine ... cannot find the file specified` | Docker Desktop chưa mở | Mở Docker Desktop, chờ engine chạy, chạy lại lệnh |
+| `Web server failed to start. Port 8080 was already in use.` | Một backend khác đang chạy (terminal khác, IntelliJ, hoặc tiến trình java còn sót) | Dùng backend đang chạy, hoặc `netstat -ano \| findstr :8080` để lấy PID rồi `Stop-Process -Id <PID>` |
+| `password authentication failed for user "datn"` | App nối nhầm vào PostgreSQL cài trên máy (cổng 5432) | Đừng đặt `DB_URL` trỏ 5432; mặc định là `localhost:5433` |
+| `'vite' is not recognized ...` | Chưa cài thư viện frontend | `cd frontend`, `npm install` |
+| Giao diện báo "Không kết nối được máy chủ"; terminal frontend in `[vite] http proxy error: /api/...` và `AggregateError [ECONNREFUSED]` | Backend chưa chạy hoặc chưa khởi động xong | Chờ dòng `Started DatnApplication` ở terminal 1 |
+| Bị đưa về trang đăng nhập với "Phiên đăng nhập đã hết hạn" | Backend vừa khởi động lại mà không đặt `JWT_SECRET` | Đăng nhập lại; lần sau đặt `JWT_SECRET` |
+| Trang Bài tập báo "Không tải được danh sách bài tập" | Đang dùng `npm run dev`, backend module B chưa có | Dùng `npm run dev:mock` để xem giao diện |
+| `java -version` không ra 21 | `JAVA_HOME` hoặc `PATH` trỏ JDK khác | Trỏ `JAVA_HOME` về JDK 21, mở terminal mới |
 
 > Postgres trong Docker dùng cổng **5433** (không phải 5432) để không đụng với PostgreSQL cài trực tiếp trên máy.
-> Nếu không kết nối được với lỗi `password authentication failed`, kiểm tra xem app có đang nối nhầm vào
-> một Postgres khác đang nghe cổng đó không.
+
+## Quy trình làm việc nhóm
+
+**Nhánh và pull request**
+
+- Mỗi việc một nhánh, **luôn tách từ `main` mới nhất** (`git switch main && git pull && git switch -c ...`). Đặt tên
+  theo loại việc: `feature/...` (tính năng), `fix/...` (sửa lỗi), `docs/...` (tài liệu), `chore/...` (cấu hình, hạ tầng).
+- Đưa code vào `main` qua pull request trên GitHub, merge bằng **"Create a merge commit"**. PR nhỏ, một mục đích, để
+  người khác xem kịp.
+- Đừng tự gộp nhiều nhánh sắp mở PR riêng thành một nhánh trên máy rồi làm tiếp trên đó: khi các nhánh gốc được merge
+  riêng, GitHub sẽ báo conflict giả. Chờ nhánh trước vào `main` rồi tách nhánh mới từ `main`.
+- Trước khi mở PR: chạy [test](#chạy-test) của phần mình sửa, và xem lại `git diff`.
+- Commit message viết tiếng Anh, câu ngắn ở dạng mệnh lệnh, giống lịch sử hiện có (ví dụ
+  `Add security rules and module A notes to the README`).
+
+**Frontend và backend phối hợp qua contract API**
+
+1. Mỗi module có một file trong `docs/api/` mô tả endpoint, JSON, mã lỗi. Người làm frontend viết bản đề xuất theo
+   thiết kế và `docs/starter/Database.md`; người làm backend duyệt, góp ý.
+2. Frontend làm theo contract, dùng dữ liệu giả trong `frontend/mock/` (`npm run dev:mock`) khi backend chưa có.
+3. Backend làm đúng theo contract. **Muốn đổi API thì sửa file contract trước**, rồi mới sửa code hai bên.
+
+**Không đụng phần của người khác**
+
+- Không sửa module của người khác; cần gì từ module khác thì gọi qua service hoặc `common`, hoặc nhắn người phụ trách.
+- File dùng chung phía backend phải báo nhóm trước khi sửa: `datn/pom.xml`, `application.properties` (cả bản trong
+  `src/test`), `.gitignore`, module `sample`.
+- Đổi bảng dùng chung (`users`, `vocabulary`...) phải báo cả nhóm và cập nhật `docs/starter/Database.md`.
+
+## Kiến trúc và quy ước code
+
+Backend là một **modular monolith**: một ứng dụng Spring Boot, mỗi chức năng là một module trong
+`datn/src/main/java/com/example/datn/modules/<tên>/`. Chi tiết từng thư mục ở
+[docs/starter/ARCHITECTURE_SAMPLE.md](docs/starter/ARCHITECTURE_SAMPLE.md).
+
+```
+modules/<tên>/
+├── config/        # chỉ khi module cần cấu hình riêng
+├── controller/    # @RestController, mỏng, chỉ gọi service
+├── dto/request/   # và dto/response/, dùng Java record
+├── entity/        # @Entity, constructor không tham số protected
+├── enums/         # (không đặt tên "enum" vì là từ khóa Java)
+├── exception/     # exception riêng và @RestControllerAdvice(basePackages = ...)
+├── mapper/        # chuyển entity thành response DTO
+├── repository/    # Spring Data JPA
+└── service/       # @Service @Transactional; hàm chỉ đọc dùng @Transactional(readOnly = true)
+```
+
+- Luồng xử lý: `controller → service → repository`. Controller không gọi repository trực tiếp.
+- Liên kết giữa các module bằng **id** (`Long`), không dùng `@ManyToOne` sang entity của module khác, không gọi
+  repository của module khác. Module chỉ phụ thuộc package `common` (xem
+  [Lưu ý từ module A](#lưu-ý-từ-module-a-từ-vựng-cho-các-module-khác)).
+- Code và comment viết **tiếng Anh**; tài liệu và giao diện viết **tiếng Việt**.
+- Quy ước chung đã chốt (họp 23/09/2026): chỉ 2 vai trò `learner` và `admin`; độ khó theo CEFR A1 đến C2; khóa chính
+  và khóa ngoại kiểu `BIGINT`.
+- `modules/sample` là module mẫu để tham khảo, **không sửa**.
+- Frontend có quy ước riêng (thư mục theo module trong `src/features/`, design system Tailwind, TanStack Query): xem
+  [frontend/README.md](frontend/README.md).
 
 ## Chạy test
 
 ```bash
+# Backend (Docker Desktop phải đang chạy)
 cd datn
-./mvnw test
+./mvnw clean test
+
+# Frontend (không cần backend)
+cd frontend
+npm test
+npm run lint
+npm run build
 ```
 
-Bộ test gồm hai loại:
+Test backend gồm hai loại:
 
 - Test API/nghiệp vụ chạy trên H2 (nhanh, không cần Docker).
 - Các test kế thừa `AbstractPostgresIntegrationTest` (ví dụ `DatabaseMigrationTests`) chạy toàn bộ migration trên
   một Postgres tạm (Testcontainers, dùng chung một container cho cả lần chạy) rồi khởi động app với
   `ddl-auto=validate`. Các test này **cần Docker đang chạy** và sẽ lỗi nếu entity không khớp bảng trong schema.
   Dùng lớp này cho test cần kiểm tra ràng buộc thật của schema (CHECK, khóa ngoại...).
+
+Test frontend dùng `installFakeBackend` (`frontend/src/test/fakeBackend.js`) để chạy cả luồng mà không cần backend.
 
 ## Xác thực (Auth)
 
@@ -85,8 +401,10 @@ mockMvc.perform(post("/api/xxx").with(TestAuth.admin()));
 
 ## Cơ sở dữ liệu và migration
 
+- Đặc tả chuẩn của toàn bộ bảng: [docs/starter/Database.md](docs/starter/Database.md).
 - Schema nằm trong `datn/src/main/resources/db/migration/`. `V1__init.sql` là schema gốc (38 bảng).
-- Hibernate chỉ **kiểm tra** schema (`ddl-auto=validate`), không tự tạo hay sửa bảng.
+- Hibernate chỉ **kiểm tra** schema (`ddl-auto=validate`), không tự tạo hay sửa bảng. Mỗi entity mới phải có bảng
+  tương ứng trong migration, nếu không app không khởi động.
 - **Đổi schema = thêm file migration mới**, không sửa file đã có. Đặt tên theo thời gian để nhiều người không
   trùng phiên bản: `V<yyyyMMddHHmm>__mo_ta_ngan.sql`, ví dụ `V202609281030__add_interval_days.sql`.
   Nếu nhánh merge trễ, đổi lại timestamp cho lớn hơn migration đã merge trước.
@@ -176,15 +494,3 @@ Contract API của module A nằm trong `docs/api/` (`vocabulary.md`, `learning.
   mỗi entity có enum.
 - Các bảng trò chơi (`games`, `game_questions`, `game_question_options`, `game_sessions`, `game_session_answers`,
   `leaderboard`) thuộc module A. Cần điểm trò chơi thì dùng `GET /api/games`, `GET /api/games/leaderboard`.
-
-## Cấu trúc thư mục
-
-| Đường dẫn | Nội dung |
-|---|---|
-| `datn/` | Backend Spring Boot (module nằm trong `src/main/java/com/example/datn/modules/`) |
-| `datn/src/main/resources/db/migration/` | Migration Flyway |
-| `docs/api/` | Contract API (frontend và backend cùng làm theo) |
-| `frontend/` | Frontend React, xem `frontend/README.md` |
-| `docker-compose.yml` | Postgres cục bộ |
-| `Database.md` | Đặc tả database toàn hệ thống |
-| `ARCHITECTURE_SAMPLE.md` | Cấu trúc một module mẫu |

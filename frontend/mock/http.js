@@ -32,6 +32,13 @@ export async function readJson(req) {
   }
 }
 
+/** The whole request body as bytes (uploads such as a pronunciation recording). */
+export async function readRaw(req) {
+  const chunks = []
+  for await (const chunk of req) chunks.push(chunk)
+  return Buffer.concat(chunks)
+}
+
 /** The signed-in user's id, read from the JWT the real backend issued (the mock does not check the signature). */
 export function userIdFromToken(authorization) {
   const token = /^Bearer (.+)$/.exec(authorization ?? '')?.[1]
