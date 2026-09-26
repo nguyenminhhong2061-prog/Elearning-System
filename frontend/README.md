@@ -11,16 +11,19 @@ giao diện **tiếng Việt**. Code và comment viết bằng tiếng Anh, gi�
 
 ## Chạy
 
+Hướng dẫn đầy đủ, chạy cả backend và frontend trên Windows, kèm bảng lỗi thường gặp: mục **"Chạy dự án trên máy"**
+trong [README gốc](../README.md#chạy-dự-án-trên-máy). Tóm tắt phần frontend (backend phải đang chạy):
+
 ```bash
 cd frontend
-npm install
+npm install        # lần đầu, và mỗi khi package.json thay đổi
 npm run dev        # http://localhost:5173
 ```
 
 | Lệnh | Tác dụng |
 |---|---|
-| `npm run dev` | Chạy server phát triển (tự nạp lại khi sửa code) |
-| `npm run dev:mock` | Như `dev`, nhưng các API của module A mô tả trong `docs/api/` (từ vựng, học flashcard...) trả **dữ liệu giả** trong `mock/`, lưu trong bộ nhớ theo từng tài khoản (mất khi tắt server). Dùng khi backend chưa có các API đó; đăng nhập vẫn cần backend thật |
+| `npm run dev` | Chạy server phát triển (tự nạp lại khi sửa code), mọi API gọi backend thật |
+| `npm run dev:mock` | Như `dev`, nhưng các API mô tả trong `docs/api/` (module A và module B: bài tập, trợ lý AI) trả **dữ liệu giả** trong `mock/`, lưu trong bộ nhớ theo từng tài khoản (mất khi tắt server). Dùng khi backend chưa có các API đó; đăng nhập vẫn cần backend thật. Sửa file trong `mock/` thì phải tắt và chạy lại lệnh |
 | `npm run build` | Build bản production vào `dist/` |
 | `npm run preview` | Chạy thử bản đã build |
 | `npm run lint` | Kiểm tra code bằng oxlint |

@@ -1,31 +1,119 @@
 # DATN — Nền tảng học tiếng Anh cá nhân hóa theo AI
 
-Backend Spring Boot (Java 21) + PostgreSQL. Schema do Flyway quản lý. Frontend React (Vite) nằm trong `frontend/`,
-xem [frontend/README.md](frontend/README.md) để biết cách chạy.
+Backend Spring Boot (Java 21) + PostgreSQL. Schema do Flyway quản lý. Frontend React (Vite) nằm trong `frontend/`.
+Cách chạy cả hai phần ở mục **"Chạy dự án trên máy"** ngay dưới; chi tiết riêng của frontend (công nghệ, cấu trúc
+thư mục, quy ước) ở [frontend/README.md](frontend/README.md).
 
-## Yêu cầu
+## Chạy dự án trên máy
 
-- **JDK 21** (`java -version` phải ra 21.x, `JAVA_HOME` trỏ tới JDK 21)
-- **Docker Desktop** đang chạy (dùng cho Postgres cục bộ và cho test Testcontainers)
-- Không cần cài Maven (dùng `./mvnw`) và không cần cài PostgreSQL
+> Đã chạy thử theo đúng các bước dưới đây ngày 26/09/2026 trên Windows 10 (PowerShell), với JDK 21.0.12,
+> Node 22.20 và Docker Desktop 29: backend khởi động, frontend lên, đăng ký và đăng nhập qua giao diện được, trang
+> Từ vựng lấy dữ liệu từ backend thật.
 
-## Chạy backend
+### Cần có (cài một lần)
 
-```bash
-# 1. Bật Postgres cục bộ (lần đầu sẽ tải image)
-docker compose up -d
+| Phần mềm | Kiểm tra | Ghi chú |
+|---|---|---|
+| **JDK 21** | `java -version` ra `21.x` | `JAVA_HOME` phải trỏ tới JDK 21 |
+| **Docker Desktop** | `docker version` có phần `Server` | Chạy Postgres cục bộ và test Testcontainers |
+| **Node 22** và npm 10 | `node -v`, `npm -v` | Cho frontend |
 
-# 2. Chạy ứng dụng (Flyway tự tạo schema ở lần chạy đầu)
-cd datn
-./mvnw spring-boot:run
+Không cần cài Maven (dùng `mvnw` có sẵn) và không cần cài PostgreSQL.
+
+Cài thư viện frontend: làm **lần đầu** và **mỗi khi `frontend/package.json` thay đổi** sau khi pull.
+
+```powershell
+cd frontend
+npm install
 ```
 
-Ứng dụng chạy tại `http://localhost:8080`. Giá trị mặc định trong `application.properties` khớp với
-`docker-compose.yml` (database `datn`, user `datn`, mật khẩu `datn`, cổng `5433`), nên không cần tạo file `.env`.
+### Mỗi lần chạy: mở Docker Desktop, rồi 2 cửa sổ terminal
+
+Mở **Docker Desktop** trước và chờ đến khi nó báo engine đang chạy. Các lệnh dưới đây viết cho **PowerShell**
+(terminal mặc định của IntelliJ và VS Code trên Windows); thay `C:\duong-dan\DATN` bằng thư mục repo trên máy bạn.
+
+**Terminal 1: backend** (để nguyên cửa sổ này, đóng lại là backend tắt)
+
+```powershell
+cd C:\duong-dan\DATN
+docker compose up -d
+cd datn
+$env:JWT_SECRET = "chuoi-bi-mat-khi-dev-dai-it-nhat-32-ky-tu-0123456789"
+.\mvnw spring-boot:run
+```
+
+- `docker compose up -d` bật Postgres 16 ở cổng **5433**. Lần đầu sẽ tải image. Postgres đã chạy rồi thì lệnh này
+  không làm gì.
+- Backend sẵn sàng khi terminal hiện dòng `Started DatnApplication in ... seconds`, tại `http://localhost:8080`.
+  Lần chạy đầu Maven tải thư viện nên lâu hơn. Flyway tự tạo bảng và dữ liệu mẫu.
+- Vì sao đặt `JWT_SECRET`: nếu để trống, mỗi lần khởi động backend sinh một khóa mới, token cũ mất hiệu lực và
+  bạn bị đăng xuất. `$env:` chỉ có tác dụng trong cửa sổ terminal đó.
+- Giá trị mặc định trong `application.properties` đã khớp `docker-compose.yml` (database, user, mật khẩu đều là
+  `datn`, cổng 5433), nên không cần tạo file `.env`.
+
+**Terminal 2: frontend**
+
+```powershell
+cd C:\duong-dan\DATN\frontend
+npm run dev
+```
+
+Mở **http://localhost:5173**, bấm "Đăng ký" để tạo tài khoản learner (hoặc đăng nhập tài khoản đã có trong DB
+cục bộ). Tài khoản admin: đặt thêm `$env:ADMIN_EMAIL` và `$env:ADMIN_PASSWORD` trước `.\mvnw spring-boot:run`, backend
+tạo tài khoản đó lúc khởi động nếu email chưa có.
+
+Dùng terminal khác PowerShell:
+
+| Việc | Git Bash | Command Prompt (cmd) |
+|---|---|---|
+| Đặt khóa JWT | `export JWT_SECRET="..."` | `set JWT_SECRET=...` |
+| Chạy backend | `./mvnw spring-boot:run` | `mvnw spring-boot:run` |
+
+Chạy backend bằng nút Run của IntelliJ (lớp `DatnApplication`) cũng được: vẫn phải bật Docker và
+`docker compose up -d` trước; đặt `JWT_SECRET` trong *Run → Edit Configurations → Environment variables*.
+
+### Hai chế độ của frontend
+
+| Lệnh | Dữ liệu | Dùng khi |
+|---|---|---|
+| `npm run dev` | Mọi API gọi **backend thật** | Kiểm tra các phần đã có backend: đăng nhập, Từ vựng, học flashcard, danh sách riêng, trò chơi |
+| `npm run dev:mock` | API mô tả trong `docs/api/` trả **dữ liệu giả** (`frontend/mock/`); chỉ đăng nhập, đăng ký đi qua backend thật (backend vẫn phải chạy) | Xem giao diện các phần backend **chưa có**, như Bài tập (module B) |
+
+Ở `npm run dev`, trang **Bài tập** báo "Không tải được danh sách bài tập": đây là **bình thường**, vì backend
+module B chưa có. Chỉ chạy một chế độ một lúc (cùng cổng 5173): Ctrl+C rồi chạy lệnh kia.
+
+### Kiểm tra nhanh đã chạy đúng chưa
+
+- Mở `http://localhost:8080/api/users/me`: trả JSON lỗi 401 nghĩa là backend đang chạy (chỉ là chưa đăng nhập).
+- Mở `http://localhost:5173`: thấy trang đăng nhập nghĩa là frontend đang chạy.
+
+### Tắt
+
+- Nhấn **Ctrl+C** ở từng terminal.
+- `docker compose stop`: dừng Postgres, **giữ** dữ liệu. `docker compose down -v` thì **xóa sạch** DB cục bộ, chỉ
+  dùng khi muốn làm lại từ đầu.
+
+### Lỗi thường gặp
+
+Các lỗi `ENOENT`, `'.\mvnw' is not recognized`, `Connection to localhost:5433 refused`,
+`Port 8080 was already in use`, `http proxy error` và trang Bài tập báo lỗi đã được tái hiện trên máy khi viết mục
+này; các dòng còn lại là lỗi hay gặp khác.
+
+| Thông báo | Nguyên nhân | Cách sửa |
+|---|---|---|
+| `npm error code ENOENT` … `path ...\DATN\package.json` | Chạy `npm` ở thư mục gốc repo | `cd frontend` rồi chạy lại |
+| `The term '.\mvnw' is not recognized ...` | Không đứng trong thư mục `datn` | `cd datn` rồi chạy lại |
+| `Connection to localhost:5433 refused` (khi khởi động backend) | Postgres chưa chạy: Docker Desktop tắt, hoặc chưa `docker compose up -d` | Mở Docker Desktop, chạy `docker compose up -d` ở thư mục gốc, rồi chạy lại backend |
+| `docker compose` báo `... dockerDesktopLinuxEngine ... cannot find the file specified` | Docker Desktop chưa mở | Mở Docker Desktop, chờ engine chạy, chạy lại lệnh |
+| `Web server failed to start. Port 8080 was already in use.` | Một backend khác đang chạy (terminal khác, IntelliJ, hoặc tiến trình java còn sót) | Dùng backend đang chạy, hoặc `netstat -ano \| findstr :8080` để lấy PID rồi `Stop-Process -Id <PID>` |
+| `password authentication failed for user "datn"` | App nối nhầm vào PostgreSQL cài trên máy (cổng 5432) | Đừng đặt `DB_URL` trỏ 5432; mặc định là `localhost:5433` |
+| `'vite' is not recognized ...` | Chưa cài thư viện frontend | `cd frontend`, `npm install` |
+| Giao diện báo "Không kết nối được máy chủ"; terminal frontend in `[vite] http proxy error: /api/...` và `AggregateError [ECONNREFUSED]` | Backend chưa chạy hoặc chưa khởi động xong | Chờ dòng `Started DatnApplication` ở terminal 1 |
+| Bị đưa về trang đăng nhập với "Phiên đăng nhập đã hết hạn" | Backend vừa khởi động lại mà không đặt `JWT_SECRET` | Đăng nhập lại; lần sau đặt `JWT_SECRET` |
+| Trang Bài tập báo "Không tải được danh sách bài tập" | Đang dùng `npm run dev`, backend module B chưa có | Dùng `npm run dev:mock` để xem giao diện |
+| `java -version` không ra 21 | `JAVA_HOME` hoặc `PATH` trỏ JDK khác | Trỏ `JAVA_HOME` về JDK 21, mở terminal mới |
 
 > Postgres trong Docker dùng cổng **5433** (không phải 5432) để không đụng với PostgreSQL cài trực tiếp trên máy.
-> Nếu không kết nối được với lỗi `password authentication failed`, kiểm tra xem app có đang nối nhầm vào
-> một Postgres khác đang nghe cổng đó không.
 
 ## Chạy test
 
