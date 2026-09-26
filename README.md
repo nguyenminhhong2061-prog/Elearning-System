@@ -150,6 +150,7 @@ DATN/
 | `api/games.md` | Trò chơi từ vựng và bảng xếp hạng (module A) | Đã có backend |
 | `api/exercises.md` | Bài tập ngữ pháp, nghe, phát âm (module B) | Đề xuất, chờ người làm backend B duyệt |
 | `api/chatbot.md` | Trợ lý AI giải thích bài tập (module B) | Đề xuất, chờ người làm backend B duyệt |
+| `api/progress.md` | Trang chủ Tiến độ: streak, biểu đồ theo ngày, điểm kỹ năng, huy hiệu (module D, D1) | Đề xuất, chờ Nhân duyệt |
 | `Báo cáo và phân công công việc/` | Tài liệu của đồ án: phiếu giao đề tài, báo cáo, B1 thu thập yêu cầu, B2 phân tích, B3 thiết kế, phân chia công việc | Tài liệu tham khảo |
 
 ## Chạy dự án trên máy
