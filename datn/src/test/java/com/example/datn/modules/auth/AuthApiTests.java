@@ -78,6 +78,16 @@ class AuthApiTests {
         register("A", "ok@example.com", "1234567").andExpect(status().isBadRequest());
         // BCrypt ignores everything after 72 bytes, so longer passwords must be refused, not silently truncated.
         register("A", "ok@example.com", "x".repeat(73)).andExpect(status().isBadRequest());
+        // The limit is in bytes: "ệ" is 3 bytes in UTF-8, so 30 of them (90 bytes) are too long despite being 30 characters.
+        register("A", "ok@example.com", "ệ".repeat(30)).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void registerAcceptsMultiBytePasswordUpTo72Bytes() throws Exception {
+        String password = "ệ".repeat(24);
+
+        register("A", "vn@example.com", password).andExpect(status().isCreated());
+        login("vn@example.com", password).andExpect(status().isOk());
     }
 
     @Test
@@ -165,6 +175,7 @@ class AuthApiTests {
         changePassword(token, "wrong-current", "new-password-1").andExpect(status().isBadRequest());
         changePassword(token, PASSWORD, PASSWORD).andExpect(status().isBadRequest());
         changePassword(token, PASSWORD, "short").andExpect(status().isBadRequest());
+        changePassword(token, PASSWORD, "ệ".repeat(30)).andExpect(status().isBadRequest());
         changePassword(token, PASSWORD, "new-password-1").andExpect(status().isNoContent());
 
         login("user@example.com", PASSWORD).andExpect(status().isUnauthorized());
