@@ -71,17 +71,11 @@ function RenameForm({ list, onDone }) {
 
 function DeleteDialog({ list, open, onClose }) {
   const navigate = useNavigate()
-  const remove = useDeleteList(list.id)
+  // Leaving the page before the cache is cleaned keeps it from refetching the deleted list; the dialog goes with it.
+  const remove = useDeleteList(list.id, { onDeleted: () => navigate(LISTS_TAB_PATH, { replace: true }) })
 
-  async function confirm() {
-    try {
-      await remove.mutateAsync()
-      onClose()
-      navigate(LISTS_TAB_PATH, { replace: true })
-    } catch {
-      // Shown below.
-    }
-  }
+  // A failure is shown below.
+  const confirm = () => remove.mutate()
 
   return (
     <Dialog open={open} onClose={onClose} title="Xóa danh sách?">

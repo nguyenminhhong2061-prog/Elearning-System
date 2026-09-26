@@ -237,10 +237,14 @@ describe('list page', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Xóa' }))
     const dialog = await screen.findByRole('dialog', { name: 'Xóa danh sách?' })
+    const listReads = () => callsTo('GET /api/custom-lists/5').length + callsTo('GET /api/custom-lists/5/words').length
+    const readsBeforeDelete = listReads()
     await user.click(within(dialog).getByRole('button', { name: 'Xóa danh sách' }))
 
     await waitFor(() => expect(location()).toHaveTextContent('/vocabulary?tab=lists'))
     expect(callsTo('DELETE /api/custom-lists/5')).toHaveLength(1)
+    // The deleted list is not fetched again on the way out (the real API would answer 404).
+    expect(listReads()).toBe(readsBeforeDelete)
   })
 
   it('shows "not found" for a list that is not the learner’s', async () => {
