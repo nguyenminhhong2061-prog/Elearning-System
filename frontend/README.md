@@ -60,7 +60,8 @@ Cấu hình tùy chọn (copy `.env.example` thành `.env.local`, file này khô
 ```
 frontend/
 ├── LinguaStep-design-source/  # bản thiết kế gốc (chỉ để tham khảo, xem mục Thiết kế)
-├── mock/                      # API giả cho `npm run dev:mock`: mockApi.js (plugin), routes/, store.js, scheduler.js (không vào bản build)
+├── mock/                      # API giả cho `npm run dev:mock`: mockApi.js (plugin), routes/, store.js, scheduler.js,
+│                              # exerciseFixtures.js và media.js (bài tập, audio bài nghe) (không vào bản build)
 └── src/
     ├── main.jsx               # điểm vào: BrowserRouter + App
     ├── index.css              # Tailwind, design token, @font-face
@@ -76,7 +77,9 @@ frontend/
     ├── features/
     │   ├── auth/              # đăng nhập, đăng ký, đổi mật khẩu, AuthProvider, useAuth, route guard
     │   ├── vocabulary/        # module A: chủ đề, học flashcard (study/), nhắc ôn, lịch sử, danh sách riêng (lists/)
-    │   └── games/             # module A (A4): trò chơi từ vựng và bảng xếp hạng
+    │   ├── games/             # module A (A4): trò chơi từ vựng và bảng xếp hạng
+    │   └── exercises/         # module B (giao diện): ngữ pháp (grammar/), nghe (listening/), phát âm
+    │                          # (pronunciation/), trợ lý AI (chat/); API theo docs/api/exercises.md, chatbot.md
     ├── pages/                 # trang chung: HomePage, ComingSoonPage, NotFoundPage, ForbiddenPage
     ├── lib/                   # hàm tiện ích nhỏ
     └── test/                  # setup.js, fakeBackend.js (giả lập backend cho test)

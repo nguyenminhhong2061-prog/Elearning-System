@@ -21,7 +21,8 @@ export function installFakeBackend(routes) {
     const handler = routes[key]
     if (!handler) throw new Error(`The fake backend has no route for ${key}`)
 
-    const body = typeof config.data === 'string' ? JSON.parse(config.data) : undefined
+    // JSON bodies arrive as strings; an upload (a Blob such as a recording) is passed on as it is.
+    const body = typeof config.data === 'string' ? JSON.parse(config.data) : config.data
     const authorization = config.headers.get('Authorization') || undefined
     const params = config.params
     calls.push({ key, body, params, authorization })

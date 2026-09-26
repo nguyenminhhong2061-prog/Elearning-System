@@ -1,18 +1,29 @@
 import { todayInVietnam } from '../src/lib/dates.js'
-import { delay, HttpError, readJson, send, sendError, userIdFromToken } from './http.js'
+import { delay, HttpError, readJson, readRaw, send, sendError, userIdFromToken } from './http.js'
+import { serveMedia } from './media.js'
+import { chatRoutes } from './routes/chat.js'
+import { exerciseRoutes } from './routes/exercises.js'
 import { gameRoutes } from './routes/games.js'
 import { learningRoutes } from './routes/learning.js'
 import { findList, listRoutes } from './routes/lists.js'
 import { vocabularyRoutes } from './routes/vocabulary.js'
 import { userState } from './store.js'
 
-// Vite dev-server plugin used by `npm run dev:mock`: it answers the module A endpoints documented in docs/api/ with
-// sample data until the backend implements them. Every other /api request (login, /users/me...) still goes to the
-// real backend through the proxy. It never runs in tests or in the production build.
+// Vite dev-server plugin used by `npm run dev:mock`: it answers the endpoints documented in docs/api/ with sample data
+// (module A, which the backend now has too, and module B: exercises and the AI assistant, which it does not have yet),
+// and serves the generated listening audio (media.js). Every other /api request (login, /users/me...) still goes to
+// the real backend through the proxy. It never runs in tests or in the production build.
 
 const LATENCY_MS = 250 // makes the loading states visible
 
-const ROUTES = [...vocabularyRoutes, ...learningRoutes({ findList }), ...listRoutes, ...gameRoutes]
+const ROUTES = [
+  ...vocabularyRoutes,
+  ...learningRoutes({ findList }),
+  ...listRoutes,
+  ...gameRoutes,
+  ...exerciseRoutes,
+  ...chatRoutes,
+]
 
 function findRoute(method, pathname) {
   for (const route of ROUTES) {
@@ -30,7 +41,8 @@ async function handle(req, res, route, match, url) {
 
   const today = todayInVietnam()
   try {
-    const body = req.method === 'GET' || req.method === 'DELETE' ? {} : await readJson(req)
+    let body = {}
+    if (req.method !== 'GET' && req.method !== 'DELETE') body = route.rawBody ? await readRaw(req) : await readJson(req)
     const result = await route.handle({
       user: userState(userId, today),
       userId,
@@ -52,9 +64,10 @@ export function mockApi() {
     name: 'linguastep-mock-api',
     apply: 'serve',
     configureServer(server) {
-      server.config.logger.info('  Mock API: module A endpoints of docs/api/*.md use sample data')
+      server.config.logger.info('  Mock API: module A and B endpoints of docs/api/*.md use sample data')
       // Middlewares added here run before Vite's own, including the /api proxy.
       server.middlewares.use((req, res, next) => {
+        if (serveMedia(req, res)) return
         const url = new URL(req.url, 'http://localhost')
         const found = findRoute(req.method, url.pathname)
         if (!found) return next()
