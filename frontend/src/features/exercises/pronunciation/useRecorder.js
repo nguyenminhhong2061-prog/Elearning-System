@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MAX_RECORDING_MS } from '../constants'
-import { recordingErrorMessage, startRecording, toWav } from './recorder'
+import { MAX_RECORDING_MS, MIN_RECORDING_MS } from '../constants'
+import { recordingErrorMessage, startRecording, TOO_SHORT_MESSAGE, toWav } from './recorder'
 
 /**
  * Recording state for one pronunciation item: idle, asking for the microphone, recording (with the elapsed time), or
@@ -26,7 +26,14 @@ export function useRecorder({ onRecorded, maxMs = MAX_RECORDING_MS }) {
     session.current = null
     setStatus('processing')
     try {
-      const recording = await toWav(await current.stop())
+      const { blob, elapsedMs } = await current.stop()
+      // Stopped at once: the recording is often empty and would fail to decode with a misleading message.
+      if (elapsedMs < MIN_RECORDING_MS) {
+        setStatus('idle')
+        setError(TOO_SHORT_MESSAGE)
+        return
+      }
+      const recording = await toWav(blob)
       setStatus('idle')
       handleRecorded.current(recording)
     } catch (failure) {

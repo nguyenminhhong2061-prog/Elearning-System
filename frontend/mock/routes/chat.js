@@ -4,12 +4,18 @@ import { findAttempt, findLesson } from './exercises.js'
 
 // docs/api/chatbot.md. There is no AI here: answers are written from the lesson data, following the rule the contract
 // suggests for the real assistant (a hint before the learner has answered, the full explanation afterwards).
-// A message containing "#503" fails like an unavailable AI service, to try the error state.
+// A message containing "#503" fails like an unavailable AI service, and "#429" like a rate limit, to try the error
+// states (the /__mock page can also make every message fail).
 
 const THINKING_MS = 900
 const sessions = new Map()
 let nextSessionId = 1
 let nextMessageId = 1
+
+/** Forgets every chat session (the /__mock page's reset). */
+export function resetChatData() {
+  sessions.clear()
+}
 
 function findQuestion(id) {
   for (const lesson of MOCK_LESSONS) {
@@ -112,6 +118,7 @@ export const chatRoutes = [
       if (!content || content.length > 1000) throw new HttpError(400, 'content must be 1 to 1000 characters')
       await delay(THINKING_MS)
       if (content.includes('#503')) throw new HttpError(503, 'AI service unavailable')
+      if (content.includes('#429')) throw new HttpError(429, 'Too many messages')
       const reply = replyFor(userId, session, { ...body, content })
       return { id: nextMessageId++, role: 'ASSISTANT', createdAt: new Date().toISOString(), ...reply }
     },

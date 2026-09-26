@@ -21,7 +21,7 @@ let app
 const WAV = new Blob(['RIFF'], { type: 'audio/wav' })
 
 beforeEach(() => {
-  startRecording.mockResolvedValue({ stop: vi.fn().mockResolvedValue(new Blob(['raw'])), cancel: vi.fn() })
+  startRecording.mockResolvedValue({ stop: vi.fn().mockResolvedValue({ blob: new Blob(['raw']), elapsedMs: 1500 }), cancel: vi.fn() })
   toWav.mockResolvedValue({ wav: WAV, durationMs: 1200 })
   URL.createObjectURL = vi.fn(() => 'blob:recording')
   URL.revokeObjectURL = vi.fn()
@@ -135,6 +135,21 @@ describe('pronunciation exercise', () => {
     await record(user)
     expect(await screen.findByRole('alert')).toHaveTextContent('Bản ghi quá ngắn')
     expect(app.callsTo(RECORDING)).toHaveLength(1)
+  })
+
+  it('says "too short" when stop is pressed at once, without trying to convert the empty recording', async () => {
+    // Stopped straight away, a browser recording is often empty and cannot be decoded at all.
+    startRecording.mockResolvedValueOnce({ stop: vi.fn().mockResolvedValue({ blob: new Blob([]), elapsedMs: 80 }), cancel: vi.fn() })
+    app = renderApp('/exercises/lessons/21', pronunciationRoutes())
+    const user = userEvent.setup()
+    await screen.findByText('Từ 1/2')
+
+    await record(user)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Bản ghi quá ngắn')
+    expect(toWav).not.toHaveBeenCalled()
+    expect(app.callsTo(RECORDING)).toHaveLength(0)
+    expect(screen.getByRole('button', { name: 'Bắt đầu ghi âm' })).toBeInTheDocument()
   })
 
   it('goes through the items, lets the last one be skipped, and ends with each item’s best score', async () => {

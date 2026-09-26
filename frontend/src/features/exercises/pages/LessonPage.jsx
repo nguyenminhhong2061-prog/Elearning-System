@@ -71,9 +71,14 @@ function LessonPlayer({ lessonId }) {
 
   if (lesson.error?.status === 404) return <LessonNotFound />
   if (lesson.isError) {
+    // Opening a lesson loads it and starts an attempt at the same time; when both failed, one retry redoes both.
+    const retry = () => {
+      lesson.refetch()
+      if (attempt.attemptId === null && !attempt.starting) attempt.restart()
+    }
     return (
       <Page title="Bài tập" width="focus">
-        <LoadError error={lesson.error} onRetry={() => lesson.refetch()} message="Không tải được bài tập." />
+        <LoadError error={lesson.error} onRetry={retry} message="Không tải được bài tập." />
       </Page>
     )
   }

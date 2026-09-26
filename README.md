@@ -97,6 +97,11 @@ Chạy backend bằng nút Run của IntelliJ (lớp `DatnApplication`) cũng đ
 Ở `npm run dev`, trang **Bài tập** báo "Không tải được danh sách bài tập": đây là **bình thường**, vì backend
 module B chưa có. Chỉ chạy một chế độ một lúc (cùng cổng 5173): Ctrl+C rồi chạy lệnh kia.
 
+**Thử hết các màn của module Bài tập:** chạy `npm run dev:mock`, đăng nhập, rồi mở **http://localhost:5173/__mock**.
+Trang này chọn tình huống (bình thường, mạng chậm, chưa có bài, lỗi tải, lỗi lưu bài, AI lỗi), có đường dẫn tới các
+màn đặc biệt và bảng "muốn xem màn nào thì làm gì". Dữ liệu mẫu có đủ 6 trình độ A1 đến C2, lịch sử làm bài sẵn cho
+mỗi tài khoản, câu điền từ, bài nghe dài, câu phát âm có từ đọc sai hoặc bỏ sót.
+
 ### Kiểm tra nhanh đã chạy đúng chưa
 
 - Mở `http://localhost:8080/api/users/me`: trả JSON lỗi 401 nghĩa là backend đang chạy (chỉ là chưa đăng nhập).

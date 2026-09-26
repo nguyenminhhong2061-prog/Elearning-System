@@ -174,6 +174,24 @@ describe('grammar exercise', () => {
     expect(screen.queryByText('✓ Chính xác!')).not.toBeInTheDocument()
   })
 
+  it('retries both the lesson and the attempt with one "Thử lại" when opening failed', async () => {
+    let down = true
+    app = renderApp(
+      '/exercises/lessons/3',
+      grammarRoutes({
+        'GET /api/exercises/3': () => (down ? { status: 500, data: {} } : { data: GRAMMAR_LESSON }),
+        'POST /api/exercises/3/attempts': () => (down ? { status: 500, data: {} } : { status: 201, data: { attemptId: ATTEMPT_ID } }),
+      }),
+    )
+    const user = userEvent.setup()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Máy chủ đang gặp sự cố')
+
+    down = false
+    await user.click(screen.getByRole('button', { name: 'Thử lại' }))
+
+    expect(await screen.findByText('Câu 1/2')).toBeInTheDocument()
+  })
+
   it('says the lesson does not exist for an unknown id', async () => {
     app = renderApp(
       '/exercises/lessons/99',

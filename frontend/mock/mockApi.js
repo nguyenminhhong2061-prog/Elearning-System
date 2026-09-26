@@ -1,6 +1,7 @@
 import { todayInVietnam } from '../src/lib/dates.js'
 import { delay, HttpError, readJson, readRaw, send, sendError, userIdFromToken } from './http.js'
 import { serveMedia } from './media.js'
+import { scenarioEffect, scenarioOf, serveControlPanel } from './scenario.js'
 import { chatRoutes } from './routes/chat.js'
 import { exerciseRoutes } from './routes/exercises.js'
 import { gameRoutes } from './routes/games.js'
@@ -39,6 +40,14 @@ async function handle(req, res, route, match, url) {
   if (!userId) return sendError(res, 401, 'Authentication required')
   await delay(LATENCY_MS)
 
+  // Scenario chosen on the /__mock page (module B only): extra latency, or an error/empty reply instead.
+  const effect = scenarioEffect(scenarioOf(req), req.method, url.pathname)
+  if (effect.extraDelayMs) await delay(effect.extraDelayMs)
+  if (effect.reply) {
+    if (effect.reply.message) return sendError(res, effect.reply.status, effect.reply.message)
+    return send(res, effect.reply.status, effect.reply.body)
+  }
+
   const today = todayInVietnam()
   try {
     let body = {}
@@ -65,9 +74,10 @@ export function mockApi() {
     apply: 'serve',
     configureServer(server) {
       server.config.logger.info('  Mock API: module A and B endpoints of docs/api/*.md use sample data')
+      server.config.logger.info('  Mock control page (scenarios, test checklist): http://localhost:5173/__mock')
       // Middlewares added here run before Vite's own, including the /api proxy.
       server.middlewares.use((req, res, next) => {
-        if (serveMedia(req, res)) return
+        if (serveControlPanel(req, res) || serveMedia(req, res)) return
         const url = new URL(req.url, 'http://localhost')
         const found = findRoute(req.method, url.pathname)
         if (!found) return next()

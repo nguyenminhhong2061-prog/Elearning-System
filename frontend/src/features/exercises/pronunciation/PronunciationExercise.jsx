@@ -13,7 +13,7 @@ import { ScoreRing } from '../components/ScoreRing'
 import { MAX_RECORDING_MS, MIN_RECORDING_MS, scoreBand } from '../constants'
 import { formatPlayTime } from '../time'
 import { AssessmentView } from './AssessmentView'
-import { isRecordingSupported } from './recorder'
+import { isRecordingSupported, TOO_SHORT_MESSAGE } from './recorder'
 import { useRecorder } from './useRecorder'
 
 const DARK_OUTLINE =
@@ -81,7 +81,7 @@ export function PronunciationExercise({ lesson, attemptId, nextLesson, onRestart
     maxMs: MAX_RECORDING_MS,
     async onRecorded({ wav, durationMs }) {
       if (durationMs < MIN_RECORDING_MS) {
-        setAssessError('Bản ghi quá ngắn. Hãy bấm dừng sau khi đọc xong.')
+        setAssessError(TOO_SHORT_MESSAGE)
         return
       }
       setRecordingUrl(URL.createObjectURL(wav))

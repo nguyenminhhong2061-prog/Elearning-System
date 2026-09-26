@@ -30,6 +30,11 @@ npm run dev        # http://localhost:5173
 | `npm test` | Chạy toàn bộ test một lần (Vitest + React Testing Library) |
 | `npm run test:watch` | Chạy test và tự chạy lại khi sửa |
 
+**Dữ liệu giả của module Bài tập:** khi chạy `npm run dev:mock`, mở `http://localhost:5173/__mock` để chọn tình
+huống (mạng chậm, danh sách trống, lỗi tải, lỗi lưu, AI lỗi) và xem danh sách các màn cần thử. Tình huống lưu trong
+cookie `mockScenario` nên áp dụng cho mọi tab. Code ở `mock/scenario.js`, dữ liệu mẫu ở `mock/exerciseFixtures.js`
+(bài `id` 99 cố tình không có câu hỏi và không hiện trong danh sách), lịch sử làm bài mẫu ở `mock/routes/exercises.js`.
+
 Muốn có tài khoản admin để thử: chạy backend với `ADMIN_EMAIL` và `ADMIN_PASSWORD` (xem README gốc).
 Tài khoản đăng ký qua giao diện luôn là learner.
 
@@ -64,7 +69,8 @@ Cấu hình tùy chọn (copy `.env.example` thành `.env.local`, file này khô
 frontend/
 ├── LinguaStep-design-source/  # bản thiết kế gốc (chỉ để tham khảo, xem mục Thiết kế)
 ├── mock/                      # API giả cho `npm run dev:mock`: mockApi.js (plugin), routes/, store.js, scheduler.js,
-│                              # exerciseFixtures.js và media.js (bài tập, audio bài nghe) (không vào bản build)
+│                              # exerciseFixtures.js, media.js (audio bài nghe), scenario.js (trang /__mock)
+│                              # (không vào bản build)
 └── src/
     ├── main.jsx               # điểm vào: BrowserRouter + App
     ├── index.css              # Tailwind, design token, @font-face

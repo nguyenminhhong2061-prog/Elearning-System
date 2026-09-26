@@ -127,6 +127,43 @@ export const MOCK_LESSONS = [
       blank(505, 'The letters have already been ___ (send).', ['sent'], 'Bị động ở hiện tại hoàn thành: have/has been + V3: send → sent.'),
     ],
   }),
+  lesson({
+    id: 6,
+    skill: 'GRAMMAR',
+    title: 'Đảo ngữ với trạng từ phủ định',
+    description: 'Never, rarely, not only, hardly… đứng đầu câu thì đảo trợ động từ lên trước chủ ngữ.',
+    topic: 'Cấu trúc câu',
+    cefrLevel: 'C1',
+    difficulty: 'HARD',
+    estimatedMinutes: 7,
+    questions: [
+      choice(601, 'Never ___ such a beautiful sunset.', ['I have seen', 'have I seen', 'I saw', 'did I saw'], 1, 'Trạng từ phủ định (never, rarely, seldom) đứng đầu câu thì đảo trợ động từ lên trước chủ ngữ: have I seen.', 'Trạng từ phủ định đứng đầu câu.'),
+      choice(602, 'Not only ___ late, but he also forgot the documents.', ['he was', 'was he', 'he is', 'is he'], 1, '"Not only" đứng đầu câu kéo theo đảo ngữ: was he.'),
+      blank(603, 'Rarely ___ (do) we see such dedication.', ['do'], 'Rarely + do/does/did + chủ ngữ + động từ nguyên mẫu. Chủ ngữ là "we" nên dùng do.'),
+      choice(604, 'Hardly had we arrived ___ it started to rain.', ['than', 'when', 'then', 'that'], 1, 'Cấu trúc cố định: Hardly/Scarcely + had + chủ ngữ + V3 + when + quá khứ đơn.'),
+      blank(605, 'Only after the meeting ___ (she / realize) her mistake.', ['did she realize', 'did she realise'], '"Only after + cụm từ" đứng đầu câu thì mệnh đề chính đảo ngữ: did she realize.'),
+      // No hint and no explanation: the feedback box shows only the verdict.
+      choice(606, 'Seldom ___ he complain about his work.', ['does', 'do', 'is', 'has'], 0, null),
+    ],
+  }),
+  lesson({
+    id: 7,
+    skill: 'GRAMMAR',
+    title: 'Thức giả định',
+    description: 'Insist that he submit, it is essential that…, wish, if only.',
+    topic: 'Thức giả định',
+    cefrLevel: 'C2',
+    difficulty: 'HARD',
+    estimatedMinutes: 6,
+    questions: [
+      choice(701, 'The committee insisted that he ___ the report by Friday.', ['submits', 'submit', 'submitted', 'will submit'], 1, 'Sau insist, demand, recommend, suggest (that) dùng động từ nguyên mẫu không "to" cho mọi ngôi: he submit.'),
+      choice(702, 'It is essential that every student ___ on time.', ['be', 'is', 'was', 'will be'], 0, 'Sau "It is essential/vital/important that" dùng dạng nguyên mẫu: be.'),
+      blank(703, 'I wish I ___ (know) the answer right now.', ['knew'], 'Wish cho điều không có thật ở hiện tại: wish + quá khứ đơn: knew.'),
+      choice(704, 'If only she ___ told me earlier!', ['has', 'had', 'would', 'did'], 1, '"If only + quá khứ hoàn thành" diễn tả tiếc nuối về quá khứ: had told.'),
+      // A long prompt, to see how questions and answers wrap.
+      choice(705, 'Had the government invested more heavily in renewable energy two decades ago, the country ___ so dependent on imported fuel today.', ['would not be', 'would not have been', 'will not be', 'is not'], 0, 'Câu điều kiện hỗn hợp: đảo ngữ "Had + chủ ngữ + V3" (điều kiện trong quá khứ), kết quả ở hiện tại (today): would not be.', 'Chú ý "two decades ago" và "today".'),
+    ],
+  }),
 
   // Listening
   lesson({
@@ -206,6 +243,38 @@ export const MOCK_LESSONS = [
       choice(1303, 'Kế hoạch mới của chính phủ là gì?', ['Xây thêm trường học', 'Trồng một tỷ cây xanh', 'Xây đê chống lũ'], 1, '"a new plan to plant one billion trees by 2030".'),
     ],
   }),
+  lesson({
+    id: 14,
+    skill: 'LISTENING',
+    title: 'Bài giảng ngắn về giấc ngủ',
+    description: 'Một người nói (không có tên người nói), 9 đoạn: thử phụ đề dài và cột bài nghe cuộn riêng trên màn rộng.',
+    topic: 'Sức khỏe',
+    cefrLevel: 'C1',
+    difficulty: 'HARD',
+    estimatedMinutes: 8,
+    passage: {
+      title: 'Bài giảng ngắn về giấc ngủ',
+      durationMs: 56_000,
+      segments: segments(14, [
+        [0, 5500, null, 'Today I’d like to talk about something we all do, but rarely think about: sleep.', 'Hôm nay tôi muốn nói về một việc ai cũng làm nhưng hiếm khi nghĩ tới: giấc ngủ.'],
+        [6000, 12000, null, 'Most adults need between seven and nine hours of sleep every night to function well.', 'Phần lớn người trưởng thành cần ngủ từ bảy đến chín tiếng mỗi đêm để hoạt động tốt.'],
+        [12500, 18500, null, 'However, surveys show that nearly a third of people regularly sleep less than six hours.', 'Tuy nhiên, các khảo sát cho thấy gần một phần ba số người thường xuyên ngủ ít hơn sáu tiếng.'],
+        [19000, 25000, null, 'During deep sleep, the brain sorts the information collected during the day and stores the important parts.', 'Trong giấc ngủ sâu, não sắp xếp thông tin thu được trong ngày và lưu lại những phần quan trọng.'],
+        [25500, 31000, null, 'That is why students who sleep well before an exam often remember more.', 'Đó là lý do học sinh ngủ đủ trước kỳ thi thường nhớ được nhiều hơn.'],
+        [31500, 37500, null, 'Screens are one of the biggest enemies of good sleep, because their blue light delays the release of melatonin.', 'Màn hình là một trong những kẻ thù lớn nhất của giấc ngủ, vì ánh sáng xanh làm chậm quá trình tiết melatonin.'],
+        [38000, 43500, null, 'Experts recommend putting phones away at least an hour before going to bed.', 'Các chuyên gia khuyên nên cất điện thoại ít nhất một tiếng trước khi đi ngủ.'],
+        [44000, 50000, null, 'Keeping the same bedtime, even at weekends, also helps your body clock stay regular.', 'Đi ngủ cùng một giờ, kể cả cuối tuần, cũng giúp đồng hồ sinh học của bạn ổn định.'],
+        [50500, 55500, null, 'So tonight, try to give your brain the rest it deserves.', 'Vậy tối nay, hãy thử cho bộ não được nghỉ ngơi xứng đáng.'],
+      ]),
+    },
+    questions: [
+      choice(1401, 'Người trưởng thành cần ngủ bao nhiêu tiếng mỗi đêm?', ['5–6 tiếng', '7–9 tiếng', '10–12 tiếng'], 1, '"between seven and nine hours".'),
+      choice(1402, 'Khoảng bao nhiêu người thường xuyên ngủ dưới 6 tiếng?', ['Một phần mười', 'Một phần ba', 'Một nửa'], 1, '"nearly a third of people".'),
+      choice(1403, 'Trong giấc ngủ sâu, não làm gì?', ['Nghỉ hoàn toàn', 'Sắp xếp và lưu thông tin', 'Tiết ra ánh sáng xanh'], 1, '"the brain sorts the information … and stores the important parts".'),
+      blank(1404, 'Nên cất điện thoại trước khi ngủ ít nhất mấy tiếng? (ghi bằng số)', ['1', 'một', 'one', '1 tiếng', 'một tiếng'], '"at least an hour before going to bed": ít nhất 1 tiếng.'),
+      choice(1405, 'Vì sao màn hình ảnh hưởng tới giấc ngủ?', ['Tiếng ồn từ thiết bị', 'Ánh sáng xanh làm chậm tiết melatonin', 'Màn hình làm nóng phòng'], 1, '"their blue light delays the release of melatonin".'),
+    ],
+  }),
 
   // Pronunciation
   lesson({
@@ -260,5 +329,48 @@ export const MOCK_LESSONS = [
       ['happy', '/ˈhæpi/', 'Tính từ 2 âm tiết thường nhấn âm đầu.'],
       ['begin', '/bɪˈɡɪn/', 'Động từ 2 âm tiết thường nhấn âm sau.'],
     ]),
+  }),
+  lesson({
+    id: 24,
+    skill: 'PRONUNCIATION',
+    title: 'Từ quen thuộc hằng ngày',
+    description: 'Từ ngắn cho người mới bắt đầu; vài mục không có ghi chú.',
+    topic: 'Giao tiếp',
+    cefrLevel: 'A1',
+    difficulty: 'EASY',
+    estimatedMinutes: 3,
+    pronunciationItems: items(24, [
+      ['hello', '/həˈləʊ/', null],
+      ['water', '/ˈwɔːtə(r)/', 'Âm "t" giữa từ: Anh-Mỹ thường đọc gần như /d/.'],
+      ['thank you', '/ˈθæŋk juː/', 'Âm /θ/: đặt đầu lưỡi giữa hai hàm răng rồi thổi hơi.'],
+      ['family', '/ˈfæməli/', null],
+    ]),
+  }),
+  lesson({
+    id: 25,
+    skill: 'PRONUNCIATION',
+    title: 'Câu dài và ngữ điệu',
+    description: 'Câu nhiều từ, không có phiên âm: thử phần tô màu từng từ, từ đọc chưa chuẩn và từ bị bỏ sót.',
+    topic: 'Ngữ điệu',
+    cefrLevel: 'C1',
+    difficulty: 'HARD',
+    estimatedMinutes: 5,
+    pronunciationItems: items(25, [
+      ['I would appreciate it if you could send me the report.', null, 'Nối âm "appreciate it"; nhấn vào "report".'],
+      ['The environmental impact of tourism is often underestimated.', null, 'Trọng âm: enviRONmental, underEStimated.'],
+      ['She thoroughly enjoyed the performance.', null, 'Âm /θ/ trong "thoroughly".'],
+    ]),
+  }),
+
+  // Not listed (no questions): only reachable by URL, /exercises/lessons/99, for the "no questions yet" screen.
+  lesson({
+    id: 99,
+    skill: 'GRAMMAR',
+    title: 'Bài đang soạn',
+    description: null,
+    topic: null,
+    cefrLevel: 'A2',
+    difficulty: 'EASY',
+    estimatedMinutes: null,
   }),
 ]

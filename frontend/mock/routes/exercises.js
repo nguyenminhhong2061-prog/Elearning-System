@@ -11,6 +11,45 @@ const MAX_RECORDING_BYTES = 1024 * 1024
 const attempts = new Map() // attemptId -> attempt
 let nextAttemptId = 1
 
+// Every learner starts with a little history, so the lists show best scores right away and beating one shows
+// "Kỷ lục mới!". [lessonId, scorePercent, days ago]
+const SEEDED_HISTORY = [
+  [1, 60, 6],
+  [1, 80, 2], // Thì hiện tại đơn: best 80%, so a perfect run is a new record
+  [2, 100, 5], // Mạo từ: already perfect, a new record is impossible
+  [3, 50, 3],
+  [12, 67, 4],
+  [22, 74, 1],
+]
+const seededUsers = new Set()
+
+function ensureHistory(userId) {
+  if (seededUsers.has(userId)) return
+  seededUsers.add(userId)
+  for (const [lessonId, scorePercent, daysAgo] of SEEDED_HISTORY) {
+    const finishedAt = new Date(Date.now() - daysAgo * 86_400_000)
+    const id = nextAttemptId++
+    attempts.set(id, {
+      id,
+      userId,
+      lessonId,
+      status: 'COMPLETED',
+      responses: new Map(),
+      recordings: new Map(),
+      playbackRate: 1,
+      startedAt: new Date(finishedAt.getTime() - 5 * 60_000).toISOString(),
+      finishedAt: finishedAt.toISOString(),
+      scorePercent,
+    })
+  }
+}
+
+/** Forgets every attempt; each learner gets the seeded history again on the next request (the /__mock page's reset). */
+export function resetExerciseData() {
+  attempts.clear()
+  seededUsers.clear()
+}
+
 export function findLesson(id) {
   return MOCK_LESSONS.find((lesson) => lesson.id === id)
 }
@@ -90,6 +129,7 @@ function completedAttempts(userId, lessonId) {
 }
 
 function progressOf(userId, lessonId) {
+  ensureHistory(userId)
   const done = completedAttempts(userId, lessonId)
   if (done.length === 0) return { attemptCount: 0, bestScorePercent: null, lastCompletedAt: null }
   return {
@@ -156,30 +196,36 @@ function rms(samples) {
 const clamp = (value) => Math.max(0, Math.min(100, Math.round(value)))
 
 /**
- * A believable fake assessment: no speech service here, so the score only depends on the item and the try number
- * (it improves as the learner tries again). Silence is rejected like a real service would (422).
+ * A believable fake assessment: no speech service here, so the score only depends on the item and the try number.
+ * First tries spread over the three colour bands (45 to 84, depending on the item) and each new try adds 9, so every
+ * band can be seen. The longest word is the badly said one; a long sentence read poorly the first time also loses its
+ * last word (the "bị bỏ sót" style). Silence is rejected like a real service would (422).
  */
 export function fakeAssessment(item, tryNumber, samples) {
   if (rms(samples) < 0.005) throw new HttpError(422, 'No speech recognized')
-  const overall = clamp(62 + (item.id % 13) + (tryNumber - 1) * 9)
+  const overall = clamp(45 + ((item.id * 17) % 40) + (tryNumber - 1) * 9)
   const words = item.text.replace(/[.,!?]/g, '').split(/\s+/)
-  const hardest = words.reduce((longest, word, index) => (word.length > words[longest].length ? index : longest), 0)
+  const omitsLast = words.length >= 5 && tryNumber === 1 && overall < 75
+  const candidates = omitsLast ? words.slice(0, -1) : words
+  const hardest = candidates.reduce((longest, word, index) => (word.length > candidates[longest].length ? index : longest), 0)
+  const tips = []
+  if (omitsLast) tips.push(`Đọc hết câu: từ "${words.at(-1)}" bị bỏ sót.`)
+  if (overall < 85) tips.push(`Chú ý từ "${words[hardest]}": nghe mẫu rồi đọc lại chậm, rõ từng âm tiết.`, 'Nhấn mạnh âm tiết mang trọng âm, các âm tiết khác đọc nhẹ hơn.')
+  else tips.push('Rất tốt! Thử nói tự nhiên và liền mạch hơn một chút.')
   return {
     itemId: item.id,
     tryNumber,
     overallScore: overall,
     accuracyScore: clamp(overall + 4),
     fluencyScore: clamp(overall - 8),
-    completenessScore: clamp(overall + 6),
-    recognizedText: item.text.replace(/[.,!?]$/, '').toLowerCase(),
+    completenessScore: omitsLast ? clamp(overall - 15) : clamp(overall + 6),
+    recognizedText: (omitsLast ? words.slice(0, -1).join(' ') : words.join(' ')).toLowerCase(),
     words: words.map((word, index) => {
-      const score = index === hardest ? clamp(overall - 22) : clamp(overall + 5)
+      if (omitsLast && index === words.length - 1) return { word, accuracyScore: 0, errorType: 'OMISSION' }
+      const score = index === hardest ? clamp(overall - 25) : clamp(overall + 5)
       return { word, accuracyScore: score, errorType: score < 60 ? 'MISPRONUNCIATION' : 'NONE' }
     }),
-    tips:
-      overall < 85
-        ? [`Chú ý từ "${words[hardest]}": nghe mẫu rồi đọc lại chậm, rõ từng âm tiết.`, 'Nhấn mạnh âm tiết mang trọng âm, các âm tiết khác đọc nhẹ hơn.']
-        : ['Rất tốt! Thử nói tự nhiên và liền mạch hơn một chút.'],
+    tips,
   }
 }
 

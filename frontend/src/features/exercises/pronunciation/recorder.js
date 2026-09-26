@@ -6,6 +6,8 @@ import { encodeWav } from './wav'
 
 export const TARGET_SAMPLE_RATE = 16_000
 
+export const TOO_SHORT_MESSAGE = 'Bản ghi quá ngắn. Hãy bấm dừng sau khi đọc xong.'
+
 function audioContextClass() {
   return typeof window === 'undefined' ? undefined : (window.AudioContext ?? window.webkitAudioContext)
 }
@@ -26,7 +28,8 @@ export function isRecordingSupported() {
 
 /**
  * Asks for the microphone and starts recording.
- * @returns {Promise<{ stop: () => Promise<Blob>, cancel: () => void }>} stop() resolves with the raw recording
+ * @returns {Promise<{ stop: () => Promise<{ blob: Blob, elapsedMs: number }>, cancel: () => void }>} stop() resolves
+ *   with the raw recording and how long it ran (a recording stopped at once is often empty and cannot be decoded)
  */
 export async function startRecording() {
   const stream = await navigator.mediaDevices.getUserMedia({
@@ -47,13 +50,15 @@ export async function startRecording() {
   })
   const stopped = new Promise((resolve) => recorder.addEventListener('stop', resolve, { once: true }))
   recorder.start()
+  const startedAt = performance.now()
 
   return {
     async stop() {
+      const elapsedMs = performance.now() - startedAt
       if (recorder.state !== 'inactive') recorder.stop()
       await stopped
       release()
-      return new Blob(chunks, { type: recorder.mimeType || 'audio/webm' })
+      return { blob: new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }), elapsedMs }
     },
     cancel() {
       if (recorder.state !== 'inactive') recorder.stop()

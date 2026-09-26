@@ -1,0 +1,196 @@
+import { resetChatData } from './routes/chat.js'
+import { resetExerciseData } from './routes/exercises.js'
+
+// Scenarios of `npm run dev:mock` for module B (exercises and the AI assistant), so that loading, empty and error
+// screens can be seen without a backend. The chosen scenario lives in a cookie, so it applies to every tab of the
+// browser; http://localhost:5173/__mock shows the control page.
+
+const COOKIE = 'mockScenario'
+
+export const SCENARIOS = [
+  { id: 'normal', label: 'Bình thường', description: 'Mọi thứ chạy như có backend thật.' },
+  { id: 'slow', label: 'Mạng chậm', description: 'Mọi API của module Bài tập chậm thêm 2,5 giây: xem khung chờ tải và nút đang xử lý.' },
+  { id: 'empty', label: 'Chưa có bài', description: 'Danh sách bài của cả ba kỹ năng trống: xem màn "Chưa có bài tập".' },
+  { id: 'load-error', label: 'Lỗi tải', description: 'Tải danh sách, nội dung bài và bắt đầu bài trả lỗi 500: xem thông báo lỗi và nút "Thử lại".' },
+  { id: 'save-error', label: 'Lỗi lưu bài', description: 'Chấm câu và nộp bài trả lỗi 500 (bài vẫn mở được). Chuyển về "Bình thường" rồi bấm lại để thấy thử lại được.' },
+  { id: 'ai-down', label: 'AI lỗi', description: 'Chấm phát âm và trợ lý AI trả lỗi 503: xem thông báo "chưa chấm được" và "không thể trả lời lúc này".' },
+]
+
+const MODULE_B = /^\/api\/(exercises|exercise-attempts|chat)(\/|$)/
+
+/** The scenario chosen on the control page ("normal" when none or an unknown one). */
+export function scenarioOf(req) {
+  const value = new RegExp(`(?:^|;\\s*)${COOKIE}=([\\w-]+)`).exec(req.headers.cookie ?? '')?.[1]
+  return SCENARIOS.some((scenario) => scenario.id === value) ? value : 'normal'
+}
+
+/**
+ * What a scenario changes for one API request: extra waiting time, or a reply that replaces the normal one
+ * ({ status, body } or { status, message } for an error). Only module B endpoints are affected.
+ */
+export function scenarioEffect(scenario, method, pathname) {
+  if (!MODULE_B.test(pathname)) return {}
+  const is = (verb, pattern) => method === verb && pattern.test(pathname)
+  switch (scenario) {
+    case 'slow':
+      return { extraDelayMs: 2500 }
+    case 'empty':
+      return is('GET', /^\/api\/exercises$/) ? { reply: { status: 200, body: [] } } : {}
+    case 'load-error':
+      return is('GET', /^\/api\/exercises(\/\d+)?$/) || is('POST', /^\/api\/exercises\/\d+\/attempts$/)
+        ? { reply: { status: 500, message: 'Simulated server error (mock scenario "load-error")' } }
+        : {}
+    case 'save-error':
+      return is('POST', /^\/api\/exercise-attempts\/\d+\/(responses|complete)$/)
+        ? { reply: { status: 500, message: 'Simulated server error (mock scenario "save-error")' } }
+        : {}
+    case 'ai-down':
+      return is('POST', /^\/api\/exercise-attempts\/\d+\/pronunciation\/\d+$/) || is('POST', /^\/api\/chat\/sessions\/\d+\/messages$/)
+        ? { reply: { status: 503, message: 'Simulated AI outage (mock scenario "ai-down")' } }
+        : {}
+    default:
+      return {}
+  }
+}
+
+// --- Control page --------------------------------------------------------------------------------------------------
+
+const APP_LINKS = [
+  ['/exercises', 'Danh sách bài ngữ pháp (đủ 6 trình độ A1 đến C2)'],
+  ['/exercises?skill=listening', 'Danh sách bài nghe'],
+  ['/exercises?skill=pronunciation', 'Danh sách bài phát âm'],
+  ['/exercises/lessons/1', 'Ngữ pháp "Thì hiện tại đơn" (đã có lịch sử tốt nhất 80%)'],
+  ['/exercises/lessons/7', 'Ngữ pháp C2 "Thức giả định" (bài cuối: nút "Về danh sách" thay cho "Bài tiếp theo")'],
+  ['/exercises/lessons/14', 'Nghe C1 "Bài giảng ngắn về giấc ngủ" (phụ đề dài, không có tên người nói)'],
+  ['/exercises/lessons/25', 'Phát âm C1 "Câu dài và ngữ điệu" (tô màu từng từ, từ bị bỏ sót)'],
+  ['/exercises/lessons/99', 'Bài chưa có câu hỏi nào'],
+  ['/exercises/lessons/999', 'Bài không tồn tại'],
+]
+
+const CHECKLIST = [
+  ['Khung chờ tải, nút đang xử lý', 'Chọn tình huống "Mạng chậm", rồi mở danh sách, mở bài, bấm "Kiểm tra".'],
+  ['Màn "Chưa có bài tập"', 'Chọn "Chưa có bài".'],
+  ['Lỗi tải và nút "Thử lại"', 'Chọn "Lỗi tải", mở danh sách hoặc một bài. Chuyển về "Bình thường" rồi bấm "Thử lại".'],
+  ['Lỗi khi chấm câu hoặc nộp bài', 'Chọn "Lỗi lưu bài", mở một bài rồi bấm "Kiểm tra" (ngữ pháp) hoặc "Nộp bài" (nghe).'],
+  ['"Kỷ lục mới!"', 'Làm đúng hết bài "Thì hiện tại đơn" (lịch sử có sẵn là 80%). Lần đầu hoàn thành một bài thì không hiện.'],
+  ['"Câu cần xem lại"', 'Làm sai ít nhất một câu ngữ pháp rồi bấm "Xem kết quả".'],
+  ['Phản hồi không có giải thích', 'Bài C1 "Đảo ngữ", câu 6.'],
+  ['Điểm phát âm đỏ, cam, xanh', 'Mỗi mục có điểm lần đầu khác nhau (45 đến 84), mỗi lần "Thử lại" cộng 9 điểm.'],
+  ['Từ đọc chưa chuẩn, từ bị bỏ sót', 'Bài C1 "Câu dài và ngữ điệu", mục 2, lần ghi âm đầu.'],
+  ['"Bản ghi quá ngắn"', 'Bấm micro rồi bấm dừng ngay.'],
+  ['"Không nhận diện được giọng nói"', 'Ghi âm trong lúc im lặng (hoặc tắt tiếng micro trong Windows).'],
+  ['Micro bị chặn', 'Bấm biểu tượng ổ khóa cạnh thanh địa chỉ, chặn Micro, tải lại trang rồi bấm ghi âm.'],
+  ['Chấm phát âm, trợ lý AI lỗi', 'Chọn "AI lỗi"; hoặc gõ tin nhắn có "#503" (AI lỗi) hay "#429" (gửi quá nhanh).'],
+  ['Trợ lý: gợi ý và giải thích', 'Hỏi về một câu trước khi trả lời (chỉ gợi ý), rồi hỏi lại sau khi đã trả lời (giải thích đầy đủ).'],
+  ['Nhãn "Trình độ của bạn"', 'Cần trình độ trong DB thật (xem lệnh bên dưới), rồi tải lại trang.'],
+]
+
+function page(current, notice) {
+  const scenarioButtons = SCENARIOS.map(
+    (scenario) => `
+      <a class="scenario${scenario.id === current ? ' active' : ''}" href="/__mock/scenario/${scenario.id}">
+        <strong>${scenario.label}</strong><span>${scenario.description}</span>
+      </a>`,
+  ).join('')
+  const links = APP_LINKS.map(([href, label]) => `<li><a href="${href}" target="_blank">${label}</a> <code>${href}</code></li>`).join('')
+  const rows = CHECKLIST.map(([what, how]) => `<tr><td>${what}</td><td>${how}</td></tr>`).join('')
+  return `<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dữ liệu giả · LinguaStep</title>
+<style>
+  body { margin: 0; background: #EDF0EF; color: #16211F; font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; display: flex; flex-direction: column; gap: 20px; }
+  h1 { margin: 0; font-size: 26px; } h2 { margin: 0 0 10px; font-size: 18px; }
+  section { background: #fff; border: 1px solid #D4DAD8; border-radius: 12px; padding: 20px; }
+  .muted { color: #77857F; font-size: 13px; margin: 4px 0 0; }
+  .notice { background: #EAF7EE; border: 1px solid #BEEBC9; color: #146C32; border-radius: 10px; padding: 10px 14px; font-weight: 600; }
+  .scenarios { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+  .scenario { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid #D4DAD8; border-radius: 10px; color: #475551; text-decoration: none; }
+  .scenario:hover { border-color: #12A594; }
+  .scenario strong { color: #16211F; } .scenario span { font-size: 13px; }
+  .scenario.active { border: 2px solid #12A594; background: #E2F5F2; }
+  .scenario.active strong::after { content: " (đang chọn)"; color: #0B7B70; font-weight: 600; }
+  a { color: #0B7B70; } ul { margin: 0; padding-left: 20px; } li { margin: 4px 0; }
+  code { background: #EDF0EF; border-radius: 4px; padding: 1px 5px; font-size: 13px; }
+  pre { background: #16211F; color: #D4DAD8; border-radius: 8px; padding: 12px; overflow-x: auto; font-size: 13px; white-space: pre-wrap; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  td { border-top: 1px solid #D4DAD8; padding: 8px 6px; vertical-align: top; } td:first-child { font-weight: 600; width: 34%; }
+  .reset { display: inline-block; margin-top: 8px; padding: 10px 16px; border-radius: 8px; background: #B02A2A; color: #fff; text-decoration: none; font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <div>
+    <h1>Dữ liệu giả của module Bài tập</h1>
+    <p class="muted">Chỉ có khi chạy <code>npm run dev:mock</code>. Tình huống lưu trong cookie nên áp dụng cho mọi tab của trình duyệt này; tải lại trang ứng dụng sau khi đổi. Dữ liệu làm bài nằm trong bộ nhớ, mất khi tắt server.</p>
+  </div>
+  ${notice ? `<p class="notice">${notice}</p>` : ''}
+  <section>
+    <h2>1. Chọn tình huống</h2>
+    <div class="scenarios">${scenarioButtons}</div>
+  </section>
+  <section>
+    <h2>2. Mở các màn trong ứng dụng</h2>
+    <ul>${links}</ul>
+  </section>
+  <section>
+    <h2>3. Muốn xem màn nào thì làm gì</h2>
+    <table>${rows}</table>
+  </section>
+  <section>
+    <h2>4. Nhãn "Trình độ của bạn"</h2>
+    <p class="muted">Trình độ lấy từ tài khoản thật trong DB (đăng nhập luôn qua backend thật). Chạy trong Git Bash, thay email của bạn, rồi tải lại trang (F5):</p>
+    <pre>docker exec datn-postgres psql -U datn -d datn -c "UPDATE users SET current_level = 'B1' WHERE email = 'email-cua-ban@example.com';"</pre>
+    <p class="muted">Muốn bỏ trình độ: thay <code>'B1'</code> bằng <code>NULL</code>.</p>
+  </section>
+  <section>
+    <h2>5. Làm lại từ đầu</h2>
+    <p class="muted">Xóa mọi lượt làm bài và cuộc trò chuyện đã lưu trong bộ nhớ; mỗi tài khoản lại có lịch sử mẫu như lúc mới chạy.</p>
+    <a class="reset" href="/__mock/reset">Xóa dữ liệu làm bài</a>
+  </section>
+</main>
+</body>
+</html>`
+}
+
+function redirect(res, location, cookie) {
+  res.statusCode = 302
+  if (cookie) res.setHeader('Set-Cookie', cookie)
+  res.setHeader('Location', location)
+  res.end()
+}
+
+/** Answers /__mock (the control page) and its actions; returns false for any other request. */
+export function serveControlPanel(req, res) {
+  const url = new URL(req.url, 'http://localhost')
+  if (req.method !== 'GET' || !url.pathname.startsWith('/__mock')) return false
+
+  const chosen = /^\/__mock\/scenario\/([\w-]+)$/.exec(url.pathname)?.[1]
+  if (chosen && SCENARIOS.some((scenario) => scenario.id === chosen)) {
+    redirect(res, `/__mock?set=${chosen}`, `${COOKIE}=${chosen}; Path=/; SameSite=Lax`)
+    return true
+  }
+  if (url.pathname === '/__mock/reset') {
+    resetExerciseData()
+    resetChatData()
+    redirect(res, '/__mock?reset=1')
+    return true
+  }
+
+  // A redirect sets the cookie in the same response, so read the new value from the query string first.
+  const current = url.searchParams.get('set') ?? scenarioOf(req)
+  const label = SCENARIOS.find((scenario) => scenario.id === current)?.label
+  const notice = url.searchParams.has('reset')
+    ? 'Đã xóa dữ liệu làm bài.'
+    : url.searchParams.has('set') && label
+      ? `Đã chọn tình huống "${label}". Tải lại trang ứng dụng để áp dụng.`
+      : ''
+  res.statusCode = 200
+  res.setHeader('Content-Type', 'text/html; charset=utf-8')
+  res.setHeader('Cache-Control', 'no-store')
+  res.end(page(current, notice))
+  return true
+}
