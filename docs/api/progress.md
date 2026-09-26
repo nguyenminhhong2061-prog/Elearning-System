@@ -44,7 +44,7 @@ Enum trong JSON viết **chữ hoa**. Dùng các bảng có sẵn trong `V1__ini
 | Biểu đồ "Điểm theo kỹ năng" (radar Nghe, Nói, Đọc, Viết) | `GET /api/progress/skills` | **Nhân** |
 | "Hành trình trình độ" (A1 → C2) | Frontend tính từ `currentLevel` của `/api/users/me`, không cần API | — |
 | "Thành tích" (huy hiệu đã đạt, sắp đạt) | `GET /api/progress/badges` | **Nhân** |
-| Thẻ "Học tiếp" | `GET /api/exercises?skill=GRAMMAR` (contract `exercises.md`) | Đạt |
+| Thẻ "Tiếp tục" (bài đang làm dở), không có thì "Học tiếp" (bài kế tiếp) | `GET /api/exercise-attempts/current`; không có lượt dở thì `GET /api/exercises?skill=GRAMMAR` (contract `exercises.md`) | Đạt |
 | Ghi thời gian học (không hiện, chạy nền) | `POST /api/progress/study-time` | **Nhân** |
 
 Thứ tự đề xuất cho backend: `summary` → `activity` → `study-time` → `badges` → `skills` (cần module C có kết quả).
@@ -220,12 +220,13 @@ không tự có; tài khoản demo nên học sau khi module D lên, hoặc dùn
 
 | Việc | Gọi |
 |---|---|
-| Mở trang chủ | Song song: `users/me` (đã có sẵn), `learning/summary`, `progress/summary`, `progress/activity?period=DAY`, `progress/skills`, `progress/badges`, `exercises?skill=GRAMMAR` |
+| Mở trang chủ | Song song: `users/me` (đã có sẵn), `learning/summary`, `progress/summary`, `progress/activity?period=DAY`, `progress/skills`, `progress/badges`, `exercise-attempts/current` (và `exercises?skill=GRAMMAR` khi không có lượt dở) |
 | Đổi Ngày / Tuần / Tháng trên biểu đồ | `GET /api/progress/activity?period=WEEK` hoặc `MONTH` |
 | Đổi chỉ số (Từ mới, Bài tập, Điểm kiểm tra, Thời gian học) | Không gọi lại: cùng một phản hồi `activity` |
 | Học xong một thẻ, một bài, một bài kiểm tra | Làm mới dữ liệu `progress` cùng dữ liệu của module đó |
 | Hành trình trình độ | Không gọi API: trình độ dưới `currentLevel` là "Đạt", bằng là "Hiện tại", trên là "Chưa đạt"; `currentLevel = null` thì mọi ô "Chưa đạt" và gợi ý làm bài kiểm tra tổng hợp |
-| Thẻ "Học tiếp" | Bài ngữ pháp đầu tiên ở trình độ hiện tại chưa hoàn thành lần nào (`progress.attemptCount = 0`); **chưa chốt**, xem mục 4 của "Gợi ý giải pháp" |
+| Thẻ "Tiếp tục" | Lượt dở gần nhất: "Tiếp tục: Thì hiện tại hoàn thành · Đã làm 4/10 câu · còn 6 câu", bấm vào thì mở bài và làm tiếp đúng câu |
+| Thẻ "Học tiếp" (không có lượt dở) | Bài ngữ pháp đầu tiên ở trình độ hiện tại chưa hoàn thành lần nào (`progress.attemptCount = 0`) |
 
 ## Khác với thiết kế LinguaStep
 
@@ -241,7 +242,7 @@ hoạch (`isPlan`) từ dòng 693.
 | "Huy hiệu theo trình độ" (dòng 295–302) | "Hành trình trình độ", tính từ `currentLevel` | Bảng `badges` chỉ có điều kiện streak, số từ, điểm tuyệt đối (`CHECK` trong `V1__init.sql`); trình độ đã có ở `users.current_level` và `user_level_history` |
 | Không có khối thành tích | Thêm khối "Thành tích": đã đạt, sắp đạt | Nghiệp vụ D1: "hiện huy hiệu đã đạt và sắp đạt"; bảng `badges`, `user_badges` dành cho việc này |
 | Không vẽ trạng thái người mới | Biểu đồ trống cùng lời mời bắt đầu học | Ngoại lệ của D1 |
-| "Tiếp tục: … còn 6 câu" (dòng 307) | Tạm thời: "Học tiếp", gợi ý bài kế tiếp | Chỉ xung đột với contract module B (`exercises.md`: mở bài là lượt mới), không xung đột nghiệp vụ hay database. **Chưa chốt** |
+| "Tiếp tục: … Bài 4/10 · còn 6 câu" (dòng 307) | Giữ, ghi "Đã làm 4/10 câu · còn 6 câu"; không có lượt dở thì "Học tiếp" gợi ý bài kế tiếp | Hồng chốt ngày 27/09: contract module B đổi để làm tiếp được bài ngữ pháp, phát âm đang dở (`exercises.md`). "Bài 4/10" dễ hiểu nhầm thành bài thứ 4 trong 10 bài |
 
 ## Gợi ý giải pháp
 
@@ -308,16 +309,16 @@ Chào Hồng 👋
 [ biểu đồ cột + dòng tổng                    ] [ Xem kế hoạch →           ]
 [Hành trình trình độ  A1 A2 (B1) B2 C1 C2    ] [Thành tích 3/12           ]
 [                                            ] [ đã đạt gần đây, sắp đạt  ]
-[Học tiếp: …                                                              ]
+[Tiếp tục: … · Đã làm 4/10 câu · còn 6 câu   (hoặc Học tiếp: … )           ]
 ```
 
 - Chỉ số "Điểm kiểm tra": kỳ không làm bài để trống, không vẽ cột 0.
 - "Thành tích": số đã đạt trên tổng, vài huy hiệu đạt gần nhất, 3 huy hiệu sắp đạt kèm thanh tiến độ ("Chăm chỉ 30 ngày ·
   14/30"), nút "Xem tất cả".
 - Người mới: các biểu đồ trống, cùng lời mời "Bắt đầu với 20 từ đầu tiên →".
-- Thẻ "Học tiếp": giữ đúng thiết kế ("Tiếp tục … còn 6 câu") thì phải sửa contract module B cho phép làm tiếp lượt dở
-  (`exercise_attempts` có trạng thái `in_progress`, database cho phép); nếu không thì dùng "Học tiếp" gợi ý bài kế tiếp.
-  Hồng chưa chốt.
+- Thẻ "Tiếp tục" giữ đúng thiết kế: Hồng chốt ngày 27/09 sửa contract module B cho phép làm tiếp bài ngữ pháp, phát âm
+  đang dở (xem `exercises.md`: luật "làm tiếp được", `GET /api/exercise-attempts/current`). Không có lượt dở thì thẻ
+  thành "Học tiếp", gợi ý bài kế tiếp, nên trang chủ luôn có một việc để làm tiếp.
 
 ### Nguồn tham khảo
 
