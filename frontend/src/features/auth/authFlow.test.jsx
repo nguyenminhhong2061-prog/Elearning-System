@@ -433,9 +433,9 @@ describe('sidebar', () => {
     signInBeforeStart()
     backend = installFakeBackend({ 'GET /api/users/me': () => ({ data: learner }) })
 
-    renderApp('/tests')
+    renderApp('/plan')
 
-    await heading('Kiểm tra')
+    await heading('Kế hoạch')
     expect(screen.getByText('Sắp ra mắt')).toBeInTheDocument()
   })
 })

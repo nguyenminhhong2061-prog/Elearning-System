@@ -96,4 +96,8 @@ public class User {
     public void changePasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
     }
+
+    public void changeCurrentLevel(CefrLevel currentLevel) {
+        this.currentLevel = currentLevel;
+    }
 }

@@ -183,16 +183,22 @@ Module dùng: Hỏi chatbot AI hỗ trợ giải thích bài tập (B4).
 
 - id BIGINT UNSIGNED PK, test_id FK→tests.id, vocabulary_id FK→vocabulary.id nullable
 - question_type ENUM(MULTIPLE_CHOICE, FILL_BLANK, LISTENING, SPEAKING, READING, WRITING)
-- skill, content, points INT DEFAULT 1
+- skill, content, audio_url (thêm ở migration V202610010900, cho câu nghe hiểu), points INT DEFAULT 1
 
 ## test_question_options (đổi tên từ "answer_options" — đã chốt)
 
 - id BIGINT UNSIGNED PK, question_id FK→test_questions.id, content, is_correct BOOLEAN DEFAULT false
 
+## test_question_accepted_answers (thêm ở migration V202610010900)
+
+- id BIGINT UNSIGNED PK, question_id FK→test_questions.id
+- answer_text, normalized_answer, is_primary BOOLEAN DEFAULT false
+- Dùng chấm câu điền từ / viết ngắn (FILL_BLANK, WRITING ngắn), đối chiếu question_accepted_answers của module B.
+
 ## test_attempts (đã chốt bổ sung 3 cột cuối)
 
 - id BIGINT UNSIGNED PK, test_id FK→tests.id, user_id FK→users.id
-- start_time, total_score DECIMAL(5,2) DEFAULT 0
+- start_time, submitted_at (thêm ở migration V202610010900, thời điểm nộp bài), total_score DECIMAL(5,2) DEFAULT 0
 - status ENUM(IN_PROGRESS, SUBMITTED, GRADED)
 - skill_scores JSON -- {nghe, noi, doc, viet}
 - suggested_level ENUM CEFR nullable
@@ -201,6 +207,7 @@ Module dùng: Hỏi chatbot AI hỗ trợ giải thích bài tập (B4).
 ## test_attempt_answers (đổi tên từ "attempt_answers" — đã chốt)
 
 - id BIGINT UNSIGNED PK, attempt_id FK→test_attempts.id, question_id FK→test_questions.id
+- selected_option_id FK→test_question_options.id nullable (thêm ở migration V202610010900, cho câu trắc nghiệm/nghe/đọc)
 - answer_content TEXT, is_correct BOOLEAN nullable, score_earned DECIMAL(5,2) DEFAULT 0
 
 Module dùng: Kiểm tra định kỳ (C1), Kiểm tra tổng hợp (C2) → nguồn dữ liệu cho user_level_history.
