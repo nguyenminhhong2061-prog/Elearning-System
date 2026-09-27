@@ -102,7 +102,7 @@ Cập nhật 27/09/2026. Chi tiết phần việc của từng người: `docs/B
 | Đăng nhập, đăng ký | Đăng ký, đăng nhập, đăng xuất, đổi mật khẩu | Nguyễn Minh Hồng (xong) | Nguyễn Minh Hồng (xong) |
 | A. Học từ vựng | Chủ đề, flashcard, lặp lại ngắt quãng, danh sách từ riêng, trò chơi và bảng xếp hạng | Nguyễn Minh Hồng (xong) | Nguyễn Minh Hồng (xong) |
 | B. Bài tập và chatbot AI | Ngữ pháp, nghe hiểu, phát âm, trợ lý AI giải thích | Lý Quang Đạt (chưa có) | Nguyễn Minh Hồng (xong, đang chạy bằng dữ liệu giả) |
-| C. Kiểm tra | Kiểm tra định kỳ, kiểm tra tổng hợp 4 kỹ năng | Khuất Huy Nhân (chưa có) | Nguyễn Minh Hồng (chưa làm) |
+| C. Kiểm tra | Kiểm tra định kỳ, kiểm tra tổng hợp 4 kỹ năng | Khuất Huy Nhân (xong) | Nguyễn Minh Hồng (xong) |
 | D. Tiến độ và kế hoạch | Biểu đồ, huy hiệu, kế hoạch học, nhắc nhở | Khuất Huy Nhân (chưa có) | Nguyễn Minh Hồng (chưa làm) |
 | E. Admin | Quản lý nội dung, người dùng, thống kê | Chưa phân công | Nguyễn Minh Hồng (chưa làm) |
 
@@ -150,6 +150,7 @@ DATN/
 | `api/games.md` | Trò chơi từ vựng và bảng xếp hạng (module A) | Đã có backend |
 | `api/exercises.md` | Bài tập ngữ pháp, nghe, phát âm (module B) | Đề xuất, chờ người làm backend B duyệt |
 | `api/chatbot.md` | Trợ lý AI giải thích bài tập (module B) | Đề xuất, chờ người làm backend B duyệt |
+| `api/tests.md` | Kiểm tra định kỳ, tổng hợp 4 kỹ năng, chấm điểm và quy đổi CEFR (module C) | Đã có backend |
 | `api/progress.md` | Trang chủ Tiến độ: streak, biểu đồ theo ngày/tuần/tháng, điểm kỹ năng, thành tích; đề xuất quy đổi trình độ CEFR (module D, D1) | Đề xuất, chờ Nhân duyệt |
 | `Báo cáo và phân công công việc/` | Tài liệu của đồ án: phiếu giao đề tài, báo cáo, B1 thu thập yêu cầu, B2 phân tích, B3 thiết kế, phân chia công việc | Tài liệu tham khảo |
 

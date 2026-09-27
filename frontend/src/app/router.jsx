@@ -26,6 +26,10 @@ const GamePlayPage = lazyPage(() => import('@/features/games/pages/GamePlayPage'
 const ExercisesPage = lazyPage(() => import('@/features/exercises/pages/ExercisesPage'), 'ExercisesPage')
 const LessonPage = lazyPage(() => import('@/features/exercises/pages/LessonPage'), 'LessonPage')
 
+const TestsPage = lazyPage(() => import('@/features/tests/pages/TestsPage'), 'TestsPage')
+const TestTakingPage = lazyPage(() => import('@/features/tests/pages/TestTakingPage'), 'TestTakingPage')
+const TestResultPage = lazyPage(() => import('@/features/tests/pages/TestResultPage'), 'TestResultPage')
+
 /**
  * Every route of the app is registered here. To add a module's pages, declare each page with lazyPage above, put
  * its route inside the <AppLayout> group (or under <ProtectedRoute roles={[ROLES.ADMIN]}> for admin-only pages) and
@@ -68,8 +72,14 @@ export function AppRoutes() {
               <Route path="lessons/:lessonId" element={<LessonPage />} />
             </Route>
 
+            {/* Module C: tests (API contract: docs/api/tests.md). */}
+            <Route path="tests">
+              <Route index element={<TestsPage />} />
+              <Route path=":testId" element={<TestTakingPage />} />
+              <Route path=":testId/result/:attemptId" element={<TestResultPage />} />
+            </Route>
+
             {/* Sections owned by other modules. Replace the placeholder when the module's pages exist. */}
-            <Route path="tests/*" element={<ComingSoonPage title="Kiểm tra" />} />
             <Route path="plan/*" element={<ComingSoonPage title="Kế hoạch" />} />
           </Route>
         </Route>
