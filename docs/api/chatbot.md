@@ -1,18 +1,48 @@
 # API trợ lý AI giải thích bài tập (module B: B4) — contract
 
-> Trạng thái: **đề xuất, chờ Đạt duyệt.** Frontend (`frontend/src/features/exercises/chat/`) đã viết theo tài liệu này và
-> chạy được với dữ liệu giả (`npm run dev:mock`, câu trả lời soạn sẵn). Backend chưa có. Quy ước chung (xác thực, lỗi,
+> Trạng thái: **backend Groq đã triển khai bản đầu.** Frontend (`frontend/src/features/exercises/chat/`) đã viết theo tài liệu này và
+> có chế độ dữ liệu giả (`npm run dev:mock`, câu trả lời soạn sẵn). Quy ước chung (xác thực, lỗi,
 > enum chữ hoa) giống `docs/api/exercises.md`.
 
 Dùng các bảng `chat_sessions`, `chat_messages`, `knowledge_chunks`, `chat_message_sources`.
 
+## Cấu hình backend Groq
+
+Backend sử dụng Groq Chat Completions và cung cấp các endpoint bên dưới. Điền vào `.env` ở gốc repo:
+
+```dotenv
+GROQ_API_KEY=
+GROQ_BACKUP_API_KEY=
+GROQ_MODEL=openai/gpt-oss-120b
+```
+
+Khởi động lại backend sau khi đổi biến môi trường. Khóa dự phòng là tùy chọn; provider thử khóa đó khi khóa chính
+gặp 401, 403, 429, lỗi 5xx hoặc lỗi kết nối. Hai khóa giống nhau chỉ được thử một lần. Các khóa cùng organization
+chia sẻ rate limit, nên khóa dự phòng không làm tăng quota của organization. Không ghi khóa vào frontend hoặc Git.
+
+Phiên bản hiện tại lấy kiến thức theo lesson/question trong `knowledge_chunks`; chưa dùng embedding hoặc tìm kiếm vector.
+Tin người học và câu trả lời AI được lưu cùng transaction: khi provider lỗi, request có thể gửi lại mà không lưu tin trùng.
+Câu trả lời AI là HTML fragment ngắn với tập thẻ giới hạn (`p`, `strong`, `em`, `ul`, `ol`, `li`, `br`, `code`).
+Frontend dựng lại các thẻ được phép và bỏ thuộc tính/thẻ nguy hiểm; câu trả lời Markdown cũ vẫn hiển thị được.
+
 ## Giao diện dùng thế nào
 
-Nút "Hỏi trợ lý AI" nổi ở góc phải dưới mọi màn bài tập (theo thiết kế). Mở khung chat, gõ câu hỏi đầu tiên thì
+Nút "Hỏi trợ lý AI" nổi ở góc phải dưới mọi màn bài tập. Mở khung chat, gõ câu hỏi đầu tiên thì
 giao diện tạo phiên chat, rồi gửi từng tin nhắn kèm **id** của thứ người học đang làm (bài, câu hỏi, lượt làm bài).
-Lịch sử chat chỉ giữ trong trang đang mở; rời trang là bắt đầu phiên mới (chưa có màn xem lại lịch sử).
+Nút "Lịch sử" liệt kê các phiên của tài khoản hiện tại; chọn một phiên để đọc lại và tiếp tục, hoặc mở cuộc trò chuyện mới.
+Danh sách và tin nhắn phân trang. Khi tiếp tục phiên thuộc bài khác, giao diện không gửi ngữ cảnh bài đang mở.
 
 ## Endpoint
+
+### `GET /api/chat/sessions?page=0`
+
+Trả trang 20 phiên của tài khoản hiện tại, mới hoạt động gần đây nhất trước. Mỗi phiên có `id`, `title`, `lessonId`,
+`createdAt`, `updatedAt`; kết quả trang có `content`, `last`, `totalElements`.
+
+### `GET /api/chat/sessions/{sessionId}/messages?page=0`
+
+Trả trang 50 tin của phiên, mới nhất trước; giao diện đảo thứ tự để đọc từ cũ tới mới. Tin trả về có cùng cấu trúc
+`ChatMessageResponse` như khi gửi, gồm nguồn nếu có. Phiên của tài khoản khác trả `404`.
 
 ### `POST /api/chat/sessions`
 
@@ -39,7 +69,7 @@ Trả `201` tin trả lời của AI:
 {
   "id": 31,
   "role": "ASSISTANT",
-  "content": "Thì hiện tại hoàn thành (**has/have + V3**) dùng khi…\n\n- Dấu hiệu: *for*, *since*…",
+  "content": "<p>Thì hiện tại hoàn thành dùng <strong>has/have + V3</strong>.</p><ul><li>Dấu hiệu: <em>for</em>, <em>since</em>.</li></ul>",
   "createdAt": "2026-09-26T02:03:00Z",
   "sources": [ { "title": "Ngữ pháp: thì hiện tại hoàn thành" } ]
 }
@@ -47,9 +77,8 @@ Trả `201` tin trả lời của AI:
 
 - Server lưu cả tin của người học (`role = 'user'`) và tin trả lời (`'assistant'`, kèm `provider`, `model_name`, số token).
   `sources`: các `knowledge_chunks` đã dùng (bảng `chat_message_sources`), có thể `[]`.
-- `content` là **Markdown đơn giản**: đoạn văn, danh sách `-` hoặc `1.`, `**đậm**`, `*nghiêng*`, `` `mã` ``. Giao diện tự
-  hiển thị các dạng này và **không bao giờ chèn HTML** từ câu trả lời (chống XSS, vì token nằm trong `localStorage`).
-  Thẻ HTML trong câu trả lời hiện nguyên văn.
+- `content` là HTML fragment giới hạn; giao diện chỉ dựng các thẻ được phép, không đưa trực tiếp HTML vào DOM.
+  Các câu trả lời Markdown đã lưu trước đây vẫn đọc được.
 - `404`: phiên không tồn tại hoặc của người khác. `400`: nội dung rỗng hoặc quá dài. `429`: gửi quá nhanh (nếu backend có
   giới hạn). `503`: dịch vụ AI lỗi hoặc quá thời gian (ngoại lệ B4, giao diện báo "không thể trả lời lúc này, thử lại
   sau" và cho gửi lại). Giao diện chờ tối đa 60 giây; backend nên tự cắt ở khoảng 30 giây.
