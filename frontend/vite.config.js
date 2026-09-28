@@ -26,6 +26,11 @@ export default defineConfig(({ mode }) => {
           target: env.DEV_API_PROXY_TARGET || 'http://localhost:8080',
           changeOrigin: true,
         },
+        // Listening/reference audio is served by Spring from resources/static/media.
+        '/media': {
+          target: env.DEV_API_PROXY_TARGET || 'http://localhost:8080',
+          changeOrigin: true,
+        },
       },
     },
     test: {

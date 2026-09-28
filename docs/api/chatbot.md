@@ -1,10 +1,27 @@
 # API trợ lý AI giải thích bài tập (module B: B4) — contract
 
-> Trạng thái: **đề xuất, chờ Đạt duyệt.** Frontend (`frontend/src/features/exercises/chat/`) đã viết theo tài liệu này và
-> chạy được với dữ liệu giả (`npm run dev:mock`, câu trả lời soạn sẵn). Backend chưa có. Quy ước chung (xác thực, lỗi,
+> Trạng thái: **backend Groq đã triển khai bản đầu.** Frontend (`frontend/src/features/exercises/chat/`) đã viết theo tài liệu này và
+> có chế độ dữ liệu giả (`npm run dev:mock`, câu trả lời soạn sẵn). Quy ước chung (xác thực, lỗi,
 > enum chữ hoa) giống `docs/api/exercises.md`.
 
 Dùng các bảng `chat_sessions`, `chat_messages`, `knowledge_chunks`, `chat_message_sources`.
+
+## Cấu hình backend Groq
+
+Backend đã có hai endpoint bên dưới và sử dụng Groq Chat Completions. Điền vào `.env` ở gốc repo:
+
+```dotenv
+GROQ_API_KEY=
+GROQ_BACKUP_API_KEY=
+GROQ_MODEL=openai/gpt-oss-120b
+```
+
+Khởi động lại backend sau khi đổi biến môi trường. Khóa dự phòng là tùy chọn; provider thử khóa đó khi khóa chính
+gặp 401, 403, 429, lỗi 5xx hoặc lỗi kết nối. Hai khóa giống nhau chỉ được thử một lần. Các khóa cùng organization
+chia sẻ rate limit, nên khóa dự phòng không làm tăng quota của organization. Không ghi khóa vào frontend hoặc Git.
+
+Phiên bản hiện tại lấy kiến thức theo lesson/question trong `knowledge_chunks`; chưa dùng embedding hoặc tìm kiếm vector.
+Tin người học và câu trả lời AI được lưu cùng transaction: khi provider lỗi, request có thể gửi lại mà không lưu tin trùng.
 
 ## Giao diện dùng thế nào
 
