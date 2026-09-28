@@ -3,10 +3,13 @@ package com.example.datn.modules.exercise.controller;
 import com.example.datn.modules.exercise.dto.request.CreateChatSessionRequest;
 import com.example.datn.modules.exercise.dto.request.SendChatMessageRequest;
 import com.example.datn.modules.exercise.dto.response.ChatMessageResponse;
+import com.example.datn.modules.exercise.dto.response.ChatPageResponse;
 import com.example.datn.modules.exercise.dto.response.ChatSessionResponse;
 import com.example.datn.modules.exercise.service.ChatService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -25,6 +28,17 @@ public class ChatController {
     @ResponseStatus(HttpStatus.CREATED)
     public ChatSessionResponse create(@RequestBody(required = false) CreateChatSessionRequest request) {
         return service.create(request);
+    }
+
+    @GetMapping
+    public ChatPageResponse<ChatSessionResponse> history(@RequestParam(defaultValue = "0") int page) {
+        return service.history(page);
+    }
+
+    @GetMapping("/{sessionId}/messages")
+    public ChatPageResponse<ChatMessageResponse> messages(@PathVariable Long sessionId,
+            @RequestParam(defaultValue = "0") int page) {
+        return service.messages(sessionId, page);
     }
 
     @PostMapping("/{sessionId}/messages")

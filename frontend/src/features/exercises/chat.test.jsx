@@ -18,8 +18,10 @@ function reply(content, sources = []) {
 function chatRoutes(overrides) {
   return baseRoutes({
     [SESSIONS]: () => ({ status: 201, data: { id: 9, title: 'Thì hiện tại hoàn thành', createdAt: '2026-09-26T02:00:00Z' } }),
+    'GET /api/chat/sessions': () => ({ data: { content: [], last: true } }),
+    'GET /api/chat/sessions/9/messages': () => ({ data: { content: [], last: true } }),
     [MESSAGES]: () =>
-      reply('Thì hiện tại hoàn thành (**has/have + V3**):\n\n- *for* + khoảng thời gian\n- *since* + mốc thời gian', [
+      reply('<p>Thì hiện tại hoàn thành (<strong>has/have + V3</strong>):</p><ul><li><em>for</em> + khoảng thời gian</li><li><em>since</em> + mốc thời gian</li></ul>', [
         { title: 'Ngữ pháp: thì hiện tại hoàn thành' },
       ]),
     ...overrides,
@@ -32,6 +34,28 @@ async function openAssistant(user) {
 }
 
 describe('AI assistant', () => {
+  it('opens saved history and continues a session without creating another one', async () => {
+    app = renderApp('/exercises', chatRoutes({
+      'GET /api/chat/sessions': () => ({ data: { content: [{ id: 9, title: 'Hỏi đáp chung', lessonId: null, createdAt: '2026-09-26T02:00:00Z', updatedAt: '2026-09-26T02:03:00Z' }], last: true } }),
+      'GET /api/chat/sessions/9/messages': () => ({ data: { content: [
+        { id: 31, role: 'ASSISTANT', content: '<p>Hãy luyện nghe mỗi ngày.</p>', sources: [] },
+        { id: 30, role: 'USER', content: 'Luyện nghe sao?', sources: [] },
+      ], last: true } }),
+    }))
+    const user = userEvent.setup()
+    const panel = await openAssistant(user)
+    await user.click(within(panel).getByRole('button', { name: 'Lịch sử' }))
+    const savedSession = await within(panel).findByRole('button', { name: /Hỏi đáp chung/ })
+    await waitFor(() => expect(savedSession).toBeEnabled())
+    await user.click(savedSession)
+    expect(within(panel).getByText('Luyện nghe sao?')).toBeInTheDocument()
+    expect(within(panel).getByText('Hãy luyện nghe mỗi ngày.')).toBeInTheDocument()
+    await user.type(within(panel).getByRole('textbox', { name: 'Câu hỏi cho trợ lý AI' }), 'Còn cách nào?{Enter}')
+    await within(panel).findByText('has/have + V3', { selector: 'strong' })
+    expect(app.callsTo(SESSIONS)).toHaveLength(0)
+    expect(app.callsTo(MESSAGES)).toHaveLength(1)
+  })
+
   it('opens a session on the first question, sends the exercise context and shows the formatted answer', async () => {
     app = renderApp('/exercises/lessons/3', chatRoutes())
     const user = userEvent.setup()
@@ -69,8 +93,8 @@ describe('AI assistant', () => {
     expect(app.callsTo(MESSAGES)[1].body).toMatchObject({ content: 'Còn câu này?', questionId: 32 })
   })
 
-  it('shows HTML in an answer as text instead of running it', async () => {
-    app = renderApp('/exercises/lessons/3', chatRoutes({ [MESSAGES]: () => reply('<img src=x onerror="alert(1)"> **ok**') }))
+  it('renders allowed HTML but drops dangerous tags and attributes', async () => {
+    app = renderApp('/exercises/lessons/3', chatRoutes({ [MESSAGES]: () => reply('<p onclick="alert(1)"><strong>ok</strong><img src=x onerror="alert(1)"><script>alert(1)</script></p>') }))
     const user = userEvent.setup()
     await screen.findByText('Câu 1/2')
     const panel = await openAssistant(user)
@@ -78,8 +102,10 @@ describe('AI assistant', () => {
     await user.click(within(panel).getByRole('button', { name: 'Mẹo để nhớ cấu trúc này' }))
 
     expect(await within(panel).findByText('ok', { selector: 'strong' })).toBeInTheDocument()
-    expect(panel).toHaveTextContent('<img src=x onerror="alert(1)">')
     expect(panel.querySelector('img')).toBeNull()
+    expect(panel.querySelector('script')).toBeNull()
+    expect(panel.querySelector('p[onclick]')).toBeNull()
+    expect(panel).not.toHaveTextContent('alert(1)')
   })
 
   it('says when the AI cannot answer and sends the same question again', async () => {

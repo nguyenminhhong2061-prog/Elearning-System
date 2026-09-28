@@ -12,7 +12,8 @@ import java.util.List;
 @Component
 public class ChatMapper {
     public ChatSessionResponse toResponse(ChatSession session) {
-        return new ChatSessionResponse(session.getId(), session.getTitle(), session.getCreatedAt());
+        return new ChatSessionResponse(session.getId(), session.getTitle(), session.getLessonId(),
+                session.getCreatedAt(), session.getUpdatedAt());
     }
 
     public ChatMessageResponse toResponse(ChatMessage message, List<KnowledgeChunk> sources) {

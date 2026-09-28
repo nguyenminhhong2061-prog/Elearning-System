@@ -4,6 +4,7 @@ import com.example.datn.common.security.CurrentUser;
 import com.example.datn.modules.exercise.dto.request.CreateChatSessionRequest;
 import com.example.datn.modules.exercise.dto.request.SendChatMessageRequest;
 import com.example.datn.modules.exercise.dto.response.ChatMessageResponse;
+import com.example.datn.modules.exercise.dto.response.ChatPageResponse;
 import com.example.datn.modules.exercise.dto.response.ChatSessionResponse;
 import com.example.datn.modules.exercise.entity.ChatMessage;
 import com.example.datn.modules.exercise.entity.ChatMessageSource;
@@ -35,6 +36,7 @@ import com.example.datn.modules.exercise.repository.QuestionAcceptedAnswerReposi
 import com.example.datn.modules.exercise.repository.QuestionOptionRepository;
 import com.example.datn.modules.exercise.repository.QuestionResponseRepository;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,9 +51,14 @@ import java.util.Map;
 @Transactional
 public class ChatService {
     private static final int HISTORY_LIMIT = 8;
+    private static final int HISTORY_PAGE_SIZE = 20;
+    private static final int MESSAGE_PAGE_SIZE = 50;
     private static final String SYSTEM_PROMPT = """
             Bạn là trợ lý học tiếng Anh của LinguaStep. Trả lời bằng tiếng Việt, ví dụ bằng tiếng Anh.
-            Chỉ dùng Markdown đơn giản, không dùng HTML. Giải thích ngắn gọn, đúng trình độ người học.
+            Trả lời bằng HTML fragment gọn, không dùng Markdown, không dùng dấu ``` hay tài liệu HTML đầy đủ.
+            Chỉ dùng các thẻ <p>, <strong>, <em>, <ul>, <ol>, <li>, <br>, <code>; không dùng thuộc tính, liên kết, ảnh hoặc CSS.
+            Ưu tiên 1-2 đoạn ngắn hoặc tối đa 3 gạch đầu dòng, không thêm tiêu đề nếu không cần.
+            Giải thích ngắn gọn, đúng trình độ người học.
             Nếu ngữ cảnh ghi rằng người học CHƯA trả lời, chỉ gợi ý cách suy nghĩ và tuyệt đối không tiết lộ đáp án.
             Nếu đã trả lời, có thể phân tích đáp án đúng/sai và đưa thêm ví dụ.
             Không bịa nội dung bài học. Khi dữ liệu không đủ, nói rõ giới hạn và hỏi lại người học.
@@ -103,6 +110,37 @@ public class ChatService {
         String title = lesson == null ? "Hỏi đáp chung" : lesson.getTitle();
         return mapper.toResponse(sessions.save(new ChatSession(
                 currentUser.id(), resolvedLessonId, questionId, title, Instant.now())));
+    }
+
+    @Transactional(readOnly = true)
+    public ChatPageResponse<ChatSessionResponse> history(int page) {
+        if (page < 0) throw new InvalidExerciseRequestException("Page must not be negative");
+        return ChatPageResponse.from(sessions.findAllByUserIdOrderByUpdatedAtDescIdDesc(currentUser.id(),
+                PageRequest.of(page, HISTORY_PAGE_SIZE)).map(mapper::toResponse));
+    }
+
+    @Transactional(readOnly = true)
+    public ChatPageResponse<ChatMessageResponse> messages(Long sessionId, int page) {
+        if (page < 0) throw new InvalidExerciseRequestException("Page must not be negative");
+        sessions.findByIdAndUserId(sessionId, currentUser.id())
+                .orElseThrow(() -> new ChatSessionNotFoundException(sessionId));
+        Page<ChatMessage> result = messages.findPageBySessionIdOrderByCreatedAtDescIdDesc(
+                sessionId, PageRequest.of(page, MESSAGE_PAGE_SIZE));
+        List<Long> messageIds = result.getContent().stream().map(ChatMessage::getId).toList();
+        Map<Long, KnowledgeChunk> sourceById = new LinkedHashMap<>();
+        Map<Long, List<KnowledgeChunk>> sourcesByMessage = new LinkedHashMap<>();
+        if (!messageIds.isEmpty()) {
+            List<ChatMessageSource> links = messageSources.findAllByMessageIds(messageIds);
+            List<Long> chunkIds = links.stream().map(link -> link.getId().getKnowledgeChunkId()).distinct().toList();
+            chunks.findAllById(chunkIds).forEach(chunk -> sourceById.put(chunk.getId(), chunk));
+            links.forEach(link -> {
+                KnowledgeChunk chunk = sourceById.get(link.getId().getKnowledgeChunkId());
+                if (chunk != null) sourcesByMessage.computeIfAbsent(link.getId().getMessageId(), id -> new ArrayList<>())
+                        .add(chunk);
+            });
+        }
+        return ChatPageResponse.from(result.map(message -> mapper.toResponse(message,
+                sourcesByMessage.getOrDefault(message.getId(), List.of()))));
     }
 
     public ChatMessageResponse send(Long sessionId, SendChatMessageRequest request) {
