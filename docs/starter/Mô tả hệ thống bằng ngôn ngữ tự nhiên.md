@@ -156,8 +156,9 @@ Người học chọn "Kiểm tra tổng hợp" -> hệ thống hiện bài ki�
 | **Đề kiểm tra** (tests) | tiêu đề, loại (định kỳ/tổng hợp), kỹ năng, ngày mở/đóng |
 | **Câu hỏi đề kiểm tra** (test_questions) | thuộc đề nào, liên kết từ vựng (nếu có, tham chiếu Module A), loại câu hỏi, kỹ năng, nội dung, điểm |
 | **Đáp án lựa chọn đề kiểm tra** (test_question_options) | thuộc câu hỏi nào, nội dung, đúng/sai |
-| **Lượt làm bài kiểm tra** (test_attempts) | người học, đề kiểm tra, thời gian bắt đầu, tổng điểm, trạng thái (đang làm/đã nộp/đã chấm), **điểm từng kỹ năng** (nghe/nói/đọc/viết), **trình độ CEFR đề xuất**, **lộ trình học đề xuất** |
-| **Câu trả lời bài kiểm tra** (test_attempt_answers) | thuộc lượt làm bài nào, câu hỏi nào, nội dung trả lời, đúng/sai, điểm đạt được |
+| **Đáp án chấp nhận cho câu điền từ** (test_question_accepted_answers) | thuộc câu hỏi nào, đáp án chuẩn hóa, đáp án chính hay phụ (thêm ở migration mở rộng schema) |
+| **Lượt làm bài kiểm tra** (test_attempts) | người học, đề kiểm tra, thời gian bắt đầu, thời gian nộp, tổng điểm, trạng thái (đang làm/đã nộp/đã chấm), **điểm từng kỹ năng** (nghe/nói/đọc/viết), **trình độ CEFR đề xuất**, **lộ trình học đề xuất** |
+| **Câu trả lời bài kiểm tra** (test_attempt_answers) | thuộc lượt làm bài nào, câu hỏi nào, lựa chọn đã chọn (nếu trắc nghiệm), nội dung trả lời, đúng/sai, điểm đạt được |
 
 Quan hệ: 1 đề kiểm tra có nhiều câu hỏi; 1 người học có nhiều lượt làm bài; kết quả `test_attempts` (trình độ đề xuất) được ghi lại vào **Lịch sử trình độ** của người dùng và có thể trở thành đầu vào cho **Kế hoạch học cá nhân** (Module D).
 
