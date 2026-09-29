@@ -1,7 +1,8 @@
 import { todayInVietnam } from '../src/lib/dates.js'
-import { delay, HttpError, readJson, readRaw, send, sendError, userIdFromToken } from './http.js'
+import { delay, HttpError, readJson, readRaw, roleFromToken, send, sendError, userIdFromToken } from './http.js'
 import { serveMedia } from './media.js'
 import { scenarioEffect, scenarioOf, serveControlPanel } from './scenario.js'
+import { adminRoutes, serveUpload } from './routes/admin.js'
 import { chatRoutes } from './routes/chat.js'
 import { exerciseRoutes } from './routes/exercises.js'
 import { gameRoutes } from './routes/games.js'
@@ -14,7 +15,7 @@ import { userState } from './store.js'
 
 // Vite dev-server plugin used by `npm run dev:mock`: it answers the endpoints documented in docs/api/ with sample data
 // (modules A and B, which the backend now has too, with more sample content here and the /__mock scenarios; module D,
-// the progress home page, which it does not have yet),
+// the progress home page, which it does not have yet; module E, the admin area, for admin tokens only),
 // and serves the generated listening audio (media.js). Every other /api request (login, /users/me...) still goes to
 // the real backend through the proxy. It never runs in tests or in the production build.
 
@@ -29,6 +30,7 @@ const ROUTES = [
   ...chatRoutes,
   ...progressRoutes,
   ...planRoutes,
+  ...adminRoutes,
 ]
 
 function findRoute(method, pathname) {
@@ -57,14 +59,10 @@ async function handle(req, res, route, match, url) {
   try {
     let body = {}
     if (req.method !== 'GET' && req.method !== 'DELETE') body = route.rawBody ? await readRaw(req) : await readJson(req)
-    const result = await route.handle({
-      user: userState(userId, today),
-      userId,
-      today,
-      match,
-      searchParams: url.searchParams,
-      body,
-    })
+    const context = { userId, role: roleFromToken(req.headers.authorization), today, match, searchParams: url.searchParams, headers: req.headers, body }
+    // The learner state is only built when a route reads it, so admin pages do not turn the admin into a learner.
+    Object.defineProperty(context, 'user', { get: () => userState(userId, today) })
+    const result = await route.handle(context)
     const status = typeof route.status === 'function' ? route.status(result) : (route.status ?? (result === undefined ? 204 : 200))
     send(res, status, result)
   } catch (error) {
@@ -82,7 +80,7 @@ export function mockApi() {
       server.config.logger.info('  Mock control page (scenarios, test checklist): http://localhost:5173/__mock')
       // Middlewares added here run before Vite's own, including the /api proxy.
       server.middlewares.use((req, res, next) => {
-        if (serveControlPanel(req, res) || serveMedia(req, res)) return
+        if (serveControlPanel(req, res) || serveMedia(req, res) || serveUpload(req, res)) return
         const url = new URL(req.url, 'http://localhost')
         const found = findRoute(req.method, url.pathname)
         if (!found) return next()

@@ -1,14 +1,14 @@
 import { addDays, todayInVietnam } from '../../src/lib/dates.js'
 import { HttpError } from '../http.js'
-import { allUsers } from '../store.js'
-import { MOCK_WORDS } from '../vocabularyFixtures.js'
+import { allUsers, gameWords } from '../store.js'
 
 // docs/api/games.md
 
-const GAMES = [
-  { id: 1, name: 'Đoán nghĩa', gameType: 'GUESS_MEANING', timeLimitSeconds: 90, questionCount: 10 },
-  { id: 2, name: 'Trắc nghiệm nhanh', gameType: 'QUICK_QUIZ', timeLimitSeconds: 60, questionCount: 12 },
-  { id: 3, name: 'Ghép từ', gameType: 'WORD_MATCH', timeLimitSeconds: 60, questionCount: 6 },
+// The admin page (routes/admin.js) changes `timeLimitSeconds` and `enabled`; a switched-off game is hidden from learners.
+export const GAMES = [
+  { id: 1, name: 'Đoán nghĩa', gameType: 'GUESS_MEANING', timeLimitSeconds: 90, questionCount: 10, enabled: true },
+  { id: 2, name: 'Trắc nghiệm nhanh', gameType: 'QUICK_QUIZ', timeLimitSeconds: 60, questionCount: 12, enabled: true },
+  { id: 3, name: 'Ghép từ', gameType: 'WORD_MATCH', timeLimitSeconds: 60, questionCount: 6, enabled: true },
 ]
 const GRACE_SECONDS = 3
 const POINTS_PER_UNIT = 10
@@ -34,7 +34,7 @@ function shuffle(items) {
 }
 
 function requireGame(match) {
-  const game = GAMES.find((candidate) => candidate.id === Number(match[1]))
+  const game = GAMES.find((candidate) => candidate.id === Number(match[1]) && candidate.enabled)
   if (!game) throw new HttpError(404, 'Game not found')
   return game
 }
@@ -46,7 +46,8 @@ function requireRound(userId, game, token) {
 }
 
 function buildRound(game, userId) {
-  const words = shuffle(MOCK_WORDS).slice(0, game.questionCount)
+  const pool = gameWords()
+  const words = shuffle(pool).slice(0, game.questionCount)
   const answers = new Map()
   const questions = words.map((word) => {
     const id = nextQuestionId++
@@ -56,7 +57,7 @@ function buildRound(game, userId) {
     const answerText = game.gameType === 'QUICK_QUIZ' ? word.word : word.meaning
     let options = []
     if (game.gameType !== 'WORD_MATCH') {
-      const distractors = shuffle(MOCK_WORDS.filter((other) => other.id !== word.id))
+      const distractors = shuffle(pool.filter((other) => other.id !== word.id))
         .slice(0, 3)
         .map((other) => ({ id: nextOptionId++, content: game.gameType === 'QUICK_QUIZ' ? other.word : other.meaning }))
       options = shuffle([{ id: correctOptionId, content: answerText }, ...distractors])
@@ -109,7 +110,8 @@ export const gameRoutes = [
   {
     method: 'GET',
     pattern: /^\/api\/games$/,
-    handle: ({ user }) => GAMES.map((game) => ({ ...game, myBestScore: bestScore(user, game.id) })),
+    handle: ({ user }) =>
+      GAMES.filter((game) => game.enabled).map(({ enabled: _enabled, ...game }) => ({ ...game, myBestScore: bestScore(user, game.id) })),
   },
   {
     method: 'GET',

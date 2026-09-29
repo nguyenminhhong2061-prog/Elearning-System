@@ -1,4 +1,5 @@
 import { addDays, todayInVietnam } from '../src/lib/dates.js'
+import { adminScenarioEffect, resetAdminData } from './routes/admin.js'
 import { resetChatData } from './routes/chat.js'
 import { resetExerciseData } from './routes/exercises.js'
 import { gradingSkillsReply, newLearnerReply, resetProgressData } from './routes/progress.js'
@@ -53,6 +54,8 @@ export function scenarioEffect(scenario, method, pathname, searchParams = new UR
   }
   const planEffect = planScenarioEffect(scenario, method, pathname)
   if (planEffect) return planEffect
+  const adminEffect = adminScenarioEffect(scenario, method, pathname)
+  if (adminEffect) return adminEffect
   if (!AFFECTED.test(pathname)) return {}
   const is = (verb, pattern) => method === verb && pattern.test(pathname)
   switch (scenario) {
@@ -106,6 +109,11 @@ const APP_LINKS = [
   ['/exercises/lessons/99', 'Bài chưa có câu hỏi nào'],
   ['/exercises/lessons/999', 'Bài không tồn tại'],
   ['/plan', 'Kế hoạch học cá nhân (module D, D2): trình độ, việc nên làm, kế hoạch đang ở tuần 3, đặt lại mục tiêu, nhắc học'],
+  ['/admin', 'Quản trị (module E, cần tài khoản admin): tổng quan hệ thống, kịch bản 25'],
+  ['/admin/vocabulary/topics/2', 'Quản trị: từ của chủ đề Du lịch, sửa “luggage”, thêm “visa”, xóa “passport” (kịch bản 18–20)'],
+  ['/admin/lessons/11', 'Quản trị: bài nghe “Hội thoại tại sân bay” thiếu file âm thanh (kịch bản 22)'],
+  ['/admin/tests', 'Quản trị: cảnh báo chưa có đề tuần tới, nhân bản đề (kịch bản 23)'],
+  ['/admin/users?q=nam.pv', 'Quản trị: tìm Phạm Văn Nam, khóa và mở khóa (kịch bản 24)'],
 ]
 
 const CHECKLIST = [
@@ -133,6 +141,10 @@ const CHECKLIST = [
   ['Kế hoạch: theo dõi tuần này', 'Mở /plan: kế hoạch mẫu "Đạt B1 trong 3 tháng" đang ở tuần 3, số từ và bài tập mỗi tuần khớp biểu đồ trang chủ. Tuần vừa qua chưa đạt thì có cảnh báo nhẹ "chưa đạt mục tiêu" (tùy tài khoản).'],
   ['Kế hoạch: đặt mục tiêu, xem trước, áp dụng', 'Bấm "Đặt lại mục tiêu", chọn mục tiêu (hoặc "Mục tiêu khác"), bấm "Gợi ý lộ trình" (AI nghĩ khoảng 1 giây), rồi "Áp dụng kế hoạch". Chọn "Người mới" để thấy màn chưa có kế hoạch.'],
   ['Kế hoạch: AI lỗi, lỗi lưu, lỗi tải', 'Chọn "AI lỗi" rồi bấm "Gợi ý lộ trình"; "Lỗi lưu bài" rồi áp dụng kế hoạch, tạm dừng hoặc đổi giờ nhắc; "Lỗi tải" để thấy từng khối báo lỗi riêng.'],
+  ['Quản trị: đăng nhập', 'Cần tài khoản admin của backend thật: chạy backend với ADMIN_EMAIL và ADMIN_PASSWORD (tạo tài khoản lúc khởi động), rồi đăng nhập bằng tài khoản đó. Admin mở trang người học thì được đưa về /admin.'],
+  ['Quản trị: dữ liệu dùng chung', 'Chủ đề, từ và cài đặt trò chơi sửa ở khu quản trị hiện ngay ở màn người học (cùng dữ liệu giả). Bài tập, đề kiểm tra và người dùng là dữ liệu riêng của khu quản trị.'],
+  ['Quản trị: kỳ không có hoạt động', 'Tổng quan → "Tùy chọn…" → 01/01/2025 đến 31/01/2025.'],
+  ['Quản trị: lỗi tải, lỗi lưu, mạng chậm', 'Chọn "Lỗi tải", "Lỗi lưu bài" hoặc "Mạng chậm": áp dụng cho mọi API /api/admin và cho việc thêm, sửa, xóa chủ đề và từ.'],
 ]
 
 function page(current, notice) {
@@ -198,7 +210,7 @@ function page(current, notice) {
   </section>
   <section>
     <h2>5. Làm lại từ đầu</h2>
-    <p class="muted">Xóa mọi lượt làm bài và cuộc trò chuyện đã lưu trong bộ nhớ; mỗi tài khoản lại có lịch sử mẫu như lúc mới chạy.</p>
+    <p class="muted">Xóa mọi lượt làm bài và cuộc trò chuyện đã lưu trong bộ nhớ; mỗi tài khoản lại có lịch sử mẫu như lúc mới chạy. Chủ đề, từ, trò chơi, bài tập, đề và người dùng của khu quản trị cũng về như ban đầu.</p>
     <a class="reset" href="/__mock/reset">Xóa dữ liệu làm bài</a>
   </section>
 </main>
@@ -228,6 +240,7 @@ export function serveControlPanel(req, res) {
     resetChatData()
     resetProgressData()
     resetPlanData()
+    resetAdminData()
     redirect(res, '/__mock?reset=1')
     return true
   }

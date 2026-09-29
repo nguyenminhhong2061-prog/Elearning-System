@@ -4,7 +4,7 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
 import App from '@/app/App'
 import { tokenStorage } from '@/api/tokenStorage'
-import { admin, installFakeBackend, learner, loginResponse } from '@/test/fakeBackend'
+import { installFakeBackend, learner, loginResponse } from '@/test/fakeBackend'
 import '@/test/preloadPages'
 
 // Data shaped exactly as docs/api/vocabulary.md describes it.
@@ -183,12 +183,14 @@ describe('topics page', () => {
   })
 
   it('does not reuse one account’s data for the next account on the same browser', async () => {
-    renderSignedIn('/vocabulary', { ...vocabularyRoutes(), 'POST /api/auth/login': () => ({ data: loginResponse(admin) }) })
+    // A second learner: admins have their own area and never open the learner pages.
+    const otherLearner = { ...learner, id: 8, fullName: 'Trần Thị Lan', email: 'lan@example.com' }
+    renderSignedIn('/vocabulary', { ...vocabularyRoutes(), 'POST /api/auth/login': () => ({ data: loginResponse(otherLearner) }) })
     const user = userEvent.setup()
     await screen.findByRole('link', { name: /Kinh doanh/ })
 
     await user.click(screen.getByRole('button', { name: /Đăng xuất/ }))
-    await user.type(await screen.findByLabelText('Email'), 'admin@example.com')
+    await user.type(await screen.findByLabelText('Email'), 'lan@example.com')
     await user.type(screen.getByLabelText('Mật khẩu'), 'matkhau123')
     await user.click(screen.getByRole('button', { name: /Đăng nhập →/ }))
     await user.click(await screen.findByRole('link', { name: 'Từ vựng' }))

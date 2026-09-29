@@ -9,8 +9,11 @@ import { MOCK_TOPICS, MOCK_WORDS } from './vocabularyFixtures.js'
 
 const users = new Map()
 
-/** Fixture words without the fixture's learningStatus (which only seeds the per-user state). */
-const SYSTEM_WORDS = MOCK_WORDS.map(({ learningStatus: _seed, ...word }) => word)
+/**
+ * Fixture words without the fixture's learningStatus (which only seeds the per-user state). The admin pages
+ * (routes/admin.js) add, change, archive (`archivedAt`) and delete entries of this array, so learners see their edits.
+ */
+export const SYSTEM_WORDS = MOCK_WORDS.map(({ learningStatus: _seed, ...word }) => ({ ...word, archivedAt: null }))
 
 function seedLearning(today) {
   const learning = new Map()
@@ -54,15 +57,28 @@ export function allUsers() {
   return users
 }
 
-export const topics = MOCK_TOPICS
+/**
+ * Words that have game questions. Like the backend's seed migration, only the words that exist at start-up get
+ * them; a word the admin adds joins the games after "Đồng bộ câu hỏi" on the admin games page.
+ */
+export const gameBankWordIds = new Set(SYSTEM_WORDS.map((word) => word.id))
 
-/** Words a user may see: the shared ones and their own (created in personal lists). */
-export function visibleWords(user) {
-  return [...SYSTEM_WORDS, ...user.customWords]
+/** System words the games draw from: in the question bank and not archived. */
+export function gameWords() {
+  return SYSTEM_WORDS.filter((word) => !word.archivedAt && gameBankWordIds.has(word.id))
 }
 
+/** Topic rows; the admin pages add, change and delete entries. */
+export const topics = MOCK_TOPICS.map((topic) => ({ ...topic }))
+
+/** Words a user may see: the shared ones and their own (created in personal lists). Archived words are left out. */
+export function visibleWords(user) {
+  return [...SYSTEM_WORDS.filter((word) => !word.archivedAt), ...user.customWords]
+}
+
+/** A word by id, archived ones included (history and personal lists keep them). */
 export function findWord(user, id) {
-  return visibleWords(user).find((word) => word.id === id)
+  return [...SYSTEM_WORDS, ...user.customWords].find((word) => word.id === id)
 }
 
 export function learningStatusOf(user, wordId) {
