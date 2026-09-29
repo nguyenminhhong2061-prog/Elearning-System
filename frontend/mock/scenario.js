@@ -13,8 +13,8 @@ const COOKIE = 'mockScenario'
 export const SCENARIOS = [
   { id: 'normal', label: 'Bình thường', description: 'Mọi thứ chạy như có backend thật.' },
   { id: 'slow', label: 'Mạng chậm', description: 'Mọi API của module Bài tập chậm thêm 2,5 giây: xem khung chờ tải và nút đang xử lý.' },
-  { id: 'empty', label: 'Chưa có bài', description: 'Danh sách bài của cả ba kỹ năng trống: xem màn "Chưa có bài tập".' },
-  { id: 'load-error', label: 'Lỗi tải', description: 'Tải danh sách, nội dung bài và bắt đầu bài trả lỗi 500: xem thông báo lỗi và nút "Thử lại".' },
+  { id: 'empty', label: 'Chưa có bài', description: 'Danh sách bài của cả ba kỹ năng và lịch sử trò chuyện trống: xem màn "Chưa có bài tập".' },
+  { id: 'load-error', label: 'Lỗi tải', description: 'Tải danh sách, nội dung bài, bắt đầu bài và lịch sử trò chuyện trả lỗi 500: xem thông báo lỗi và nút "Thử lại".' },
   { id: 'save-error', label: 'Lỗi lưu bài', description: 'Chấm câu và nộp bài trả lỗi 500 (bài vẫn mở được). Chuyển về "Bình thường" rồi bấm lại để thấy thử lại được.' },
   { id: 'ai-down', label: 'AI lỗi', description: 'Chấm phát âm và trợ lý AI trả lỗi 503: xem thông báo "chưa chấm được" và "không thể trả lời lúc này".' },
   { id: 'new-learner', label: 'Người mới', description: 'Trang chủ của người chưa học gì: số liệu bằng 0, biểu đồ trống, chưa có điểm kỹ năng và thành tích, không có bài đang dở.' },
@@ -60,11 +60,13 @@ export function scenarioEffect(scenario, method, pathname, searchParams = new UR
       return { extraDelayMs: 2500 }
     case 'empty':
       if (is('GET', /^\/api\/exercises$/)) return { reply: { status: 200, body: [] } }
+      if (is('GET', /^\/api\/chat\/sessions$/)) return { reply: { status: 200, body: { content: [], last: true, totalElements: 0 } } }
       return is('GET', /^\/api\/exercise-attempts\/current$/) ? { reply: { status: 200, body: { current: null } } } : {}
     case 'load-error':
       return is('GET', /^\/api\/exercises(\/\d+)?$/) ||
         is('POST', /^\/api\/exercises\/\d+\/attempts$/) ||
         is('GET', /^\/api\/exercise-attempts\/current$/) ||
+        is('GET', /^\/api\/chat\/sessions(\/\d+\/messages)?$/) ||
         is('GET', /^\/api\/progress\//)
         ? { reply: { status: 500, message: 'Simulated server error (mock scenario "load-error")' } }
         : {}
@@ -122,6 +124,7 @@ const CHECKLIST = [
   ['Micro bị chặn', 'Bấm biểu tượng ổ khóa cạnh thanh địa chỉ, chặn Micro, tải lại trang rồi bấm ghi âm.'],
   ['Chấm phát âm, trợ lý AI lỗi', 'Chọn "AI lỗi"; hoặc gõ tin nhắn có "#503" (AI lỗi) hay "#429" (gửi quá nhanh).'],
   ['Trợ lý: gợi ý và giải thích', 'Hỏi về một câu trước khi trả lời (chỉ gợi ý), rồi hỏi lại sau khi đã trả lời (giải thích đầy đủ).'],
+  ['Trợ lý: lịch sử trò chuyện', 'Chat vài câu, bấm "Lịch sử" rồi mở lại phiên cũ (còn cả sau khi tải lại trang). "Lỗi tải" làm lịch sử báo lỗi, "Chưa có bài" làm lịch sử trống.'],
   ['Trang chủ: người mới', 'Chọn "Người mới": lời chào và nút bắt đầu, biểu đồ trống, radar trống, thẻ "Học tiếp" thay cho "Tiếp tục". Hành trình trình độ trống cần trình độ rỗng trong DB (xem lệnh bên dưới).'],
   ['Trang chủ: đang chấm Nói, Viết', 'Chọn "Đang chấm Nói, Viết": radar chỉ có Nghe, Đọc và nhãn "Đang chấm".'],
   ['Trang chủ: biểu đồ Ngày, Tuần, Tháng', 'Đổi khoảng thời gian và chỉ số. "Điểm kiểm tra": kỳ không làm bài để trống (—), không vẽ cột 0.'],

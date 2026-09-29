@@ -8,13 +8,35 @@ import { findAttempt, findLesson } from './exercises.js'
 // states (the /__mock page can also make every message fail).
 
 const THINKING_MS = 900
-const sessions = new Map()
+const HISTORY_PAGE_SIZE = 20
+const MESSAGE_PAGE_SIZE = 50
+const sessions = new Map() // id -> { id, userId, lessonId, title, createdAt, updatedAt, messages: [] }
 let nextSessionId = 1
 let nextMessageId = 1
 
 /** Forgets every chat session (the /__mock page's reset). */
 export function resetChatData() {
   sessions.clear()
+}
+
+/** A page as the backend's chat endpoints return it: { content, last, totalElements }. */
+function chatPage(items, searchParams, size) {
+  const page = Number(searchParams.get('page') ?? 0)
+  if (!Number.isInteger(page) || page < 0) throw new HttpError(400, 'Page must not be negative')
+  return { content: items.slice(page * size, (page + 1) * size), last: (page + 1) * size >= items.length, totalElements: items.length }
+}
+
+const newestFirst = (a, b) => b.at.localeCompare(a.at) || b.id - a.id
+
+function toSession(session) {
+  const { id, title, lessonId, createdAt, updatedAt } = session
+  return { id, title, lessonId, createdAt, updatedAt }
+}
+
+function ownSession(userId, id) {
+  const session = sessions.get(id)
+  if (!session || session.userId !== userId) throw new HttpError(404, 'Chat session not found')
+  return session
 }
 
 function findQuestion(id) {
@@ -89,6 +111,17 @@ function replyFor(userId, session, body) {
 
 export const chatRoutes = [
   {
+    method: 'GET',
+    pattern: /^\/api\/chat\/sessions$/,
+    handle({ userId, searchParams }) {
+      const own = [...sessions.values()]
+        .filter((session) => session.userId === userId)
+        .map((session) => ({ ...session, at: session.updatedAt }))
+        .sort(newestFirst)
+      return chatPage(own.map(toSession), searchParams, HISTORY_PAGE_SIZE)
+    },
+  },
+  {
     method: 'POST',
     pattern: /^\/api\/chat\/sessions$/,
     status: 201,
@@ -96,15 +129,27 @@ export const chatRoutes = [
       const lesson = body.lessonId ? findLesson(body.lessonId) : null
       if (body.lessonId && !lesson) throw new HttpError(404, 'Lesson not found')
       if (body.questionId && !findQuestion(body.questionId)) throw new HttpError(404, 'Question not found')
+      const now = new Date().toISOString()
       const session = {
         id: nextSessionId++,
         userId,
         lessonId: lesson?.id ?? null,
         title: lesson?.title ?? 'Hỏi đáp chung',
-        createdAt: new Date().toISOString(),
+        createdAt: now,
+        updatedAt: now,
+        messages: [],
       }
       sessions.set(session.id, session)
-      return { id: session.id, title: session.title, createdAt: session.createdAt }
+      return toSession(session)
+    },
+  },
+  {
+    method: 'GET',
+    pattern: /^\/api\/chat\/sessions\/(\d+)\/messages$/,
+    handle({ userId, match, searchParams }) {
+      const session = ownSession(userId, Number(match[1]))
+      const messages = session.messages.map((message) => ({ ...message, at: message.createdAt })).sort(newestFirst)
+      return chatPage(messages.map(({ at: _at, ...message }) => message), searchParams, MESSAGE_PAGE_SIZE)
     },
   },
   {
@@ -112,15 +157,20 @@ export const chatRoutes = [
     pattern: /^\/api\/chat\/sessions\/(\d+)\/messages$/,
     status: 201,
     async handle({ userId, match, body }) {
-      const session = sessions.get(Number(match[1]))
-      if (!session || session.userId !== userId) throw new HttpError(404, 'Chat session not found')
+      const session = ownSession(userId, Number(match[1]))
       const content = typeof body.content === 'string' ? body.content.trim() : ''
       if (!content || content.length > 1000) throw new HttpError(400, 'content must be 1 to 1000 characters')
+      const askedAt = new Date().toISOString()
       await delay(THINKING_MS)
       if (content.includes('#503')) throw new HttpError(503, 'AI service unavailable')
       if (content.includes('#429')) throw new HttpError(429, 'Too many messages')
       const reply = replyFor(userId, session, { ...body, content })
-      return { id: nextMessageId++, role: 'ASSISTANT', createdAt: new Date().toISOString(), ...reply }
+      // As on the server, the question and the answer are stored together, and only when the AI has answered.
+      const answer = { id: nextMessageId + 1, role: 'ASSISTANT', createdAt: new Date().toISOString(), ...reply }
+      session.messages.push({ id: nextMessageId, role: 'USER', content, createdAt: askedAt, sources: [] }, answer)
+      nextMessageId += 2
+      session.updatedAt = answer.createdAt
+      return answer
     },
   },
 ]

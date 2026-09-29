@@ -13,8 +13,8 @@ import { vocabularyRoutes } from './routes/vocabulary.js'
 import { userState } from './store.js'
 
 // Vite dev-server plugin used by `npm run dev:mock`: it answers the endpoints documented in docs/api/ with sample data
-// (module A, which the backend now has too; module B, exercises and the AI assistant, and module D, the progress home
-// page, which it does not have yet),
+// (modules A and B, which the backend now has too, with more sample content here and the /__mock scenarios; module D,
+// the progress home page, which it does not have yet),
 // and serves the generated listening audio (media.js). Every other /api request (login, /users/me...) still goes to
 // the real backend through the proxy. It never runs in tests or in the production build.
 
