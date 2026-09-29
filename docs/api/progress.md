@@ -129,6 +129,7 @@ Giao diện tự tính dòng tóm tắt ("Tổng: 42 từ · 5 bài tập · tru
     "takenAt": "2026-09-20T08:30:00Z",
     "status": "GRADED",
     "overallScore": 46,
+    "previousOverallScore": 38,
     "level": "B1",
     "skills": {
       "listening": { "score": 56, "level": "B2" },
@@ -148,6 +149,8 @@ Giao diện tự tính dòng tóm tắt ("Tổng: 42 từ · 5 bài tập · tru
 - `status = "SUBMITTED"`: phần nói, viết đang chờ AI chấm (ngoại lệ của C2). Kỹ năng chưa chấm có `score` và `level`
   là `null`, và `overallScore`, `level` cũng là `null` cho đến khi chấm xong. Giao diện hiện "Đang chấm phần Nói, Viết".
 - `level` bằng `test_attempts.suggested_level`. `takenAt` là thời điểm nộp bài (xem câu hỏi mở 4).
+- `previousOverallScore`: điểm tổng của lượt tổng hợp **đã chấm xong** ngay trước `latest`, `null` nếu không có. Màn Kế
+  hoạch dùng để hiện "Tăng 8 điểm so với lần kiểm tra trước" (thêm ngày 29/09, xem `plans.md`).
 - Màn Kế hoạch (D2) cũng vẽ radar này, dùng lại endpoint này.
 
 ### `GET /api/progress/badges` — thành tích

@@ -152,6 +152,7 @@ DATN/
 | `api/chatbot.md` | Trợ lý AI giải thích bài tập (module B) | Đề xuất, chờ người làm backend B duyệt |
 | `api/tests.md` | Kiểm tra định kỳ, tổng hợp 4 kỹ năng, chấm điểm và quy đổi CEFR (module C) | Đã có backend |
 | `api/progress.md` | Trang chủ Tiến độ: streak, biểu đồ theo ngày/tuần/tháng, điểm kỹ năng, thành tích; đề xuất quy đổi trình độ CEFR (module D, D1) | Đề xuất, chờ Nhân duyệt |
+| `api/plans.md` | Kế hoạch học cá nhân: mục tiêu, lộ trình theo tuần do AI gợi ý, việc nên làm, nhắc học (module D, D2) | Đề xuất, chờ Nhân duyệt |
 | `Báo cáo và phân công công việc/` | Tài liệu của đồ án: phiếu giao đề tài, báo cáo, B1 thu thập yêu cầu, B2 phân tích, B3 thiết kế, phân chia công việc | Tài liệu tham khảo |
 
 ## Chạy dự án trên máy
