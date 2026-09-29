@@ -5,127 +5,305 @@ import { Page } from '@/components/layout/Page'
 import { Alert } from '@/components/ui/Alert'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { Dialog } from '@/components/ui/Dialog'
 import { LoadError } from '@/components/ui/LoadError'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Tag } from '@/components/ui/Tag'
-import { TextField } from '@/components/ui/TextField'
+import { useAuth } from '@/features/auth/context/useAuth'
 import { cx } from '@/lib/cx'
-import { saveAnswer, startAttempt, submitAttempt } from '../api/testsApi'
-import { useTest } from '../api/testsQueries'
-import { QUESTION_TYPES, SKILL_LABELS, TEST_TYPE_LABELS } from '../constants'
+import { answerPayload, answersFromSaved, firstUnansweredIndex, isChoice, unansweredQuestions } from '../answers'
+import { startAttempt } from '../api/testsApi'
+import { useSubmitAttempt, useTest } from '../api/testsQueries'
+import { QuestionView } from '../components/QuestionView'
+import { ATTEMPT_STATUS, SKILL_LABELS, SKILL_ORDER, TEST_TYPE_LABELS, TEST_TYPES } from '../constants'
+import { useAnswerSaver } from '../useAnswerSaver'
 
-/** A test question answered by picking one of its options. */
-const isChoice = (question) => question.options.length > 0
-
-/** The body of PUT .../answers/{questionId}, or null when nothing usable was entered (nothing is saved then). */
-function answerPayload(question, answer) {
-  if (!answer) return null
-  if (isChoice(question)) {
-    return answer.optionId != null ? { optionId: answer.optionId } : null
-  }
-  const text = (answer.text ?? '').trim()
-  return text ? { text } : null
+const SAVE_TEXT = {
+  unsaved: 'Đang lưu…',
+  saving: 'Đang lưu…',
+  saved: 'Đã lưu',
 }
 
-/** Turns the resume payload into the page's answer map. */
-function answersFromSaved(saved) {
-  const map = {}
-  for (const item of saved) {
-    map[item.questionId] = item.optionId != null ? { optionId: item.optionId } : { text: item.text ?? '' }
-  }
-  return map
-}
-
-function QuestionPrompt({ question }) {
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        {question.skill && <Tag variant="brand">{SKILL_LABELS[question.skill.toLowerCase()] ?? question.skill}</Tag>}
-        <Tag>{question.points} điểm</Tag>
-      </div>
-      <p className="whitespace-pre-line text-body text-ink">{question.content}</p>
-      {question.audioUrl && (
-        <audio controls src={question.audioUrl} className="w-full">
-          Trình duyệt của bạn không phát được âm thanh này.
-        </audio>
-      )}
-    </div>
-  )
-}
-
-function ChoiceAnswer({ question, answer, onSelect }) {
-  return (
-    <ul className="flex flex-col gap-2.5">
-      {question.options.map((option) => {
-        const selected = answer?.optionId === option.id
-        return (
-          <li key={option.id}>
-            <button
-              type="button"
-              onClick={() => onSelect(option.id)}
-              aria-pressed={selected}
-              className={cx(
-                'w-full rounded-[10px] border px-4 py-3.5 text-left text-body transition-colors',
-                selected
-                  ? 'border-brand bg-brand-tint font-semibold text-brand-dark'
-                  : 'border-line bg-white text-ink-soft hover:border-brand/50',
-              )}
-            >
-              {option.content}
-            </button>
-          </li>
-        )
-      })}
-    </ul>
-  )
-}
-
-function TextAnswer({ question, answer, onChange }) {
-  const value = answer?.text ?? ''
-  const long = question.type === QUESTION_TYPES.WRITING || question.type === QUESTION_TYPES.SPEAKING
-
-  if (!long) {
+/** The small "Đã lưu" note beside the question counter; a failed save offers to try again. */
+function SaveStatus({ status, onRetry }) {
+  if (status === 'error') {
     return (
-      <TextField
-        label="Câu trả lời của bạn"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        autoComplete="off"
-        placeholder="Gõ đáp án…"
-      />
+      <span className="flex items-center gap-2 text-label text-danger">
+        Chưa lưu được câu trả lời.
+        <button type="button" onClick={onRetry} className="cursor-pointer font-semibold underline">
+          Thử lại
+        </button>
+      </span>
     )
   }
-
   return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-label font-medium text-ink-soft">
-        {question.type === QUESTION_TYPES.SPEAKING ? 'Gõ câu bạn sẽ đọc (bản demo chưa thu âm)' : 'Bài viết của bạn'}
-      </span>
-      <textarea
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        rows={question.type === QUESTION_TYPES.SPEAKING ? 3 : 6}
-        className="w-full rounded-lg border border-line bg-white px-4 py-3.5 text-body text-ink outline-none transition-colors placeholder:text-muted-light focus:border-brand focus:ring-2 focus:ring-brand/25"
-        placeholder={question.type === QUESTION_TYPES.SPEAKING ? 'Đọc to câu trên rồi gõ lại…' : 'Viết câu trả lời của bạn…'}
-      />
-    </label>
+    <span className="text-label text-muted" aria-hidden={status === 'idle'}>
+      {SAVE_TEXT[status] ?? ''}
+    </span>
   )
 }
 
-/** /tests/:testId: starts (or resumes) an attempt and walks the learner through every question. */
-export function TestTakingPage() {
-  const params = useParams()
-  const navigate = useNavigate()
-  const testId = /^\d+$/.test(params.testId ?? '') ? Number(params.testId) : null
-  const test = useTest(testId)
+function QuestionNav({ questions, answers, currentIndex, onGo }) {
+  return (
+    <nav aria-label="Chuyển câu hỏi" className="flex flex-wrap gap-2">
+      {questions.map((question, index) => {
+        const answered = Boolean(answerPayload(question, answers[question.id]))
+        const current = index === currentIndex
+        return (
+          <button
+            key={question.id}
+            type="button"
+            onClick={() => onGo(index)}
+            aria-current={current ? 'step' : undefined}
+            aria-label={`Câu ${index + 1}${answered ? ' (đã trả lời)' : ''}`}
+            className={cx(
+              'size-9 cursor-pointer rounded-lg border text-label font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand',
+              current
+                ? 'border-brand bg-brand text-white'
+                : answered
+                  ? 'border-success-line bg-success-bg text-success'
+                  : 'border-line bg-white text-ink-soft hover:border-brand-tint-line',
+            )}
+          >
+            {index + 1}
+          </button>
+        )
+      })}
+    </nav>
+  )
+}
 
+/** Asks before the final submission, and says how many questions are still empty (they count as wrong). */
+function SubmitDialog({ open, unanswered, submitting, error, onGoToFirstUnanswered, onSubmit, onClose }) {
+  return (
+    <Dialog open={open} onClose={onClose} title="Nộp bài kiểm tra?">
+      <p className="text-body text-ink-soft">
+        {unanswered.length > 0
+          ? `Bạn còn ${unanswered.length} câu chưa trả lời. Câu bỏ trống được tính 0 điểm.`
+          : 'Bạn đã trả lời tất cả các câu. Sau khi nộp, bạn không sửa được câu trả lời nữa.'}
+      </p>
+      {error && <Alert variant="error">{describeApiError(error, 'Không nộp được bài. Vui lòng thử lại.')}</Alert>}
+      <div className="flex flex-wrap justify-end gap-3">
+        {unanswered.length > 0 ? (
+          <Button variant="outline" onClick={onGoToFirstUnanswered} disabled={submitting}>
+            Làm câu còn thiếu
+          </Button>
+        ) : (
+          <Button variant="outline" onClick={onClose} disabled={submitting}>
+            Kiểm tra lại
+          </Button>
+        )}
+        <Button onClick={onSubmit} loading={submitting}>
+          Nộp bài
+        </Button>
+      </div>
+    </Dialog>
+  )
+}
+
+/**
+ * Taking one attempt: every answer is saved as it is given, the learner moves freely between questions, and the
+ * attempt is submitted once, after a confirmation. Mounted with key={attemptId}, so restarting begins from scratch.
+ */
+function AttemptRunner({ test, attempt }) {
+  const navigate = useNavigate()
+  const { user, refreshUser } = useAuth()
+  const { questions } = test
+  const [answers, setAnswers] = useState(() => answersFromSaved(attempt.answers))
+  const [currentIndex, setCurrentIndex] = useState(() => firstUnansweredIndex(questions, answers))
+  const [confirming, setConfirming] = useState(false)
+  const saver = useAnswerSaver(attempt.attemptId, attempt.answers)
+  const submit = useSubmitAttempt()
+
+  const question = questions[currentIndex]
+  const unanswered = unansweredQuestions(questions, answers)
+  const isLast = currentIndex === questions.length - 1
+
+  function pick(optionId) {
+    setAnswers((current) => ({ ...current, [question.id]: { optionId } }))
+    saver.saveNow(question.id, { optionId })
+  }
+
+  function type(text) {
+    setAnswers((current) => ({ ...current, [question.id]: { text } }))
+    saver.saveLater(question.id, answerPayload(question, { text }))
+  }
+
+  function goTo(index) {
+    saver.flush() // typed text of the question being left; a failure shows in the save status
+    setCurrentIndex(index)
+  }
+
+  async function openSubmit() {
+    submit.reset()
+    if (!(await saver.flush())) return // the save status already says what went wrong
+    setConfirming(true)
+  }
+
+  function confirmSubmit() {
+    const levelBefore = user.currentLevel ?? null
+    submit.mutate(attempt.attemptId, {
+      onSuccess: (result) => {
+        // A graded comprehensive test changes the learner's level: the sidebar and home page show it at once.
+        if (result.type === TEST_TYPES.COMPREHENSIVE && result.status === ATTEMPT_STATUS.GRADED) {
+          refreshUser().catch(() => {})
+        }
+        navigate(`/tests/${test.id}/result/${result.attemptId}`, { state: { justSubmitted: true, levelBefore } })
+      },
+    })
+  }
+
+  return (
+    <Page
+      title={test.title}
+      width="focus"
+      heading={
+        <div className="flex flex-col gap-1">
+          <h1 className="text-title font-bold text-ink">{test.title}</h1>
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+            <p className="text-label text-muted">
+              Câu {currentIndex + 1}/{questions.length} · đã trả lời {questions.length - unanswered.length}/
+              {questions.length}
+            </p>
+            <SaveStatus status={saver.status} onRetry={saver.flush} />
+          </div>
+        </div>
+      }
+    >
+      <QuestionNav questions={questions} answers={answers} currentIndex={currentIndex} onGo={goTo} />
+
+      {saver.status === 'error' && (
+        <Alert variant="error">{describeApiError(saver.error, 'Không lưu được câu trả lời. Vui lòng thử lại.')}</Alert>
+      )}
+
+      <QuestionView
+        key={question.id}
+        number={currentIndex + 1}
+        question={question}
+        answer={answers[question.id]}
+        onPick={pick}
+        onType={type}
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Button variant="outline" onClick={() => goTo(currentIndex - 1)} disabled={currentIndex === 0}>
+          ← Câu trước
+        </Button>
+        {isLast ? (
+          <Button onClick={openSubmit}>Nộp bài</Button>
+        ) : (
+          <Button onClick={() => goTo(currentIndex + 1)}>Câu tiếp theo →</Button>
+        )}
+      </div>
+      {!isLast && (
+        <button
+          type="button"
+          onClick={openSubmit}
+          className="cursor-pointer self-end text-label font-semibold text-brand-dark hover:underline"
+        >
+          Nộp bài sớm
+        </button>
+      )}
+
+      <SubmitDialog
+        open={confirming}
+        unanswered={unanswered}
+        submitting={submit.isPending}
+        error={submit.error}
+        onGoToFirstUnanswered={() => {
+          setConfirming(false)
+          setCurrentIndex(questions.indexOf(unanswered[0]))
+        }}
+        onSubmit={confirmSubmit}
+        onClose={() => {
+          if (!submit.isPending) setConfirming(false)
+        }}
+      />
+    </Page>
+  )
+}
+
+/** The skills a test covers, in the progress radar's order: "Nghe, Đọc, Viết, Nói". */
+function skillList(questions) {
+  const skills = new Set(questions.map((question) => question.skill?.toLowerCase()).filter(Boolean))
+  return SKILL_ORDER.filter((key) => skills.has(key))
+    .map((key) => SKILL_LABELS[key])
+    .join(', ')
+}
+
+/** What the test contains, and "Bắt đầu" / "Làm tiếp" / "Làm lại từ đầu" before the questions show. */
+function StartCard({ test, starting, error, onStart }) {
+  const choiceCount = test.questions.filter(isChoice).length
+  const typedCount = test.questions.length - choiceCount
+  return (
+    <Card className="flex flex-col gap-5">
+      <div className="flex flex-col gap-2">
+        <p className="text-body text-ink-soft">
+          {test.questions.length} câu
+          {typedCount > 0 ? ` (${choiceCount} câu chọn đáp án, ${typedCount} câu tự gõ)` : ''}
+          {skillList(test.questions) ? ` · Kỹ năng: ${skillList(test.questions)}` : ''}
+        </p>
+        <ul className="flex list-disc flex-col gap-1 pl-5 text-label text-muted">
+          <li>Câu trả lời được lưu ngay khi bạn chọn hoặc gõ; rời trang rồi quay lại vẫn làm tiếp được.</li>
+          <li>Câu bỏ trống khi nộp bài được tính 0 điểm.</li>
+          {test.type === TEST_TYPES.COMPREHENSIVE && <li>Kết quả bài này xác định lại trình độ CEFR của bạn.</li>}
+        </ul>
+      </div>
+      {error && <Alert variant="error">{describeApiError(error, 'Không bắt đầu được bài kiểm tra.')}</Alert>}
+      {test.hasInProgress ? (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={() => onStart(false)} loading={starting === 'resume'} disabled={Boolean(starting)}>
+              Làm tiếp
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => onStart(true)}
+              loading={starting === 'restart'}
+              disabled={Boolean(starting)}
+            >
+              Làm lại từ đầu
+            </Button>
+          </div>
+          <p className="text-label text-muted">Bạn đang làm dở bài này. Làm lại từ đầu sẽ xóa các câu đã trả lời.</p>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-3">
+          <Button onClick={() => onStart(false)} loading={starting === 'resume'}>
+            Bắt đầu
+          </Button>
+          <ButtonLink to="/tests" variant="outline">
+            Về danh sách
+          </ButtonLink>
+        </div>
+      )}
+    </Card>
+  )
+}
+
+function parseId(value) {
+  return /^\d+$/.test(value ?? '') ? Number(value) : null
+}
+
+/** /tests/:testId: the test's overview, then its questions once an attempt is started or resumed. */
+export function TestTakingPage() {
+  const testId = parseId(useParams().testId)
+  const test = useTest(testId)
   const [attempt, setAttempt] = useState(null)
-  const [answers, setAnswers] = useState({})
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [starting, setStarting] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+  const [starting, setStarting] = useState(null) // null | 'resume' | 'restart'
   const [error, setError] = useState(null)
+
+  async function start(restart) {
+    setError(null)
+    setStarting(restart ? 'restart' : 'resume')
+    try {
+      setAttempt(await startAttempt(testId, { restart }))
+    } catch (startError) {
+      setError(startError)
+    } finally {
+      setStarting(null)
+    }
+  }
 
   if (testId === null) {
     return (
@@ -138,7 +316,7 @@ export function TestTakingPage() {
   if (test.isPending) {
     return (
       <Page title="Kiểm tra" width="focus">
-        <Skeleton className="h-40 w-full rounded-xl" />
+        <Skeleton className="h-56 w-full rounded-xl" />
       </Page>
     )
   }
@@ -146,169 +324,38 @@ export function TestTakingPage() {
   if (test.isError) {
     return (
       <Page title="Kiểm tra" width="focus">
-        <LoadError error={test.error} onRetry={() => test.refetch()} message="Không tải được bài kiểm tra." />
+        {test.error?.status === 404 ? (
+          <Card className="flex flex-col items-start gap-3">
+            <p className="text-body text-ink-soft">Bài kiểm tra không tồn tại hoặc đã hết hạn.</p>
+            <ButtonLink to="/tests" variant="outline" size="sm">
+              ← Về danh sách bài kiểm tra
+            </ButtonLink>
+          </Card>
+        ) : (
+          <LoadError error={test.error} onRetry={() => test.refetch()} message="Không tải được bài kiểm tra." />
+        )}
       </Page>
     )
   }
 
-  const { questions } = test.data
-  const question = questions[currentIndex]
-  const answeredCount = questions.filter((item) => answerPayload(item, answers[item.id])).length
-  const isLast = currentIndex === questions.length - 1
-
-  async function handleStart() {
-    setError(null)
-    setStarting(true)
-    try {
-      const started = await startAttempt(testId)
-      setAttempt(started)
-      setAnswers(answersFromSaved(started.answers))
-      setCurrentIndex(0)
-    } catch (startError) {
-      setError(startError)
-    } finally {
-      setStarting(false)
-    }
-  }
-
-  function setAnswer(questionId, patch) {
-    setAnswers((current) => ({ ...current, [questionId]: { ...current[questionId], ...patch } }))
-  }
-
-  /** Saves the current question; returns false (and shows the error) when saving failed. */
-  async function persistCurrent() {
-    if (!attempt) return true
-    const payload = answerPayload(question, answers[question.id])
-    if (!payload) return true
-    setSaving(true)
-    try {
-      await saveAnswer(attempt.attemptId, question.id, payload)
-      return true
-    } catch (saveError) {
-      setError(saveError)
-      return false
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function goTo(index) {
-    setError(null)
-    if (!(await persistCurrent())) return
-    setCurrentIndex(index)
-  }
-
-  async function handleSubmit() {
-    setError(null)
-    if (!(await persistCurrent())) return
-    setSubmitting(true)
-    try {
-      await submitAttempt(attempt.attemptId)
-      navigate(`/tests/${testId}/result/${attempt.attemptId}`)
-    } catch (submitError) {
-      setError(submitError)
-      setSubmitting(false)
-    }
-  }
-
-  // Before starting: what the test contains, and the start / resume action.
   if (!attempt) {
     return (
-      <Page title={test.data.title} width="focus">
-        <Card className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
+      <Page
+        title={test.data.title}
+        width="focus"
+        heading={
+          <div className="flex flex-col gap-2">
             <Tag variant="brand" className="self-start">
               {TEST_TYPE_LABELS[test.data.type]}
             </Tag>
             <h1 className="text-title font-bold text-ink">{test.data.title}</h1>
-            <p className="text-sm text-muted">{questions.length} câu hỏi. Trả lời từng câu rồi bấm “Nộp bài” ở câu cuối.</p>
           </div>
-          {error && <Alert variant="error">{describeApiError(error, 'Không bắt đầu được bài kiểm tra.')}</Alert>}
-          <div className="flex flex-wrap gap-3">
-            <Button onClick={handleStart} loading={starting}>
-              {test.data.hasInProgress ? 'Làm tiếp' : 'Bắt đầu'}
-            </Button>
-            <ButtonLink to="/tests" variant="outline">
-              Về danh sách
-            </ButtonLink>
-          </div>
-        </Card>
+        }
+      >
+        <StartCard test={test.data} starting={starting} error={error} onStart={start} />
       </Page>
     )
   }
 
-  return (
-    <Page
-      title={test.data.title}
-      width="focus"
-      heading={
-        <div className="flex flex-col gap-1">
-          <h1 className="text-title font-bold text-ink">{test.data.title}</h1>
-          <p className="text-label text-muted">
-            Câu {currentIndex + 1}/{questions.length} · đã trả lời {answeredCount}/{questions.length}
-          </p>
-        </div>
-      }
-    >
-      <nav aria-label="Chuyển câu hỏi" className="flex flex-wrap gap-2">
-        {questions.map((item, index) => {
-          const answered = Boolean(answerPayload(item, answers[item.id]))
-          const current = index === currentIndex
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => goTo(index)}
-              aria-current={current ? 'true' : undefined}
-              aria-label={`Câu ${index + 1}${answered ? ' (đã trả lời)' : ''}`}
-              className={cx(
-                'size-8 rounded-lg border text-label font-semibold transition-colors',
-                current
-                  ? 'border-brand bg-brand text-white'
-                  : answered
-                    ? 'border-success-line bg-success-bg text-success'
-                    : 'border-line bg-white text-ink-soft',
-              )}
-            >
-              {index + 1}
-            </button>
-          )
-        })}
-      </nav>
-
-      {error && <Alert variant="error">{describeApiError(error, 'Không lưu được câu trả lời. Vui lòng thử lại.')}</Alert>}
-
-      <Card className="flex flex-col gap-5">
-        <QuestionPrompt question={question} />
-        {isChoice(question) ? (
-          <ChoiceAnswer
-            question={question}
-            answer={answers[question.id]}
-            onSelect={(optionId) => setAnswer(question.id, { optionId })}
-          />
-        ) : (
-          <TextAnswer
-            question={question}
-            answer={answers[question.id]}
-            onChange={(text) => setAnswer(question.id, { text })}
-          />
-        )}
-      </Card>
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button variant="outline" onClick={() => goTo(currentIndex - 1)} disabled={currentIndex === 0 || saving}>
-          ← Câu trước
-        </Button>
-        {isLast ? (
-          <Button onClick={handleSubmit} loading={submitting} disabled={saving}>
-            Nộp bài
-          </Button>
-        ) : (
-          <Button onClick={() => goTo(currentIndex + 1)} loading={saving}>
-            Câu tiếp theo →
-          </Button>
-        )}
-      </div>
-    </Page>
-  )
+  return <AttemptRunner key={attempt.attemptId} test={test.data} attempt={attempt} />
 }

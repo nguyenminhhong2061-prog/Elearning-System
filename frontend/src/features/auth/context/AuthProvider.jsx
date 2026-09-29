@@ -99,6 +99,17 @@ export function AuthProvider({ children }) {
 
   const retry = useCallback(() => setState(LOADING), [])
 
+  // Reads the signed-in user again, for example after a comprehensive test changed their level, without the loading
+  // screen of a full check. A reply for another account (the token changed in another tab meanwhile) is dropped; the
+  // storage listener above reloads that user.
+  const refreshUser = useCallback(async () => {
+    const user = await authApi.getCurrentUser()
+    setState((current) =>
+      current.status === 'authenticated' && current.user.id === user.id ? { ...current, user } : current,
+    )
+    return user
+  }, [])
+
   const value = useMemo(
     () => ({
       ...state,
@@ -108,8 +119,9 @@ export function AuthProvider({ children }) {
       register,
       logout,
       retry,
+      refreshUser,
     }),
-    [state, login, register, logout, retry],
+    [state, login, register, logout, retry, refreshUser],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
