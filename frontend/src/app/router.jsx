@@ -6,7 +6,6 @@ import { RouteBoundary } from '@/components/layout/RouteBoundary'
 import { GuestRoute } from '@/features/auth/guards/GuestRoute'
 import { ProtectedRoute } from '@/features/auth/guards/ProtectedRoute'
 import { lazyPage } from '@/lib/lazyPage'
-import { ComingSoonPage } from '@/pages/ComingSoonPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
 // Every page is downloaded the first time it is opened (one file per page), so opening the app only waits for the
@@ -29,6 +28,8 @@ const LessonPage = lazyPage(() => import('@/features/exercises/pages/LessonPage'
 const TestsPage = lazyPage(() => import('@/features/tests/pages/TestsPage'), 'TestsPage')
 const TestTakingPage = lazyPage(() => import('@/features/tests/pages/TestTakingPage'), 'TestTakingPage')
 const TestResultPage = lazyPage(() => import('@/features/tests/pages/TestResultPage'), 'TestResultPage')
+
+const PlanPage = lazyPage(() => import('@/features/plan/pages/PlanPage'), 'PlanPage')
 
 /**
  * Every route of the app is registered here. To add a module's pages, declare each page with lazyPage above, put
@@ -79,8 +80,8 @@ export function AppRoutes() {
               <Route path=":testId/result/:attemptId" element={<TestResultPage />} />
             </Route>
 
-            {/* Sections owned by other modules. Replace the placeholder when the module's pages exist. */}
-            <Route path="plan/*" element={<ComingSoonPage title="Kế hoạch" />} />
+            {/* Module D, D2: study plan (API contract: docs/api/plans.md). */}
+            <Route path="plan" element={<PlanPage />} />
           </Route>
         </Route>
 

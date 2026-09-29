@@ -428,14 +428,4 @@ describe('sidebar', () => {
     await heading('Đổi mật khẩu')
     expect(phoneMenu()).not.toBeInTheDocument()
   })
-
-  it('shows a placeholder page for sections whose module is not built yet', async () => {
-    signInBeforeStart()
-    backend = installFakeBackend({ 'GET /api/users/me': () => ({ data: learner }) })
-
-    renderApp('/plan')
-
-    await heading('Kế hoạch')
-    expect(screen.getByText('Sắp ra mắt')).toBeInTheDocument()
-  })
 })
