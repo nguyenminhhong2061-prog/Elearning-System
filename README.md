@@ -78,7 +78,7 @@ khoản và thấy trang Từ vựng có các chủ đề.
 trước lần commit đầu tiên, rồi:
 
 ```bash
-git switch main
+git switch dev
 git pull
 git switch -c feature/ten-viec-ngan-gon
 ```
@@ -95,16 +95,16 @@ git switch -c feature/ten-viec-ngan-gon
 
 ## Phân công và trạng thái
 
-Cập nhật 27/09/2026. Chi tiết phần việc của từng người: `docs/Báo cáo và phân công công việc/Phân chia công việc.docx`.
+Cập nhật 29/09/2026. Chi tiết phần việc của từng người: `docs/Báo cáo và phân công công việc/Phân chia công việc.docx`.
 
 | Module | Nội dung | Backend | Frontend |
 |---|---|---|---|
 | Đăng nhập, đăng ký | Đăng ký, đăng nhập, đăng xuất, đổi mật khẩu | Nguyễn Minh Hồng (xong) | Nguyễn Minh Hồng (xong) |
 | A. Học từ vựng | Chủ đề, flashcard, lặp lại ngắt quãng, danh sách từ riêng, trò chơi và bảng xếp hạng | Nguyễn Minh Hồng (xong) | Nguyễn Minh Hồng (xong) |
-| B. Bài tập và chatbot AI | Ngữ pháp, nghe hiểu, phát âm, trợ lý AI giải thích | Lý Quang Đạt (chưa có) | Nguyễn Minh Hồng (xong, đang chạy bằng dữ liệu giả) |
-| C. Kiểm tra | Kiểm tra định kỳ, kiểm tra tổng hợp 4 kỹ năng | Khuất Huy Nhân (xong) | Nguyễn Minh Hồng (xong) |
-| D. Tiến độ và kế hoạch | Biểu đồ, huy hiệu, kế hoạch học, nhắc nhở | Khuất Huy Nhân (chưa có) | Nguyễn Minh Hồng (chưa làm) |
-| E. Admin | Quản lý nội dung, người dùng, thống kê | Chưa phân công | Nguyễn Minh Hồng (chưa làm) |
+| B. Bài tập và chatbot AI | Ngữ pháp, nghe hiểu, phát âm, trợ lý AI giải thích | Lý Quang Đạt (bản đầu: ngữ pháp, nghe, chatbot Groq; chưa có chấm phát âm) | Nguyễn Minh Hồng (xong) |
+| C. Kiểm tra | Kiểm tra định kỳ, kiểm tra tổng hợp 4 kỹ năng | Khuất Huy Nhân (bản đầu; AI chấm Nói, Viết còn là bản tạm) | Khuất Huy Nhân, Nguyễn Minh Hồng (xong) |
+| D. Tiến độ và kế hoạch | Biểu đồ, huy hiệu, kế hoạch học, nhắc nhở | Khuất Huy Nhân (chưa có) | Nguyễn Minh Hồng (trang chủ Tiến độ xong; Kế hoạch đang làm) |
+| E. Admin | Quản lý nội dung, người dùng, thống kê | Chưa phân công | Không làm cho buổi demo (nhóm chốt 29/09) |
 
 **Toàn bộ giao diện (thư mục `frontend/`) do một người làm.** Người làm backend không cần sửa `frontend/`; hai bên
 thống nhất với nhau qua contract API trong `docs/api/` (xem [Quy trình làm việc nhóm](#quy-trình-làm-việc-nhóm)).
@@ -122,7 +122,7 @@ DATN/
 │       ├── main/java/com/example/datn/
 │       │   ├── DatnApplication.java
 │       │   ├── common/       # dùng chung mọi module: CurrentUser, PageResponse, sự kiện, CefrLevel...
-│       │   └── modules/      # mỗi chức năng một module: auth, user, vocabulary, sample (module mẫu)
+│       │   └── modules/      # mỗi chức năng một module: auth, user, vocabulary (A), exercise (B), test (C), sample (mẫu)
 │       ├── main/resources/
 │       │   ├── application.properties
 │       │   └── db/migration/ # migration Flyway (V1__init.sql là schema gốc)
@@ -148,17 +148,17 @@ DATN/
 | `api/learning.md` | Phiên flashcard, đánh giá thẻ, lịch ôn, lịch sử học (module A) | Đã có backend |
 | `api/custom-lists.md` | Danh sách từ riêng (module A) | Đã có backend |
 | `api/games.md` | Trò chơi từ vựng và bảng xếp hạng (module A) | Đã có backend |
-| `api/exercises.md` | Bài tập ngữ pháp, nghe, phát âm (module B) | Đề xuất, chờ người làm backend B duyệt |
-| `api/chatbot.md` | Trợ lý AI giải thích bài tập (module B) | Đề xuất, chờ người làm backend B duyệt |
+| `api/exercises.md` | Bài tập ngữ pháp, nghe, phát âm (module B) | Đã có backend (chưa có chấm phát âm) |
+| `api/chatbot.md` | Trợ lý AI giải thích bài tập, lịch sử trò chuyện (module B) | Đã có backend (Groq) |
 | `api/tests.md` | Kiểm tra định kỳ, tổng hợp 4 kỹ năng, chấm điểm và quy đổi CEFR (module C) | Đã có backend |
 | `api/progress.md` | Trang chủ Tiến độ: streak, biểu đồ theo ngày/tuần/tháng, điểm kỹ năng, thành tích; đề xuất quy đổi trình độ CEFR (module D, D1) | Đề xuất, chờ Nhân duyệt |
 | `Báo cáo và phân công công việc/` | Tài liệu của đồ án: phiếu giao đề tài, báo cáo, B1 thu thập yêu cầu, B2 phân tích, B3 thiết kế, phân chia công việc | Tài liệu tham khảo |
 
 ## Chạy dự án trên máy
 
-> Đã chạy thử theo đúng các bước dưới đây ngày 26/09/2026 trên Windows 10 (Git Bash và PowerShell), với JDK 21.0.12,
-> Node 22.20 và Docker Desktop 29: backend khởi động, frontend lên, đăng ký và đăng nhập qua giao diện được, trang
-> Từ vựng lấy dữ liệu từ backend thật.
+> Đã chạy thử theo đúng các bước dưới đây ngày 29/09/2026 (code trên `dev`) trên Windows 10, Git Bash, với JDK 21.0.12,
+> Node 22.20 và Docker Desktop 29: backend khởi động và tự áp các migration mới, cả hai chế độ frontend lên; đăng nhập,
+> Từ vựng, Bài tập, Kiểm tra chạy với backend thật.
 
 Cần các công cụ ở [Bước 2](#bước-2-cài-công-cụ). Cài thư viện frontend **lần đầu** và **mỗi khi
 `frontend/package.json` thay đổi** sau khi pull:
@@ -211,6 +211,20 @@ $env:JWT_SECRET = "chuoi-bi-mat-khi-dev-dai-it-nhat-32-ky-tu-0123456789"
   bạn bị đăng xuất. Biến chỉ có tác dụng trong cửa sổ terminal vừa đặt, mở cửa sổ mới thì đặt lại.
 - Giá trị mặc định trong `application.properties` đã khớp `docker-compose.yml` (database, user, mật khẩu đều là
   `datn`, cổng 5433), nên không cần tạo file `.env`.
+- **Trợ lý AI (chatbot, module B) cần khóa Groq.** Không đặt thì mọi thứ khác vẫn chạy, riêng trợ lý AI báo "không
+  thể trả lời lúc này". Muốn thử chatbot thật, đặt thêm trước `./mvnw spring-boot:run` (lấy khóa ở
+  https://console.groq.com/keys; **không commit khóa**, không gửi vào nhóm chat):
+
+  ```bash
+  export GROQ_API_KEY="gsk_..."          # Git Bash
+  ```
+
+  ```powershell
+  $env:GROQ_API_KEY = "gsk_..."          # PowerShell
+  ```
+
+  Backend **không tự đọc file `.env`** (file đó dành cho `docker compose` và để ghi nhớ giá trị): biến nào cũng phải
+  đặt trong terminal như trên, hoặc trong *Environment variables* của IntelliJ.
 
 **Terminal 2: frontend** (giống nhau ở Git Bash và PowerShell)
 
@@ -232,16 +246,35 @@ Chạy backend bằng nút Run của IntelliJ (lớp `DatnApplication`) cũng đ
 
 | Lệnh | Dữ liệu | Dùng khi |
 |---|---|---|
-| `npm run dev` | Mọi API gọi **backend thật** | Kiểm tra các phần đã có backend: đăng nhập, Từ vựng, học flashcard, danh sách riêng, trò chơi |
-| `npm run dev:mock` | API mô tả trong `docs/api/` trả **dữ liệu giả** (`frontend/mock/`); chỉ đăng nhập, đăng ký đi qua backend thật (backend vẫn phải chạy) | Xem giao diện các phần backend **chưa có**, như Bài tập (module B) |
+| `npm run dev` | Mọi API gọi **backend thật** | Kiểm tra các phần đã có backend: đăng nhập, Từ vựng (A), Bài tập và trợ lý AI (B), Kiểm tra (C) |
+| `npm run dev:mock` | Từ vựng, Bài tập, trợ lý AI và trang chủ Tiến độ trả **dữ liệu giả** (`frontend/mock/`, nhiều bài mẫu hơn DB); đăng nhập, đăng ký và Kiểm tra vẫn đi qua backend thật (backend vẫn phải chạy) | Xem giao diện phần backend **chưa có** (trang chủ Tiến độ, module D) và thử các tình huống đặc biệt |
 
-Ở `npm run dev`, trang **Bài tập** báo "Không tải được danh sách bài tập": đây là **bình thường**, vì backend
-module B chưa có. Chỉ chạy một chế độ một lúc (cùng cổng 5173): Ctrl+C rồi chạy lệnh kia.
+Ở `npm run dev` (backend thật), các chỗ sau báo lỗi là **bình thường** vì backend chưa làm tới:
 
-**Thử hết các màn của module Bài tập:** chạy `npm run dev:mock`, đăng nhập, rồi mở **http://localhost:5173/__mock**.
-Trang này chọn tình huống (bình thường, mạng chậm, chưa có bài, lỗi tải, lỗi lưu bài, AI lỗi), có đường dẫn tới các
-màn đặc biệt và bảng "muốn xem màn nào thì làm gì". Dữ liệu mẫu có đủ 6 trình độ A1 đến C2, lịch sử làm bài sẵn cho
-mỗi tài khoản, câu điền từ, bài nghe dài, câu phát âm có từ đọc sai hoặc bỏ sót.
+- Trang chủ: các khối biểu đồ hoạt động, điểm kỹ năng, thành tích báo "Không tải được" (backend module D chưa có).
+- Bài nghe: "Không phát được file âm thanh" (chưa có file ghi âm trong `datn/src/main/resources/static/media/`).
+- Bài phát âm: chấm luôn báo AI lỗi (backend chưa có chấm phát âm).
+- Trợ lý AI: báo "không thể trả lời lúc này" nếu chưa đặt `GROQ_API_KEY` (xem terminal 1).
+
+**Chạy cả hai chế độ cùng lúc** (so sánh dữ liệu thật và dữ liệu giả): mỗi lệnh một terminal, backend vẫn ở
+terminal 1.
+
+```bash
+cd ~/Desktop/DATN/frontend
+npm run dev:mock                  # http://localhost:5173, dữ liệu giả
+```
+
+```bash
+cd ~/Desktop/DATN/frontend
+npm run dev -- --port 5174        # http://localhost:5174, backend thật
+```
+
+Hai bản dùng chung một backend nên đăng nhập bằng cùng tài khoản; mỗi cổng giữ phiên đăng nhập riêng.
+
+**Thử các tình huống đặc biệt:** chạy `npm run dev:mock`, đăng nhập, rồi mở **http://localhost:5173/__mock**.
+Trang này chọn tình huống (bình thường, mạng chậm, chưa có bài, lỗi tải, lỗi lưu bài, AI lỗi, người mới, đang chấm
+Nói/Viết), có đường dẫn tới các màn đặc biệt và bảng "muốn xem màn nào thì làm gì". Dữ liệu mẫu có đủ 6 trình độ A1
+đến C2, lịch sử làm bài sẵn cho mỗi tài khoản, câu điền từ, bài nghe dài, câu phát âm có từ đọc sai hoặc bỏ sót.
 
 ### Kiểm tra nhanh đã chạy đúng chưa
 
@@ -257,8 +290,8 @@ mỗi tài khoản, câu điền từ, bài nghe dài, câu phát âm có từ �
 ### Lỗi thường gặp
 
 Các lỗi gõ nhầm cú pháp Git Bash và PowerShell, `ENOENT`, `'.\mvnw' is not recognized`, `Connection to localhost:5433 refused`,
-`Port 8080 was already in use`, `http proxy error` và trang Bài tập báo lỗi đã được tái hiện trên máy khi viết mục
-này; các dòng còn lại là lỗi hay gặp khác.
+`Port 8080 was already in use`, `http proxy error` và lỗi migration `Detected resolved migration not applied` đã được
+tái hiện trên máy khi viết mục này; các dòng còn lại là lỗi hay gặp khác.
 
 | Thông báo | Nguyên nhân | Cách sửa |
 |---|---|---|
@@ -273,7 +306,10 @@ này; các dòng còn lại là lỗi hay gặp khác.
 | `'vite' is not recognized ...` | Chưa cài thư viện frontend | `cd frontend`, `npm install` |
 | Giao diện báo "Không kết nối được máy chủ"; terminal frontend in `[vite] http proxy error: /api/...` và `AggregateError [ECONNREFUSED]` | Backend chưa chạy hoặc chưa khởi động xong | Chờ dòng `Started DatnApplication` ở terminal 1 |
 | Bị đưa về trang đăng nhập với "Phiên đăng nhập đã hết hạn" | Backend vừa khởi động lại mà không đặt `JWT_SECRET` | Đăng nhập lại; lần sau đặt `JWT_SECRET` |
-| Trang Bài tập báo "Không tải được danh sách bài tập" | Đang dùng `npm run dev`, backend module B chưa có | Dùng `npm run dev:mock` để xem giao diện |
+| Backend không khởi động: `Validate failed: Migrations have failed validation` … `Detected resolved migration not applied to database: 2026...` | DB trên máy đã chạy một migration có số phiên bản **lớn hơn** migration vừa pull về (ví dụ đã chạy code của nhánh khác trước) | Chạy **một lần** (Git Bash): `./mvnw spring-boot:run -Dspring-boot.run.arguments=--spring.flyway.out-of-order=true`; ở PowerShell đặt cả tham số `-D...` trong dấu ngoặc kép. Lần sau chạy bình thường. Không cần giữ dữ liệu cũ thì `docker compose down -v` rồi chạy lại cũng được |
+| Trang chủ báo "Không tải được" ở biểu đồ, điểm kỹ năng, thành tích | Đang dùng `npm run dev`; backend module D chưa có | Bình thường. Dùng `npm run dev:mock` để xem trang chủ đầy đủ |
+| Trợ lý AI báo "không thể trả lời lúc này"; tab Network của DevTools thấy lời gọi `.../messages` trả 503 `Groq API key is not configured` | Chưa đặt `GROQ_API_KEY` trước khi chạy backend | Đặt khóa (xem terminal 1) rồi khởi động lại backend |
+| Danh sách Kiểm tra không còn đề định kỳ | Đề định kỳ mẫu chỉ mở 7 ngày, tính từ lúc migration dữ liệu mẫu chạy trên máy bạn | Bình thường với dữ liệu mẫu; muốn có lại thì làm mới DB cục bộ (`docker compose down -v`, mất dữ liệu cũ) |
 | `java -version` không ra 21 | `JAVA_HOME` hoặc `PATH` trỏ JDK khác | Trỏ `JAVA_HOME` về JDK 21, mở terminal mới |
 
 > Postgres trong Docker dùng cổng **5433** (không phải 5432) để không đụng với PostgreSQL cài trực tiếp trên máy.
@@ -282,12 +318,16 @@ này; các dòng còn lại là lỗi hay gặp khác.
 
 **Nhánh và pull request**
 
-- Mỗi việc một nhánh, **luôn tách từ `main` mới nhất** (`git switch main && git pull && git switch -c ...`). Đặt tên
-  theo loại việc: `feature/...` (tính năng), `fix/...` (sửa lỗi), `docs/...` (tài liệu), `chore/...` (cấu hình, hạ tầng).
-- Đưa code vào `main` qua pull request trên GitHub, merge bằng **"Create a merge commit"**. PR nhỏ, một mục đích, để
-  người khác xem kịp.
+- Nhánh tích hợp là **`dev`** (nhóm chốt 27/09; là nhánh mặc định trên GitHub). Mỗi việc một nhánh, **luôn tách từ
+  `dev` mới nhất** (`git switch dev && git pull && git switch -c ...`). Đặt tên theo loại việc: `feature/...` (tính
+  năng), `fix/...` (sửa lỗi), `docs/...` (tài liệu), `chore/...` (cấu hình, hạ tầng).
+- Đưa code vào `dev` qua pull request trên GitHub, merge bằng **"Create a merge commit"**. PR nhỏ, một mục đích, để
+  người khác xem kịp. Khi `dev` chạy ổn định mới mở PR `dev` → `main` (cũng merge commit, không squash).
+- Tên file migration theo **giờ lúc tạo** (`V<yyyyMMddHHmm>__mo_ta.sql`), không đặt giờ trong tương lai: migration
+  đến sau mà có số nhỏ hơn migration đã chạy sẽ làm backend của người khác không khởi động được (xem
+  [Lỗi thường gặp](#lỗi-thường-gặp)).
 - Đừng tự gộp nhiều nhánh sắp mở PR riêng thành một nhánh trên máy rồi làm tiếp trên đó: khi các nhánh gốc được merge
-  riêng, GitHub sẽ báo conflict giả. Chờ nhánh trước vào `main` rồi tách nhánh mới từ `main`.
+  riêng, GitHub sẽ báo conflict giả. Chờ nhánh trước vào `dev` rồi tách nhánh mới từ `dev`.
 - Trước khi mở PR: chạy [test](#chạy-test) của phần mình sửa, và xem lại `git diff`.
 - Commit message viết tiếng Anh, câu ngắn ở dạng mệnh lệnh, giống lịch sử hiện có (ví dụ
   `Add security rules and module A notes to the README`).
