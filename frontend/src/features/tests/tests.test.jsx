@@ -299,6 +299,8 @@ describe('taking a test', () => {
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Nộp bài' }))
 
     expect(await screen.findByText('Trình độ của bạn đổi từ A2 thành B1.')).toBeInTheDocument()
+    // C2: the report leads on to the study plan (D2).
+    expect(screen.getByRole('link', { name: 'Xem kế hoạch cá nhân →' })).toHaveAttribute('href', '/plan')
     await waitFor(() => expect(sidebarLevel()).toHaveTextContent('B1'))
   })
 

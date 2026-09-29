@@ -222,6 +222,9 @@ export function TestResultPage() {
           ← Về danh sách bài kiểm tra
         </ButtonLink>
         <ButtonLink to={`/tests/${data.testId}`}>Làm lại</ButtonLink>
+        <ButtonLink to="/plan" variant="outline">
+          Xem kế hoạch cá nhân →
+        </ButtonLink>
       </div>
     </Page>
   )
