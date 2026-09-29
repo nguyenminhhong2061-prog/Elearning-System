@@ -7,6 +7,7 @@ import { exerciseRoutes } from './routes/exercises.js'
 import { gameRoutes } from './routes/games.js'
 import { learningRoutes } from './routes/learning.js'
 import { findList, listRoutes } from './routes/lists.js'
+import { planRoutes } from './routes/plan.js'
 import { progressRoutes } from './routes/progress.js'
 import { vocabularyRoutes } from './routes/vocabulary.js'
 import { userState } from './store.js'
@@ -27,6 +28,7 @@ const ROUTES = [
   ...exerciseRoutes,
   ...chatRoutes,
   ...progressRoutes,
+  ...planRoutes,
 ]
 
 function findRoute(method, pathname) {
@@ -84,7 +86,9 @@ export function mockApi() {
         const url = new URL(req.url, 'http://localhost')
         const found = findRoute(req.method, url.pathname)
         if (!found) return next()
-        handle(req, res, found.route, found.match, url).catch(next)
+        // A request the browser gave up on (a reload while it was sent) has nobody left to answer: drop it instead of
+        // showing Vite's error overlay on the next page.
+        handle(req, res, found.route, found.match, url).catch((error) => (req.destroyed ? undefined : next(error)))
       })
     },
   }

@@ -31,6 +31,7 @@
  * @property {string} takenAt
  * @property {'SUBMITTED' | 'GRADED'} status SUBMITTED: speaking and writing are still being graded
  * @property {number | null} overallScore
+ * @property {number | null} [previousOverallScore] of the graded comprehensive test before this one (plan page)
  * @property {import('@/api/types').CefrLevel | null} level
  * @property {{ listening: SkillScore, speaking: SkillScore, reading: SkillScore, writing: SkillScore }} skills
  *

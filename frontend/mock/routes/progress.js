@@ -25,7 +25,11 @@ const LATEST_TEST = {
   attemptId: 42,
   testTitle: 'Kiểm tra tổng hợp tháng 9',
   skills: { listening: 56, speaking: 38, reading: 48, writing: 42 },
+  previousOverallScore: 38, // the comprehensive test before: "Tăng 8 điểm" on the plan page
 }
+
+/** The latest comprehensive test's scores, for the plan mock (suggestions, goal options). */
+export const latestTestScores = () => LATEST_TEST.skills
 
 // Cut-offs proposed in docs/api/progress.md ("Gợi ý giải pháp" 2, EF SET bands).
 const CEFR_BANDS = [
@@ -75,6 +79,18 @@ function dayOf(userId, date, today) {
   if (date !== today) return day
   const minutes = liveMinutes.get(`${userId}|${date}`) ?? 0
   return { ...day, studyMinutes: day.studyMinutes + minutes, exercisesCompleted: day.exercisesCompleted + exerciseCompletionsOn(userId, date) }
+}
+
+/** Words learned and exercises completed from `from` to `to`, both included, as the sum of user_progress rows. */
+export function totalsBetween(userId, from, to, today) {
+  let wordsDone = 0
+  let exercisesDone = 0
+  for (let date = from; date <= to && date <= today; date = addDays(date, 1)) {
+    const day = dayOf(userId, date, today)
+    wordsDone += day.wordsLearned
+    exercisesDone += day.exercisesCompleted
+  }
+  return { wordsDone, exercisesDone }
 }
 
 const isActive = (day) => day.wordsLearned + day.exercisesCompleted + day.testsCompleted + day.studyMinutes > 0
@@ -211,6 +227,7 @@ function skills(today) {
       takenAt: `${addDays(today, -7)}T08:30:00Z`,
       status: 'GRADED',
       overallScore: overall,
+      previousOverallScore: LATEST_TEST.previousOverallScore,
       level: cefrOf(overall),
       skills: Object.fromEntries(Object.entries(scores).map(([skill, score]) => [skill, { score, level: cefrOf(score) }])),
     },

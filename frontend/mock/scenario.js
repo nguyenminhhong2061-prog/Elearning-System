@@ -2,6 +2,7 @@ import { addDays, todayInVietnam } from '../src/lib/dates.js'
 import { resetChatData } from './routes/chat.js'
 import { resetExerciseData } from './routes/exercises.js'
 import { gradingSkillsReply, newLearnerReply, resetProgressData } from './routes/progress.js'
+import { planScenarioEffect, resetPlanData } from './routes/plan.js'
 
 // Scenarios of `npm run dev:mock` for module B (exercises and the AI assistant) and the home page (module D), so that
 // loading, empty and error screens can be seen without a backend. The chosen scenario lives in a cookie, so it applies
@@ -50,6 +51,8 @@ export function scenarioEffect(scenario, method, pathname, searchParams = new UR
   if (scenario === 'new-learner' && method === 'GET' && pathname === '/api/learning/summary') {
     return { reply: { status: 200, body: emptyLearningSummary() } }
   }
+  const planEffect = planScenarioEffect(scenario, method, pathname)
+  if (planEffect) return planEffect
   if (!AFFECTED.test(pathname)) return {}
   const is = (verb, pattern) => method === verb && pattern.test(pathname)
   switch (scenario) {
@@ -100,6 +103,7 @@ const APP_LINKS = [
   ['/exercises/lessons/25', 'Phát âm C1 "Câu dài và ngữ điệu" (tô màu từng từ, từ bị bỏ sót)'],
   ['/exercises/lessons/99', 'Bài chưa có câu hỏi nào'],
   ['/exercises/lessons/999', 'Bài không tồn tại'],
+  ['/plan', 'Kế hoạch học cá nhân (module D, D2): trình độ, việc nên làm, kế hoạch đang ở tuần 3, đặt lại mục tiêu, nhắc học'],
 ]
 
 const CHECKLIST = [
@@ -123,6 +127,9 @@ const CHECKLIST = [
   ['Trang chủ: biểu đồ Ngày, Tuần, Tháng', 'Đổi khoảng thời gian và chỉ số. "Điểm kiểm tra": kỳ không làm bài để trống (—), không vẽ cột 0.'],
   ['Trang chủ: thời gian học', 'Mở một bài tập hoặc phiên flashcard, thao tác trong hơn 1 phút rồi quay về trang chủ: cột hôm nay có thêm phút học và streak được giữ.'],
   ['Nhãn "Trình độ của bạn"', 'Cần trình độ trong DB thật (xem lệnh bên dưới), rồi tải lại trang.'],
+  ['Kế hoạch: theo dõi tuần này', 'Mở /plan: kế hoạch mẫu "Đạt B1 trong 3 tháng" đang ở tuần 3, số từ và bài tập mỗi tuần khớp biểu đồ trang chủ. Tuần vừa qua chưa đạt thì có cảnh báo nhẹ "chưa đạt mục tiêu" (tùy tài khoản).'],
+  ['Kế hoạch: đặt mục tiêu, xem trước, áp dụng', 'Bấm "Đặt lại mục tiêu", chọn mục tiêu (hoặc "Mục tiêu khác"), bấm "Gợi ý lộ trình" (AI nghĩ khoảng 1 giây), rồi "Áp dụng kế hoạch". Chọn "Người mới" để thấy màn chưa có kế hoạch.'],
+  ['Kế hoạch: AI lỗi, lỗi lưu, lỗi tải', 'Chọn "AI lỗi" rồi bấm "Gợi ý lộ trình"; "Lỗi lưu bài" rồi áp dụng kế hoạch, tạm dừng hoặc đổi giờ nhắc; "Lỗi tải" để thấy từng khối báo lỗi riêng.'],
 ]
 
 function page(current, notice) {
@@ -217,6 +224,7 @@ export function serveControlPanel(req, res) {
     resetExerciseData()
     resetChatData()
     resetProgressData()
+    resetPlanData()
     redirect(res, '/__mock?reset=1')
     return true
   }

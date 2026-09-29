@@ -31,8 +31,11 @@ function point(axis, fraction) {
 
 const ring = (fraction) => SKILL_AXES.map((_, axis) => point(axis, fraction).join(',')).join(' ')
 
-/** @param {{ result: import('../types').SkillResult | null }} props */
-function Radar({ result }) {
+/**
+ * The four-skill radar alone (also drawn on the study plan page, D2).
+ * @param {{ result: import('../types').SkillResult | null }} props
+ */
+export function Radar({ result }) {
   const scores = SKILL_AXES.map(({ key }) => result?.skills[key] ?? null)
   const graded = scores.every((skill) => skill?.score !== null && skill?.score !== undefined)
   const description = result

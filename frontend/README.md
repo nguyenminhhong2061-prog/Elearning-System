@@ -90,9 +90,11 @@ frontend/
     │   ├── games/             # module A (A4): trò chơi từ vựng và bảng xếp hạng
     │   ├── exercises/         # module B (giao diện): ngữ pháp (grammar/), nghe (listening/), phát âm
     │                          # (pronunciation/), trợ lý AI (chat/); API theo docs/api/exercises.md, chatbot.md
-    │   └── progress/          # module D (giao diện): trang chủ Tiến độ (D1), biểu đồ vẽ bằng SVG, không thư viện;
-    │                          # ghi thời gian học (useStudyTime); API theo docs/api/progress.md
-    ├── pages/                 # trang chung: HomePage, ComingSoonPage, NotFoundPage, ForbiddenPage
+    │   ├── tests/             # module C (giao diện): kiểm tra định kỳ và tổng hợp; API theo docs/api/tests.md
+    │   ├── progress/          # module D (giao diện): trang chủ Tiến độ (D1), biểu đồ vẽ bằng SVG, không thư viện;
+    │   │                      # ghi thời gian học (useStudyTime); API theo docs/api/progress.md
+    │   └── plan/              # module D (giao diện): Kế hoạch học cá nhân (D2); API theo docs/api/plans.md
+    ├── pages/                 # trang chung: HomePage, NotFoundPage, ForbiddenPage
     ├── lib/                   # hàm tiện ích nhỏ; lazyPage.js (tải trang khi cần, tự tải lại sau khi deploy)
     └── test/                  # setup.js, fakeBackend.js (giả lập backend cho test)
 ```
@@ -116,7 +118,7 @@ File chứa JSX phải có đuôi `.jsx`, file logic thuần dùng `.js`. Mỗi 
    ```
 
 2. Khai báo trang bằng `lazyPage` ở đầu `src/app/router.jsx` (không `import` trang trực tiếp), rồi đăng ký route
-   bên trong nhóm `AppLayout` (thay `ComingSoonPage` của mục tương ứng):
+   bên trong nhóm `AppLayout`:
 
    ```jsx
    const GrammarListPage = lazyPage(() => import('@/features/exercises/pages/GrammarListPage'), 'GrammarListPage')
