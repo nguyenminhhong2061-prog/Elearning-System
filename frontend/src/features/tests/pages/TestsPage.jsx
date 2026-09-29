@@ -1,22 +1,21 @@
-import { ButtonLink } from '@/components/ui/Button'
+import { Link } from 'react-router'
 import { Card } from '@/components/ui/Card'
 import { LoadError } from '@/components/ui/LoadError'
 import { Page } from '@/components/layout/Page'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { Tag } from '@/components/ui/Tag'
+import { cx } from '@/lib/cx'
+import { describeDeadline } from '../answers'
 import { useTests } from '../api/testsQueries'
 import { TEST_TYPES, TEST_TYPE_LABELS } from '../constants'
 
-/** The one-line status under a test's title. */
+/** The learner's standing on a test, under its title. */
 function progressLine(test) {
   const { progress } = test
   if (progress.inProgress) {
     return `Đang làm dở · đã trả lời ${progress.inProgress.answeredCount}/${test.questionCount} câu`
   }
-  if (progress.attemptCount === 0) {
-    return 'Chưa làm lần nào'
-  }
-  const best = progress.bestScorePercent === null ? '' : ` · điểm cao nhất ${progress.bestScorePercent}/100`
+  if (progress.attemptCount === 0) return 'Chưa làm lần nào'
+  const best = progress.bestScorePercent === null ? '' : ` · cao nhất ${progress.bestScorePercent}/100`
   return `Đã làm ${progress.attemptCount} lần${best}`
 }
 
@@ -26,39 +25,55 @@ function actionLabel(test) {
   return 'Bắt đầu'
 }
 
+// The design's test cards: dark for a periodic test, the teal gradient for the comprehensive one.
+const CARD = {
+  [TEST_TYPES.PERIODIC]: {
+    card: 'bg-sidebar',
+    detail: 'text-muted-light',
+    action: 'bg-brand hover:bg-brand-dark',
+  },
+  [TEST_TYPES.COMPREHENSIVE]: {
+    card: 'bg-[linear-gradient(155deg,var(--color-brand-dark),var(--color-brand))]',
+    detail: 'text-white/85',
+    action: 'bg-white/18 hover:bg-white/28',
+  },
+}
+
 function TestCard({ test }) {
+  const style = CARD[test.type] ?? CARD[TEST_TYPES.PERIODIC]
+  const details = [`${test.questionCount} câu`, describeDeadline(test.endDate), progressLine(test)].filter(Boolean)
   return (
-    <Card className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex min-w-0 flex-col gap-1.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-lg font-semibold text-ink">{test.title}</h3>
-          <Tag variant={test.type === TEST_TYPES.COMPREHENSIVE ? 'brand' : 'neutral'}>
-            {TEST_TYPE_LABELS[test.type]}
-          </Tag>
-          {test.progress.inProgress && <Tag variant="warning">Đang làm dở</Tag>}
-        </div>
-        <p className="text-label text-muted">
-          {test.questionCount} câu · {progressLine(test)}
-        </p>
+    <article className={cx('flex h-full flex-col justify-between gap-4 rounded-xl p-5 text-white', style.card)}>
+      <div className="flex flex-col gap-1">
+        <h3 className="text-[17px] leading-6 font-semibold">{test.title}</h3>
+        <p className={cx('text-label', style.detail)}>{details.join(' · ')}</p>
       </div>
-      <ButtonLink to={`/tests/${test.id}`} className="flex-none self-start sm:self-auto">
+      <Link
+        to={`/tests/${test.id}`}
+        aria-label={`${actionLabel(test)}: ${test.title}`}
+        className={cx(
+          'self-start rounded-lg px-5 py-2.75 text-label font-semibold text-white transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand',
+          style.action,
+        )}
+      >
         {actionLabel(test)}
-      </ButtonLink>
-    </Card>
+      </Link>
+    </article>
   )
 }
 
-function TestGroup({ title, description, tests }) {
+function TestGroup({ type, description, tests }) {
   if (tests.length === 0) return null
+  const headingId = `tests-${type.toLowerCase()}`
   return (
-    <section aria-labelledby={`group-${title}`} className="flex flex-col gap-3">
+    <section aria-labelledby={headingId} className="flex flex-col gap-3">
       <div>
-        <h2 id={`group-${title}`} className="text-lg font-semibold text-ink">
-          {title}
+        <h2 id={headingId} className="text-lg font-semibold text-ink">
+          {TEST_TYPE_LABELS[type]}
         </h2>
         <p className="text-label text-muted">{description}</p>
       </div>
-      <ul className="flex flex-col gap-3">
+      <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] gap-3">
         {tests.map((test) => (
           <li key={test.id}>
             <TestCard test={test} />
@@ -72,8 +87,8 @@ function TestGroup({ title, description, tests }) {
 function LoadingList() {
   return (
     <div aria-busy="true" aria-label="Đang tải danh sách bài kiểm tra" className="flex flex-col gap-3">
-      {[0, 1, 2].map((key) => (
-        <Skeleton key={key} className="h-24 w-full rounded-xl" />
+      {[0, 1].map((key) => (
+        <Skeleton key={key} className="h-28 w-full rounded-xl" />
       ))}
     </div>
   )
@@ -89,7 +104,9 @@ export function TestsPage() {
       heading={
         <div>
           <h1 className="text-title font-bold text-ink">Kiểm tra</h1>
-          <p className="text-label text-muted">Kiểm tra định kỳ đo tiến bộ, kiểm tra tổng hợp xác định trình độ CEFR của bạn.</p>
+          <p className="text-label text-muted">
+            Kiểm tra định kỳ đo tiến bộ, kiểm tra tổng hợp xác định trình độ CEFR của bạn.
+          </p>
         </div>
       }
     >
@@ -106,12 +123,12 @@ export function TestsPage() {
       {tests.isSuccess && tests.data.length > 0 && (
         <div className="flex flex-col gap-7">
           <TestGroup
-            title={TEST_TYPE_LABELS[TEST_TYPES.PERIODIC]}
+            type={TEST_TYPES.PERIODIC}
             description="Bài ngắn theo tuần, chấm điểm ngay khi nộp."
             tests={tests.data.filter((test) => test.type === TEST_TYPES.PERIODIC)}
           />
           <TestGroup
-            title={TEST_TYPE_LABELS[TEST_TYPES.COMPREHENSIVE]}
+            type={TEST_TYPES.COMPREHENSIVE}
             description="Đủ bốn kỹ năng Nghe, Nói, Đọc, Viết; kết quả xác định trình độ CEFR của bạn."
             tests={tests.data.filter((test) => test.type === TEST_TYPES.COMPREHENSIVE)}
           />
