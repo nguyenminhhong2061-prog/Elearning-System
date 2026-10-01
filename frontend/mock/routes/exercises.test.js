@@ -89,6 +89,20 @@ describe('sample data for trying every screen', () => {
     expect(listLessons('u-history', 'GRAMMAR').find((lesson) => lesson.id === 1).progress.attemptCount).toBe(2)
   })
 
+  it('says how many pronunciation items were practised and the latest listening result', () => {
+    const pronunciation = listLessons('u-standing', 'PRONUNCIATION')
+    const finished = pronunciation.find((lesson) => lesson.id === 22)
+    expect(finished.progress.practicedCount).toBe(finished.itemCount)
+    expect(pronunciation.find((lesson) => lesson.id === 23).progress.practicedCount).toBe(2)
+    expect(finished.progress.lastResult).toBeNull()
+
+    const listening = listLessons('u-standing', 'LISTENING')
+    const done = listening.find((lesson) => lesson.id === 12)
+    expect(done.progress.lastResult).toEqual({ correctCount: Math.round(0.67 * done.itemCount), questionCount: done.itemCount })
+    expect(listening.find((lesson) => lesson.id === 11).progress.lastResult).toBeNull()
+    expect(done.progress.practicedCount).toBeNull()
+  })
+
   it('spreads first-try pronunciation scores over the red, orange and green bands', () => {
     const tone = Float32Array.from({ length: 8000 }, (_, index) => 0.3 * Math.sin(index / 5))
     const firstTries = MOCK_LESSONS.flatMap((lesson) => lesson.pronunciationItems).map((item) => fakeAssessment(item, 1, tone).overallScore)

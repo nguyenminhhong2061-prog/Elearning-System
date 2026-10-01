@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { pronounce } from '@/lib/speech'
 import { startRecording, toWav } from './pronunciation/recorder'
 import { ASSESSMENT, ATTEMPT_ID, baseRoutes, renderApp } from './testFixtures'
+import '@/test/preloadPages'
 
 // The pronunciation exercise (B3), against docs/api/exercises.md. jsdom has no microphone or audio decoding, so the
 // recorder module is replaced; its own logic (WAV encoding) is tested in pronunciation/wav.test.js.
@@ -79,7 +80,8 @@ describe('pronunciation exercise', () => {
 
     expect(await screen.findByRole('img', { name: 'Điểm phát âm 86 trên 100' })).toBeInTheDocument()
     expect(app.callsTo(RECORDING)[0].body).toBe(WAV)
-    expect(card).toHaveTextContent('Chính xác 90 · Trôi chảy 78 · Đầy đủ 92')
+    expect(card).toHaveTextContent('Chính xác 90 · Trôi chảy 78')
+    expect(card).not.toHaveTextContent('Đầy đủ')
     expect(card).not.toHaveTextContent('55 điểm') // a single word is not repeated below the score
     expect(card).toHaveTextContent('Máy nghe được: “sustainability”')
     expect(card).toHaveTextContent('Nhấn mạnh âm tiết "bil" rõ hơn.')
@@ -168,7 +170,7 @@ describe('pronunciation exercise', () => {
     expect(screen.getByText('Đã luyện 1/2 mục · điểm trung bình 86')).toBeInTheDocument()
     const scores = screen.getByRole('list', { name: 'Điểm tốt nhất từng mục' })
     expect(within(scores).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
-      'sustainability86 điểm',
+      'sustainability1 lần thử86 điểm',
       'We need to reach an agreement.Bỏ qua',
     ])
     expect(screen.getByRole('button', { name: 'Luyện lại' })).toBeInTheDocument()

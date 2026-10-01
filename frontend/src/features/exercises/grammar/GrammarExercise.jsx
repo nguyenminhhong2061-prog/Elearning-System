@@ -14,6 +14,7 @@ import { QuestionProgress } from '../components/QuestionProgress'
 import { ResultCard } from '../components/ResultCard'
 import { ResumeNotice } from '../components/ResumeNotice'
 import { ScoreRing } from '../components/ScoreRing'
+import { answerText, chatContextLabel } from '../chat/contextLabel'
 import { GrammarReview } from './GrammarReview'
 
 const EMPTY_CHOICE = { optionId: null, answer: '' }
@@ -77,9 +78,38 @@ export function GrammarExercise({ lesson, attemptId, progress, nextLesson, onRes
 
   // The assistant is told which question is on screen, so its answer is about this one. On the result there is no
   // single question: the review items below ask about their own.
+  const chosen = choices.get(question.id)
   useEffect(() => {
-    onChatContext(complete.isSuccess ? {} : { questionId: question.id })
-  }, [complete.isSuccess, question.id, onChatContext])
+    if (complete.isSuccess) {
+      onChatContext({})
+      return
+    }
+    const label = chatContextLabel({
+      number: index + 1,
+      lessonTitle: lesson.title,
+      prompt: question.prompt,
+      answer: result ? answerText(question, chosen) : null,
+      correct: result?.correct ?? null,
+    })
+    onChatContext({ questionId: question.id, label })
+  }, [complete.isSuccess, question, index, lesson.title, result, chosen, onChatContext])
+
+  /** The context of a question asked about from the review list. */
+  function reviewContext(questionId) {
+    const position = questions.findIndex((item) => item.id === questionId)
+    const item = questions[position]
+    const outcome = graded.get(questionId)
+    return {
+      questionId,
+      label: chatContextLabel({
+        number: position + 1,
+        lessonTitle: lesson.title,
+        prompt: item.prompt,
+        answer: answerText(item, choices.get(questionId)),
+        correct: outcome?.correct ?? null,
+      }),
+    }
+  }
 
   // Once graded, focus goes to "Câu tiếp theo" so Enter moves on (the feedback is announced by the live region).
   useEffect(() => {
@@ -163,7 +193,7 @@ export function GrammarExercise({ lesson, attemptId, progress, nextLesson, onRes
             lesson={lesson}
             review={summary.review}
             onAsk={(questionId) => {
-              onChatContext({ questionId })
+              onChatContext(reviewContext(questionId))
               onAskAssistant()
             }}
           />

@@ -66,6 +66,7 @@ function chatErrorMessage(error) {
  * @param {number | null} [props.questionId]
  * @param {number | null} [props.pronunciationItemId]
  * @param {string[]} [props.suggestions] questions offered before the first message
+ * @param {string | null} [props.contextLabel] what the learner is asking about, shown at the top (scenario 13, step 3)
  */
 export function ChatAssistant({
   open,
@@ -75,6 +76,7 @@ export function ChatAssistant({
   questionId = null,
   pronunciationItemId = null,
   suggestions = GENERAL_SUGGESTIONS,
+  contextLabel = null,
 }) {
   const [messages, setMessages] = useState([]) // { key, role: 'user' | 'assistant', content, sources?, error? }
   const [draft, setDraft] = useState('')
@@ -101,6 +103,37 @@ export function ChatAssistant({
   useEffect(() => {
     if (open && view === 'chat') input.current?.focus()
   }, [open, view])
+
+  // Scenario 13, branch 2a: coming back to a lesson reopens its latest chat session (once, when the panel first opens).
+  const resumeChecked = useRef(false)
+  useEffect(() => {
+    if (!open || lessonId === null || resumeChecked.current || sessionId.current !== null) return undefined
+    resumeChecked.current = true
+    let cancelled = false
+    let done = false
+    ;(async () => {
+      try {
+        const recent = await listChatSessions(0)
+        const previous = recent.content.find((session) => session.lessonId === lessonId)
+        if (!previous || cancelled || sessionId.current !== null) return
+        const page = await getChatMessages(previous.id)
+        if (cancelled || sessionId.current !== null) return
+        sessionId.current = previous.id
+        sessionLessonId.current = lessonId
+        setMessages(savedMessages(page))
+        setOlderPage(0)
+        setHasOlder(!page.last)
+      } catch {
+        // Nothing to resume: the panel simply starts a new chat.
+      } finally {
+        done = true
+      }
+    })()
+    return () => {
+      cancelled = true
+      if (!done) resumeChecked.current = false // StrictMode runs this effect twice: let the second run fetch
+    }
+  }, [open, lessonId])
 
   useEffect(() => {
     const element = log.current
@@ -256,6 +289,10 @@ export function ChatAssistant({
               ✕
             </button>
           </div>
+
+          {view === 'chat' && contextLabel && (
+            <p className="border-b border-line bg-surface-alt px-4 py-2 text-xs leading-normal text-ink-soft">{contextLabel}</p>
+          )}
 
           {view === 'history' ? (
             <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-4" aria-label="Các cuộc trò chuyện">

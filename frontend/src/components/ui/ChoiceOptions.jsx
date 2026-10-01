@@ -35,9 +35,10 @@ const MARK = {
  * @param {number | null} props.selectedId
  * @param {(optionId: number) => void} props.onSelect
  * @param {{ correctOptionId: number | null } | null} [props.graded]
+ * @param {boolean} [props.disabled] locks the answers without grading them (a listening file that failed to load)
  * @param {boolean} [props.shortcuts] announce keys 1-4 (the grammar screen listens for them)
  */
-export function ChoiceOptions({ name, label, options, selectedId, onSelect, graded = null, shortcuts = false }) {
+export function ChoiceOptions({ name, label, options, selectedId, onSelect, graded = null, shortcuts = false, disabled = false }) {
   return (
     <div role="radiogroup" aria-label={label} className="flex flex-col gap-2.5">
       {options.map((option, position) => {
@@ -50,7 +51,7 @@ export function ChoiceOptions({ name, label, options, selectedId, onSelect, grad
               name={name}
               value={option.id}
               checked={option.id === selectedId}
-              disabled={Boolean(graded)}
+              disabled={Boolean(graded) || disabled}
               onChange={() => onSelect(option.id)}
               aria-keyshortcuts={shortcuts ? String(position + 1) : undefined}
               className="sr-only"

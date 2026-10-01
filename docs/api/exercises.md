@@ -72,7 +72,9 @@ xem bẫy "enum chữ thường" trong README). Dùng các bảng có sẵn tron
       "attemptCount": 2,
       "bestScorePercent": 80,
       "lastCompletedAt": "2026-09-25T09:12:00Z",
-      "inProgress": { "attemptId": 57, "doneCount": 4, "lastActivityAt": "2026-09-26T14:10:00Z" }
+      "inProgress": { "attemptId": 57, "doneCount": 4, "lastActivityAt": "2026-09-26T14:10:00Z" },
+      "practicedCount": null,
+      "lastResult": { "correctCount": 8, "questionCount": 10 }
     }
   }
 ]
@@ -84,6 +86,8 @@ xem bẫy "enum chữ thường" trong README). Dùng các bảng có sẵn tron
 | `itemCount` | Số câu hỏi (ngữ pháp, nghe) hoặc số mục luyện (phát âm) |
 | `progress` | Của **người dùng hiện tại**. `attemptCount`, `bestScorePercent`, `lastCompletedAt` chỉ tính lượt `completed`: `0`, `null`, `null` khi chưa hoàn thành lần nào |
 | `progress.inProgress` | Lượt đang dở **làm tiếp được** của bài này (xem "Nguyên tắc"), `null` nếu không có. `doneCount`: số câu đã trả lời (ngữ pháp) hoặc số mục đã ghi âm ít nhất một lần (phát âm); giao diện hiện nhãn "Đang làm dở · 4/10 câu". Bài nghe luôn `null` |
+| `progress.practicedCount` | **Đề xuất thêm 01/10/2026, chờ Đạt** (kịch bản 12, bước 2 và 14). Chỉ bài phát âm: số mục khác nhau đã có ít nhất một lần ghi âm được chấm, tính mọi lượt; giao diện hiện "Đã luyện 3/5 mục". Kỹ năng khác: `null`. Thiếu trường này thì thẻ bài hiện điểm cao nhất như cũ |
+| `progress.lastResult` | **Đề xuất thêm 01/10/2026, chờ Đạt** (kịch bản 11, bước 2 và 11). Kết quả lượt `completed` gần nhất: `{ correctCount, questionCount }`, `null` khi chưa hoàn thành lần nào; bài nghe hiện "Gần nhất 4/5". Bài phát âm: `null` |
 
 Sắp xếp "cơ bản đến nâng cao" (B1): `cefr_level` A1 → C2, rồi `sort_order`, rồi `id`. Giao diện nhóm theo trình độ.
 

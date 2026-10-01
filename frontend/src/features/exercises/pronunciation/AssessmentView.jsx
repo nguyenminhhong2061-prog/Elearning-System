@@ -59,8 +59,7 @@ export function AssessmentView({ assessment, showWords }) {
         {overall}
       </ScoreRing>
       <p className="text-label text-muted-light">
-        Chính xác {Math.round(assessment.accuracyScore)} · Trôi chảy {Math.round(assessment.fluencyScore)} · Đầy đủ{' '}
-        {Math.round(assessment.completenessScore)}
+        Chính xác {Math.round(assessment.accuracyScore)} · Trôi chảy {Math.round(assessment.fluencyScore)}
       </p>
       {showWords && assessment.words.length > 0 && <WordScores words={assessment.words} />}
       {assessment.recognizedText && (

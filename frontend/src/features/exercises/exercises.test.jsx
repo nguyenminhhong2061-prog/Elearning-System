@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ATTEMPT_ID, baseRoutes, GRAMMAR_LESSON, gradeGrammar, LESSONS, renderApp } from './testFixtures'
+import '@/test/preloadPages'
 
 // Lesson lists and the grammar exercise (B1), against docs/api/exercises.md.
 

@@ -131,6 +131,7 @@ function LessonPlayer({ lessonId }) {
         attemptId={attempt.attemptId}
         questionId={chatContext.questionId ?? null}
         pronunciationItemId={chatContext.pronunciationItemId ?? null}
+        contextLabel={chatContext.label ?? null}
         suggestions={CHAT_SUGGESTIONS[data.skill]}
       />
     </>

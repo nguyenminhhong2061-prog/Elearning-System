@@ -219,16 +219,38 @@ function completedAttempts(userId, lessonId) {
   return [...attempts.values()].filter((attempt) => attempt.userId === userId && attempt.lessonId === lessonId && attempt.status === 'COMPLETED')
 }
 
+/** Different items recorded at least once over every attempt; a seeded finished attempt counts as all of them. */
+function practicedCountOf(userId, lesson) {
+  if (lesson.skill !== 'PRONUNCIATION') return null
+  const mine = [...attempts.values()].filter((attempt) => attempt.userId === userId && attempt.lessonId === lesson.id)
+  if (mine.some((attempt) => attempt.seeded && attempt.status === 'COMPLETED')) return lesson.pronunciationItems.length
+  return new Set(mine.flatMap((attempt) => [...attempt.recordings.keys()])).size
+}
+
+/** The latest finished attempt as "8/10"; a seeded one only has its percentage, so the count is derived from it. */
+function lastResultOf(lesson, done) {
+  if (lesson.skill === 'PRONUNCIATION' || done.length === 0) return null
+  const last = done.at(-1)
+  const questionCount = lesson.questions.length
+  const correctCount = last.responses.size > 0
+    ? [...last.responses.values()].filter((response) => response.correct).length
+    : Math.round((last.scorePercent / 100) * questionCount)
+  return { correctCount, questionCount }
+}
+
 function progressOf(userId, lessonId) {
   ensureHistory(userId)
+  const lesson = findLesson(lessonId)
   const done = completedAttempts(userId, lessonId)
-  const inProgress = inProgressOf(userId, findLesson(lessonId))
-  if (done.length === 0) return { attemptCount: 0, bestScorePercent: null, lastCompletedAt: null, inProgress }
+  const inProgress = inProgressOf(userId, lesson)
+  const extra = { practicedCount: practicedCountOf(userId, lesson), lastResult: lastResultOf(lesson, done) }
+  if (done.length === 0) return { attemptCount: 0, bestScorePercent: null, lastCompletedAt: null, inProgress, ...extra }
   return {
     attemptCount: done.length,
     bestScorePercent: Math.max(...done.map((attempt) => attempt.scorePercent)),
     lastCompletedAt: done.at(-1).finishedAt,
     inProgress,
+    ...extra,
   }
 }
 
