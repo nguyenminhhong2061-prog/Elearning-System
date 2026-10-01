@@ -2,7 +2,7 @@
 
 Đồ án tốt nghiệp PTIT (Khoa CNTT1): **"Xây dựng hệ thống quản lý học tiếng Anh theo năng lực ứng dụng công nghệ AI hỗ
 trợ giải thích và gợi ý lộ trình học"**. Nền tảng web cho người học theo trình độ CEFR (A1 đến C2): học từ vựng bằng
-flashcard và lặp lại ngắt quãng, làm bài tập ngữ pháp, nghe, phát âm có chatbot AI giải thích, làm bài kiểm tra, theo
+flashcard và lặp lại ngắt quãng, làm bài tập đọc hiểu, viết, nghe, phát âm có chatbot AI giải thích, làm bài kiểm tra, theo
 dõi tiến độ và kế hoạch học cá nhân; admin quản lý nội dung, người dùng và thống kê.
 
 **Mới vào nhóm? Bắt đầu ở mục [Bắt đầu nhanh cho thành viên mới](#bắt-đầu-nhanh-cho-thành-viên-mới).**
@@ -101,7 +101,7 @@ Cập nhật 29/09/2026. Chi tiết phần việc của từng người: `docs/B
 |---|---|---|---|
 | Đăng nhập, đăng ký | Đăng ký, đăng nhập, đăng xuất, đổi mật khẩu | Nguyễn Minh Hồng (xong) | Nguyễn Minh Hồng (xong) |
 | A. Học từ vựng | Chủ đề, flashcard, lặp lại ngắt quãng, danh sách từ riêng, trò chơi và bảng xếp hạng | Nguyễn Minh Hồng (xong) | Nguyễn Minh Hồng (xong) |
-| B. Bài tập và chatbot AI | Ngữ pháp, nghe hiểu, phát âm, trợ lý AI giải thích | Lý Quang Đạt (bản đầu: ngữ pháp, nghe, chatbot Groq; chưa có chấm phát âm) | Nguyễn Minh Hồng (xong) |
+| B. Bài tập và chatbot AI | Đọc hiểu, viết (AI chấm), nghe hiểu, phát âm, trợ lý AI giải thích | Lý Quang Đạt (bản đầu: ngữ pháp, nghe, chatbot Groq; chưa có đọc hiểu, viết, chấm phát âm) | Nguyễn Minh Hồng (xong) |
 | C. Kiểm tra | Kiểm tra định kỳ, kiểm tra tổng hợp 4 kỹ năng | Khuất Huy Nhân (bản đầu; AI chấm Nói, Viết còn là bản tạm) | Khuất Huy Nhân, Nguyễn Minh Hồng (xong) |
 | D. Tiến độ và kế hoạch | Biểu đồ, huy hiệu, kế hoạch học, nhắc nhở | Khuất Huy Nhân (chưa có) | Nguyễn Minh Hồng (trang chủ Tiến độ xong; Kế hoạch đang làm) |
 | E. Admin | Quản lý nội dung, người dùng, thống kê | Chưa phân công | Không làm cho buổi demo (nhóm chốt 29/09) |
@@ -148,7 +148,7 @@ DATN/
 | `api/learning.md` | Phiên flashcard, đánh giá thẻ, lịch ôn, lịch sử học (module A) | Đã có backend |
 | `api/custom-lists.md` | Danh sách từ riêng (module A) | Đã có backend |
 | `api/games.md` | Trò chơi từ vựng và bảng xếp hạng (module A) | Đã có backend |
-| `api/exercises.md` | Bài tập ngữ pháp, nghe, phát âm (module B) | Đã có backend (chưa có chấm phát âm) |
+| `api/exercises.md` | Bài tập đọc hiểu, viết, nghe, phát âm (module B) | Đã có backend cho bản ngữ pháp cũ; đọc hiểu và viết (02/10) chưa có, chưa có chấm phát âm |
 | `api/chatbot.md` | Trợ lý AI giải thích bài tập, lịch sử trò chuyện (module B) | Đã có backend (Groq) |
 | `api/tests.md` | Kiểm tra định kỳ, tổng hợp 4 kỹ năng, chấm điểm và quy đổi CEFR (module C) | Đã có backend |
 | `api/progress.md` | Trang chủ Tiến độ: streak, biểu đồ theo ngày/tuần/tháng, điểm kỹ năng, thành tích; đề xuất quy đổi trình độ CEFR (module D, D1) | Đề xuất, chờ Nhân duyệt |

@@ -45,7 +45,7 @@ Enum trong JSON viết **chữ hoa**. Dùng các bảng có sẵn trong `V1__ini
 | Biểu đồ "Điểm theo kỹ năng" (radar Nghe, Nói, Đọc, Viết) | `GET /api/progress/skills` | **Nhân** |
 | "Hành trình trình độ" (A1 → C2) | Frontend tính từ `currentLevel` của `/api/users/me`, không cần API | — |
 | "Thành tích" (huy hiệu đã đạt, sắp đạt) | `GET /api/progress/badges` | **Nhân** |
-| Thẻ "Tiếp tục" (bài đang làm dở), không có thì "Học tiếp" (bài kế tiếp) | `GET /api/exercise-attempts/current`; không có lượt dở thì `GET /api/exercises?skill=GRAMMAR` (contract `exercises.md`) | Đạt |
+| Thẻ "Tiếp tục" (bài đang làm dở), không có thì "Học tiếp" (bài kế tiếp) | `GET /api/exercise-attempts/current`; không có lượt dở thì `GET /api/exercises?skill=READING` (contract `exercises.md`; trước 02/10 là `GRAMMAR`) | Đạt |
 | Ghi thời gian học (không hiện, chạy nền) | `POST /api/progress/study-time` | **Nhân** |
 
 Thứ tự đề xuất cho backend: `summary` → `activity` → `study-time` → `badges` → `skills` (cần module C có kết quả).
@@ -238,14 +238,14 @@ không tự có; tài khoản demo nên học sau khi module D lên, hoặc dùn
 
 | Việc | Gọi |
 |---|---|
-| Mở trang chủ | Song song: `users/me` (đã có sẵn), `learning/summary`, `progress/summary`, `progress/activity?period=DAY`, `progress/skills`, `progress/badges`, `exercise-attempts/current` (và `exercises?skill=GRAMMAR` khi không có lượt dở) |
+| Mở trang chủ | Song song: `users/me` (đã có sẵn), `learning/summary`, `progress/summary`, `progress/activity?period=DAY`, `progress/skills`, `progress/badges`, `exercise-attempts/current` (và `exercises?skill=READING` khi không có lượt dở) |
 | Đổi Ngày / Tuần / Tháng trên biểu đồ | `GET /api/progress/activity?period=WEEK` hoặc `MONTH` (kèm `from`, `to` nếu đang xem khoảng tự chọn; khoảng quá 31 cột theo kỳ mới thì giao diện bỏ khoảng, báo lỗi và quay về mặc định) |
 | Nhập "Từ ngày", "Đến ngày" rồi bấm "Xem" | Kiểm tra ở giao diện, hợp lệ thì `GET /api/progress/activity?period=…&from=…&to=…`; bảng số liệu (mọi chỉ số, dòng "Tổng") hiện dưới biểu đồ |
 | Đổi chỉ số (Từ mới, Bài tập, Điểm kiểm tra, Thời gian học) | Không gọi lại: cùng một phản hồi `activity` |
 | Học xong một thẻ, một bài, một bài kiểm tra | Làm mới dữ liệu `progress` cùng dữ liệu của module đó |
 | Hành trình trình độ | Không gọi API: trình độ dưới `currentLevel` là "Đạt", bằng là "Hiện tại", trên là "Chưa đạt"; `currentLevel = null` thì mọi ô "Chưa đạt" và gợi ý làm bài kiểm tra tổng hợp |
 | Thẻ "Tiếp tục" | Lượt dở gần nhất: "Tiếp tục: Thì hiện tại hoàn thành · Đã làm 4/10 câu · còn 6 câu", bấm vào thì mở bài và làm tiếp đúng câu |
-| Thẻ "Học tiếp" (không có lượt dở) | Bài ngữ pháp đầu tiên ở trình độ hiện tại chưa hoàn thành lần nào (`progress.attemptCount = 0`) |
+| Thẻ "Học tiếp" (không có lượt dở) | Bài đọc hiểu đầu tiên ở trình độ hiện tại chưa hoàn thành lần nào (`progress.attemptCount = 0`) |
 
 ## Khác với thiết kế LinguaStep
 

@@ -228,8 +228,9 @@ Body là bản nháp người học đã xem, **kèm các mục tiêu tuần ng�
 ```
 
 - Tối đa 4 mục, việc quan trọng trước. Server viết sẵn `title`, `reason` bằng tiếng Việt; giao diện chỉ dựng nút
-  "Bắt đầu" theo `type`: `PRACTICE_SKILL` → màn Bài tập (`LISTENING` → tab Nghe, `SPEAKING` → tab Phát âm, `READING` và
-  `WRITING` → tab Ngữ pháp); `LEARN_TOPIC` → chủ đề `topicId`; `REVIEW_WORDS` → phiên ôn tập; `TAKE_TEST` → bài `testId`.
+  "Bắt đầu" theo `type`: `PRACTICE_SKILL` → màn Bài tập (`LISTENING` → tab Nghe hiểu, `SPEAKING` → tab Phát âm, `READING`
+  → tab Đọc hiểu, `WRITING` → tab Viết; 02/10, trước đây cả hai vào tab Ngữ pháp); `LEARN_TOPIC` → chủ đề `topicId`;
+  `REVIEW_WORDS` → phiên ôn tập; `TAKE_TEST` → bài `testId`.
 - Người mới: vẫn trả danh sách (ví dụ chỉ `TAKE_TEST` và `LEARN_TOPIC`), không trả `404`.
 
 ## Nhắc học
