@@ -21,20 +21,29 @@ function TextAnswer({ question, value, onChange }) {
   }
 
   const speaking = question.type === QUESTION_TYPES.SPEAKING
+  // Scenario 15, step 10: the essay shows how many words it has.
+  const words = value.trim() ? value.trim().split(/\s+/).length : 0
   return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-label font-medium text-ink-soft">
-        {speaking ? 'Gõ câu bạn sẽ đọc (bản demo chưa thu âm)' : 'Bài viết của bạn'}
-      </span>
-      <textarea
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        rows={speaking ? 3 : 6}
-        maxLength={5000}
-        className="w-full rounded-lg border border-line bg-white px-4 py-3.5 text-body text-ink outline-none transition-colors placeholder:text-muted-light focus:border-brand focus:ring-2 focus:ring-brand/25"
-        placeholder={speaking ? 'Đọc to câu trên rồi gõ lại…' : 'Viết câu trả lời của bạn…'}
-      />
-    </label>
+    <div className="flex flex-col gap-1.5">
+      <label className="flex flex-col gap-1.5">
+        <span className="text-label font-medium text-ink-soft">
+          {speaking ? 'Gõ câu bạn sẽ đọc (bản demo chưa thu âm)' : 'Bài viết của bạn'}
+        </span>
+        <textarea
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          rows={speaking ? 3 : 6}
+          maxLength={5000}
+          className="w-full rounded-lg border border-line bg-white px-4 py-3.5 text-body text-ink outline-none transition-colors placeholder:text-muted-light focus:border-brand focus:ring-2 focus:ring-brand/25"
+          placeholder={speaking ? 'Đọc to câu trên rồi gõ lại…' : 'Viết câu trả lời của bạn…'}
+        />
+      </label>
+      {!speaking && (
+        <span aria-live="polite" className="self-end text-xs text-muted">
+          {words} từ
+        </span>
+      )}
+    </div>
   )
 }
 

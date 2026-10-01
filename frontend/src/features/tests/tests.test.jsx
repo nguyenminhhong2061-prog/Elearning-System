@@ -217,7 +217,7 @@ describe('taking a test', () => {
     await user.click(screen.getByRole('button', { name: 'Nộp bài' }))
 
     const dialog = await screen.findByRole('dialog', { name: 'Nộp bài kiểm tra?' })
-    expect(within(dialog).getByText(/Bạn còn 2 câu chưa trả lời/)).toBeInTheDocument()
+    expect(within(dialog).getByText('Bạn còn 2 câu chưa trả lời (câu 1, 2). Câu bỏ trống được tính 0 điểm.')).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Làm câu còn thiếu' }))
 
     expect(await screen.findByText(/Câu 1\/2/)).toBeInTheDocument()
@@ -244,17 +244,46 @@ describe('taking a test', () => {
     expect(callsTo('PUT /api/test-attempts/57/answers/11')).toHaveLength(0)
   })
 
-  it('restarts from scratch when asked', async () => {
-    const user = userEvent.setup()
+  it('only offers to continue an unfinished test, never to restart it (scenario 14, branch 7a)', async () => {
     renderSignedIn('/tests/100', {
       ...takingRoutes(),
       'GET /api/tests/100': () => ({ data: { ...DETAIL, hasInProgress: true } }),
     })
 
-    await user.click(await screen.findByRole('button', { name: 'Làm lại từ đầu' }))
+    expect(await screen.findByRole('button', { name: 'Làm tiếp' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Làm lại từ đầu' })).not.toBeInTheDocument()
+    expect(screen.getByText('Bạn đang làm dở bài này. Các câu đã trả lời được giữ lại.')).toBeInTheDocument()
+  })
 
-    expect(await screen.findByText(/Câu 1\/2 · đã trả lời 0\/2/)).toBeInTheDocument()
-    expect(callsTo('POST /api/tests/100/attempts')[0].params).toEqual({ restart: true })
+  it('introduces a multi-part test with its content and parts, numbers its questions by part and counts essay words', async () => {
+    const user = userEvent.setup()
+    const questions = [
+      { id: 21, type: 'LISTENING', skill: 'LISTENING', content: 'Where is the man flying to?', points: 1, audioUrl: '/media/trip.mp3', options: [{ id: 211, content: 'Hanoi' }, { id: 212, content: 'Singapore' }] },
+      { id: 22, type: 'SPEAKING', skill: 'SPEAKING', content: 'Introduce yourself.', points: 5, audioUrl: null, options: [] },
+      { id: 23, type: 'WRITING', skill: 'WRITING', content: 'Write about your last holiday.', points: 5, audioUrl: null, options: [] },
+    ]
+    renderSignedIn('/tests/200', {
+      'GET /api/tests/200': () => ({ data: { ...DETAIL, id: 200, type: 'COMPREHENSIVE', skill: 'Nghe, nói, viết về du lịch', questions } }),
+      'POST /api/tests/200/attempts': () => ({ status: 201, data: NEW_ATTEMPT }),
+      'PUT /api/test-attempts/57/answers/23': () => ({ status: 204 }),
+    })
+
+    expect(await screen.findByText('Nội dung: Nghe, nói, viết về du lịch')).toBeInTheDocument()
+    const parts = screen.getByRole('table', { name: 'Cấu trúc đề' })
+    expect(within(parts).getAllByRole('row').slice(1).map((row) => row.textContent)).toEqual([
+      'Nghe1trắc nghiệm',
+      'Nói1đề bài nói',
+      'Viết1bài viết',
+    ])
+
+    await user.click(screen.getByRole('button', { name: 'Bắt đầu' }))
+    const nav = await screen.findByRole('navigation', { name: 'Chuyển câu hỏi' })
+    expect(within(nav).getByRole('group', { name: 'Phần Nghe' })).toHaveTextContent('Nghe1')
+    expect(within(nav).getByRole('group', { name: 'Phần Viết' })).toHaveTextContent('Viết3')
+
+    await user.click(within(nav).getByRole('button', { name: 'Câu 3' }))
+    await user.type(screen.getByLabelText('Bài viết của bạn'), 'We went to Da Lat last summer')
+    expect(screen.getByText('7 từ')).toBeInTheDocument()
   })
 
   it('asks before signing out in the middle of a test, and keeps the attempt (scenario 3, 4a)', async () => {
@@ -334,8 +363,9 @@ describe('taking a test', () => {
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Nộp bài' }))
 
     expect(await screen.findByText('Trình độ của bạn đổi từ A2 thành B1.')).toBeInTheDocument()
-    // C2: the report leads on to the study plan (D2).
-    expect(screen.getByRole('link', { name: 'Xem kế hoạch cá nhân →' })).toHaveAttribute('href', '/plan')
+    // Scenario 15, step 18: who, when and the level before; the roadmap can be applied to the study plan (D2).
+    expect(screen.getByText('Người học: Nguyễn Minh Hồng · Ngày làm: 27/09/2026 · Trình độ trước khi làm bài: A2')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Áp dụng lộ trình vào kế hoạch học →' })).toHaveAttribute('href', '/plan')
     await waitFor(() => expect(sidebarLevel()).toHaveTextContent('B1'))
   })
 

@@ -8,6 +8,7 @@ import { LevelJourney } from '@/features/progress/components/LevelJourney'
 import { ProgressStats } from '@/features/progress/components/ProgressStats'
 import { SkillRadar } from '@/features/progress/components/SkillRadar'
 import { WelcomeBanner } from '@/features/progress/components/WelcomeBanner'
+import { OpenTestNotice } from '@/features/tests/components/OpenTestNotice'
 import { getGivenName } from '@/lib/personName'
 
 /**
@@ -28,6 +29,7 @@ export function HomePage() {
       }
     >
       <WelcomeBanner />
+      <OpenTestNotice />
       <ProgressStats />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)]">
         <ActivityChart />

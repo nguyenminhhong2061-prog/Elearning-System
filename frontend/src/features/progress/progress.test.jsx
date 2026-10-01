@@ -76,6 +76,7 @@ function routes(overrides = {}) {
     'GET /api/progress/badges': () => ({ data: BADGES }),
     'GET /api/exercise-attempts/current': () => ({ data: { current: CURRENT } }),
     'GET /api/exercises': ({ params }) => ({ data: LESSONS[params.skill] ?? [] }),
+    'GET /api/tests': () => ({ data: [] }),
     ...overrides,
   }
 }
@@ -103,6 +104,24 @@ describe('home page numbers', () => {
     expect(await screen.findByText('14 ngày')).toBeInTheDocument()
     expect(screen.getByText('Học hôm nay để giữ chuỗi 14 ngày')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Bạn có 12 từ cần ôn hôm nay. Ôn tập ngay' })).toHaveAttribute('href', '/vocabulary/review')
+  })
+
+  it('announces the open periodic test the learner has not taken yet (scenarios 2 and 14)', async () => {
+    const test = (id, title, type, progress) => ({
+      id, title, type, skill: null, startDate: '2026-10-04T17:00:00Z', endDate: '2026-10-11T16:59:59Z', questionCount: 10,
+      progress: { attemptCount: 0, bestScorePercent: null, lastCompletedAt: null, inProgress: null, ...progress },
+    })
+    renderHome({
+      'GET /api/tests': () => ({ data: [
+        test(40, 'Kiểm tra tuần 40 – 2026', 'PERIODIC', { attemptCount: 1, bestScorePercent: 70 }),
+        test(41, 'Kiểm tra tuần 41 – 2026', 'PERIODIC'),
+        test(50, 'Kiểm tra tổng hợp tháng 10', 'COMPREHENSIVE'),
+      ] }),
+    })
+
+    expect(await screen.findByText('Kiểm tra tuần 41 – 2026 đang mở đến 11/10/2026')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Làm bài: Kiểm tra tuần 41 – 2026' })).toHaveAttribute('href', '/tests/41')
+    expect(screen.queryByText(/Kiểm tra tuần 40/)).not.toBeInTheDocument()
   })
 
   it('welcomes a learner who has not studied yet, with an empty chart', async () => {
