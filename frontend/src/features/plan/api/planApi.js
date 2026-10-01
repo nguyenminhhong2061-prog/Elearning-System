@@ -13,7 +13,7 @@ export async function getStudyPlan() {
 
 /**
  * The AI's weekly plan for a goal, not saved.
- * @param {{ targetLevel: string, months: number, note: string | null }} goal
+ * @param {import('../types').GoalRequest} goal
  * @returns {Promise<import('../types').PlanDraft>}
  */
 export async function previewPlan(goal) {
@@ -21,28 +21,42 @@ export async function previewPlan(goal) {
   return data
 }
 
+const scheduleOf = (weeks) =>
+  weeks.map(({ weekNumber, description, targetWords, targetExercises }) => ({ weekNumber, description, targetWords, targetExercises }))
+
 /**
- * Saves the previewed plan as the learner's plan, replacing the previous one.
+ * Saves the previewed plan, with the learner's changes to the weekly targets, as their active plan; an active plan
+ * they already had is paused.
  * @param {import('../types').PlanDraft} draft
  * @returns {Promise<import('../types').StudyPlan>}
  */
 export async function createPlan(draft) {
   const { data } = await httpClient.post('/api/study-plan', {
     targetLevel: draft.goal.targetLevel,
-    months: draft.goal.months,
-    note: draft.goal.note,
+    startDate: draft.startDate,
+    endDate: draft.endDate,
+    description: draft.goal.description,
     summary: draft.summary,
-    weeks: draft.weeks.map(({ weekNumber, description, targetWords, targetExercises }) => ({
-      weekNumber,
-      description,
-      targetWords,
-      targetExercises,
-    })),
+    weeks: scheduleOf(draft.weeks),
   })
   return data
 }
 
-/** @param {'ACTIVE' | 'PAUSED'} status @returns {Promise<import('../types').StudyPlan>} */
+/**
+ * Scenario 18: new targets for the weeks not over yet, and maybe a new end date (weeks are added or dropped).
+ * @param {{ endDate: string, weeks: import('../types').PlanWeek[] }} change
+ * @returns {Promise<import('../types').StudyPlan>}
+ */
+export async function updateSchedule({ endDate, weeks }) {
+  const { data } = await httpClient.put('/api/study-plan/schedule', { endDate, weeks: scheduleOf(weeks) })
+  return data
+}
+
+/**
+ * Pause, resume, or end the plan (COMPLETED: it is no longer the learner's plan).
+ * @param {'ACTIVE' | 'PAUSED' | 'COMPLETED'} status
+ * @returns {Promise<import('../types').StudyPlan>}
+ */
 export async function changePlanStatus(status) {
   const { data } = await httpClient.patch('/api/study-plan', { status })
   return data
@@ -51,17 +65,5 @@ export async function changePlanStatus(status) {
 /** @returns {Promise<{ items: import('../types').Suggestion[] }>} */
 export async function getSuggestions() {
   const { data } = await httpClient.get('/api/study-plan/suggestions')
-  return data
-}
-
-/** @returns {Promise<import('../types').ReminderSetting>} */
-export async function getReminder() {
-  const { data } = await httpClient.get('/api/study-plan/reminder')
-  return data
-}
-
-/** @param {import('../types').ReminderSetting} setting @returns {Promise<import('../types').ReminderSetting>} */
-export async function saveReminder(setting) {
-  const { data } = await httpClient.put('/api/study-plan/reminder', setting)
   return data
 }

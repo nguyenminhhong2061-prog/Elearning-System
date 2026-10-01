@@ -1,22 +1,24 @@
-import { addDays } from '../../src/lib/dates.js'
+import { addDays, calendarWeeks, daysInRange } from '../../src/lib/dates.js'
 import { delay, HttpError } from '../http.js'
 import { isDue, userState } from '../store.js'
 import { MOCK_TOPICS, MOCK_WORDS } from '../vocabularyFixtures.js'
 import { cefrOf, latestTestScores, totalsBetween } from './progress.js'
 
-// docs/api/plans.md (module D, D2). The backend does not exist yet. Every learner starts with a made-up plan in its
-// third week ("Đạt B1 trong 3 tháng", begun 16 days ago), whose weekly progress is summed from the same made-up history
-// as the home page chart, so both screens agree. The AI is replaced by fixed sentences built from the goal.
+// docs/api/plans.md (module D, D2; scenarios 17 and 18). The backend does not exist yet. Every learner starts with a
+// made-up plan in its third week ("Giao tiếp khi đi du lịch", A2 to B1), whose weekly progress is summed from the
+// same made-up history as the home page chart, so both screens agree. The AI is replaced by fixed sentences built from
+// the goal.
 
 const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
 const THINKING_MS = 1200 // the AI writing the plan
-const SEEDED_START_DAYS_AGO = 16
+const MAX_PLAN_DAYS = 366
 const SKILL_NAMES = { listening: 'Nghe', speaking: 'Nói', reading: 'Đọc', writing: 'Viết' }
+const ROADMAP = 'Ưu tiên luyện Nói và Viết, mỗi tuần một chủ đề từ vựng mới, cuối lộ trình làm lại bài kiểm tra tổng hợp.'
 
-const plans = new Map() // userId -> { plan: stored plan | null, reminder }
+const plans = new Map() // userId -> stored plans, oldest first; at most one ACTIVE
 let nextPlanId = 1
 
-/** Forgets every plan and reminder (the /__mock page's reset). */
+/** Forgets every plan (the /__mock page's reset). */
 export function resetPlanData() {
   plans.clear()
 }
@@ -33,16 +35,6 @@ function weakestSkill() {
   return Object.entries(latestTestScores()).toSorted((a, b) => a[1] - b[1])[0]
 }
 
-/** "YYYY-MM-DD" plus a number of months, minus one day: the last day of a plan. */
-function endDateOf(startDate, months) {
-  const date = new Date(`${startDate}T00:00:00Z`)
-  date.setUTCMonth(date.getUTCMonth() + months)
-  date.setUTCDate(date.getUTCDate() - 1)
-  return date.toISOString().slice(0, 10)
-}
-
-const daysBetween = (from, to) => Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1
-
 /** Suggested minutes a day ("Gợi ý giải pháp" 1 and 2): more levels in less time needs more practice. */
 function dailyMinutesFor(startLevel, targetLevel, months) {
   const jump = levelIndex(targetLevel) - levelIndex(startLevel)
@@ -51,10 +43,14 @@ function dailyMinutesFor(startLevel, targetLevel, months) {
   return months >= 3 * jump ? { min: 30, max: 45 } : { min: 45, max: 60 }
 }
 
-/** Mock of the rule-based weekly targets: about 1.6 words and 0.2 exercises per daily minute. */
-function weeklyTargets({ min, max }) {
+/** Mock of the rule-based weekly targets: about 1.6 words and 0.2 exercises per daily minute, less for a short week. */
+function weeklyTargets({ min, max }, days) {
   const minutes = (min + max) / 2
-  return { targetWords: Math.round((minutes * 1.6) / 5) * 5, targetExercises: Math.max(1, Math.round(minutes * 0.2)) }
+  const share = days / 7
+  return {
+    targetWords: Math.round((minutes * 1.6 * share) / 5) * 5,
+    targetExercises: Math.max(1, Math.round(minutes * 0.2 * share)),
+  }
 }
 
 function weekDescription(weekNumber, weekCount, targetLevel, words, exercises) {
@@ -70,49 +66,63 @@ function weekDescription(weekNumber, weekCount, targetLevel, words, exercises) {
   return kinds[(weekNumber - 1) % kinds.length]
 }
 
-/** The AI's draft for a goal (POST .../preview): dates, minutes, weekly targets and a short advice. */
-function draftFor({ targetLevel, months, note }, today, startLevel = currentLevel()) {
-  const startDate = today
-  const endDate = endDateOf(startDate, months)
-  const weekCount = Math.ceil(daysBetween(startDate, endDate) / 7)
-  const dailyMinutes = dailyMinutesFor(startLevel, targetLevel, months)
-  const { targetWords, targetExercises } = weeklyTargets(dailyMinutes)
-  const weeks = Array.from({ length: weekCount }, (_, index) => {
-    const weekNumber = index + 1
-    const weekStart = addDays(startDate, index * 7)
-    const last = weekNumber === weekCount
+const isDate = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+const monthsOf = (startDate, endDate) => Math.max(1, Math.round(daysInRange(startDate, endDate) / 30.4))
+
+/** The weeks of a plan: Monday to Sunday, the first and last cut to its dates. */
+const weeksBetween = (startDate, endDate) =>
+  calendarWeeks(startDate, endDate).map(({ start, end }, index) => ({ weekNumber: index + 1, startDate: start, endDate: end }))
+
+/** The AI's draft for a goal (POST .../preview): minutes a day, weekly targets and a short advice. */
+function draftFor({ targetLevel, startDate, endDate, description, fromAttemptId }, startLevel = currentLevel()) {
+  const dailyMinutes = dailyMinutesFor(startLevel, targetLevel, monthsOf(startDate, endDate))
+  const dates = weeksBetween(startDate, endDate)
+  const weeks = dates.map((week) => {
+    const last = week.weekNumber === dates.length
+    const { targetWords, targetExercises } = weeklyTargets(dailyMinutes, daysInRange(week.startDate, week.endDate))
     const words = last ? Math.round(targetWords / 2) : targetWords
     return {
-      weekNumber,
-      startDate: weekStart,
-      endDate: last ? endDate : addDays(weekStart, 6),
-      description: weekDescription(weekNumber, weekCount, targetLevel, words, targetExercises),
+      ...week,
+      description: weekDescription(week.weekNumber, dates.length, targetLevel, words, targetExercises),
       targetWords: words,
       targetExercises,
     }
   })
   const [skill, score] = weakestSkill()
-  const keeping = targetLevel === startLevel
   const summary = [
-    keeping
-      ? `Lộ trình ${weekCount} tuần để giữ vững ${targetLevel}.`
-      : `Lộ trình ${weekCount} tuần từ ${startLevel ?? 'mức khởi đầu'} lên ${targetLevel}.`,
+    targetLevel === startLevel
+      ? `Lộ trình ${weeks.length} tuần để giữ vững ${targetLevel}.`
+      : `Lộ trình ${weeks.length} tuần từ ${startLevel ?? 'mức khởi đầu'} lên ${targetLevel}.`,
+    fromAttemptId ? `Theo lộ trình đề xuất của bài kiểm tra tổng hợp: ${ROADMAP}` : null,
     `Mỗi ngày học ${dailyMinutes.min}–${dailyMinutes.max} phút: ưu tiên kỹ năng ${SKILL_NAMES[skill]} (điểm thấp nhất, ${score}/100), xen kẽ từ vựng theo chủ đề và ngữ pháp ${targetLevel}.`,
-    note ? `Vì mục tiêu của bạn là "${note}", các tuần chọn chủ đề và bài nghe gần với việc đó.` : null,
-    'Cuối mỗi tháng làm một bài kiểm tra định kỳ để xem tiến bộ.',
+    `Vì mục tiêu của bạn là "${description}", các tuần chọn chủ đề và bài nghe gần với việc đó.`,
   ]
     .filter(Boolean)
     .join(' ')
-  return { goal: { targetLevel, months, note: note ?? null }, startLevel, startDate, endDate, dailyMinutes, summary, weeks }
+  return { goal: { targetLevel, description }, startLevel, startDate, endDate, dailyMinutes, summary, weeks }
 }
 
-function stateOf(userId, today) {
+/** Monday of the week of `date`. */
+function mondayOf(date) {
+  const weekday = new Date(`${date}T00:00:00Z`).getUTCDay() // 0 = Sunday
+  return addDays(date, weekday === 0 ? -6 : 1 - weekday)
+}
+
+function plansOf(userId, today) {
   if (!plans.has(userId)) {
-    const startDate = addDays(today, -SEEDED_START_DAYS_AGO)
-    const draft = draftFor({ targetLevel: 'B1', months: 3, note: 'Giao tiếp khi đi du lịch' }, startDate, 'A2')
-    plans.set(userId, { plan: { ...draft, id: nextPlanId++, status: 'ACTIVE' }, reminder: { enabled: true, time: '20:00' } })
+    // Began on the Monday two weeks ago, for about three months: this week is week 3.
+    const startDate = addDays(mondayOf(today), -14)
+    const endDate = addDays(startDate, 7 * 13 - 1)
+    const draft = draftFor({ targetLevel: 'B1', startDate, endDate, description: 'Giao tiếp khi đi du lịch' }, 'A2')
+    plans.set(userId, [{ ...draft, id: nextPlanId++, status: 'ACTIVE' }])
   }
   return plans.get(userId)
+}
+
+/** The plan the learner follows: the active one, else the latest paused one (an ended plan is not shown). */
+function currentPlan(userId, today) {
+  const list = plansOf(userId, today)
+  return list.find((plan) => plan.status === 'ACTIVE') ?? list.findLast((plan) => plan.status === 'PAUSED') ?? null
 }
 
 /** A stored plan as GET returns it: this week's number, and each week's status and progress up to today. */
@@ -142,10 +152,30 @@ export function goalOptionsFor(level) {
   return [option(index + 1, 3, true), option(index + 2, 6, false)]
 }
 
-function checkGoal(body) {
+/** The rules of scenario 17, step 4: any CEFR level, a description, from today at the earliest, at most a year. */
+function checkGoal(body, today) {
   if (!LEVELS.includes(body.targetLevel)) throw new HttpError(400, 'targetLevel must be a CEFR level')
-  if (!Number.isInteger(body.months) || body.months < 1 || body.months > 12) throw new HttpError(400, 'months must be from 1 to 12')
-  if (body.note != null && (typeof body.note !== 'string' || body.note.length > 255)) throw new HttpError(400, 'note must be at most 255 characters')
+  if (typeof body.description !== 'string' || !body.description.trim() || body.description.length > 255) {
+    throw new HttpError(400, 'description must have 1 to 255 characters')
+  }
+  if (!isDate(body.startDate) || !isDate(body.endDate)) throw new HttpError(400, 'startDate and endDate must be dates (YYYY-MM-DD)')
+  if (body.startDate < today) throw new HttpError(400, 'startDate must not be before today')
+  if (body.endDate <= body.startDate) throw new HttpError(400, 'endDate must be after startDate')
+  if (daysInRange(body.startDate, body.endDate) > MAX_PLAN_DAYS) throw new HttpError(400, 'a plan lasts at most a year')
+  if (body.fromAttemptId != null && !Number.isInteger(body.fromAttemptId)) throw new HttpError(400, 'fromAttemptId must be an id')
+}
+
+/** Weekly targets the learner typed (scenario 17 branch 8a, scenario 18 branch 6a), in the order of `expected`. */
+function checkWeeks(weeks, expected) {
+  if (!Array.isArray(weeks) || weeks.length !== expected.length) throw new HttpError(400, `weeks must have ${expected.length} items`)
+  weeks.forEach((week, index) => {
+    const valid =
+      week.weekNumber === expected[index].weekNumber &&
+      Number.isInteger(week.targetWords) && week.targetWords >= 0 && week.targetWords <= 500 &&
+      Number.isInteger(week.targetExercises) && week.targetExercises >= 0 && week.targetExercises <= 50 &&
+      typeof week.description === 'string' && week.description.length <= 255
+    if (!valid) throw new HttpError(400, `week ${expected[index].weekNumber} is not valid`)
+  })
 }
 
 /** What to do next ("Gợi ý giải pháp" 3), from the made-up test and the learner's vocabulary in this mock. */
@@ -172,14 +202,12 @@ function suggestions(userId, today) {
   return { items }
 }
 
-const TIME = /^([01]\d|2[0-3]):(00|30)$/
-
 export const planRoutes = [
   {
     method: 'GET',
     pattern: /^\/api\/study-plan$/,
     handle({ userId, today }) {
-      const { plan } = stateOf(userId, today)
+      const plan = currentPlan(userId, today)
       return { plan: plan ? toResponse(userId, plan, today) : null, goalOptions: goalOptionsFor(currentLevel()) }
     },
   },
@@ -187,9 +215,9 @@ export const planRoutes = [
     method: 'POST',
     pattern: /^\/api\/study-plan\/preview$/,
     async handle({ body, today }) {
-      checkGoal(body)
+      checkGoal(body, today)
       await delay(THINKING_MS)
-      return draftFor(body, today)
+      return draftFor(body)
     },
   },
   {
@@ -197,26 +225,45 @@ export const planRoutes = [
     pattern: /^\/api\/study-plan$/,
     status: 201,
     handle({ userId, body, today }) {
-      checkGoal(body)
-      const expected = draftFor(body, today)
-      const weeks = Array.isArray(body.weeks) ? body.weeks : []
-      if (weeks.length !== expected.weeks.length) throw new HttpError(400, `weeks must have ${expected.weeks.length} items`)
-      weeks.forEach((week, index) => {
-        const valid =
-          week.weekNumber === index + 1 &&
-          Number.isInteger(week.targetWords) && week.targetWords >= 0 && week.targetWords <= 500 &&
-          Number.isInteger(week.targetExercises) && week.targetExercises >= 0 && week.targetExercises <= 50 &&
-          typeof week.description === 'string' && week.description.length >= 1 && week.description.length <= 255
-        if (!valid) throw new HttpError(400, `week ${index + 1} is not valid`)
-      })
+      checkGoal(body, today)
+      const expected = draftFor(body)
+      checkWeeks(body.weeks, expected.weeks)
+      const list = plansOf(userId, today)
+      // Scenario 17, branch 2b: only one active plan; the one before is paused, not deleted.
+      for (const old of list) if (old.status === 'ACTIVE') old.status = 'PAUSED'
       const plan = {
         ...expected,
+        goal: { targetLevel: body.targetLevel, description: body.description.trim() },
         id: nextPlanId++,
         status: 'ACTIVE',
         summary: body.summary ?? null,
-        weeks: expected.weeks.map((week, index) => ({ ...week, ...weeks[index] })),
+        weeks: expected.weeks.map((week, index) => ({ ...week, ...body.weeks[index] })),
       }
-      stateOf(userId, today).plan = plan
+      list.push(plan)
+      return toResponse(userId, plan, today)
+    },
+  },
+  {
+    method: 'PUT',
+    pattern: /^\/api\/study-plan\/schedule$/,
+    handle({ userId, body, today }) {
+      const plan = currentPlan(userId, today)
+      if (!plan) throw new HttpError(404, 'No study plan')
+      const { endDate } = body
+      if (!isDate(endDate)) throw new HttpError(400, 'endDate must be a date (YYYY-MM-DD)')
+      if (endDate < today) throw new HttpError(400, 'endDate must not be before today')
+      if (endDate <= plan.startDate) throw new HttpError(400, 'endDate must be after startDate')
+      if (daysInRange(plan.startDate, endDate) > MAX_PLAN_DAYS) throw new HttpError(400, 'a plan lasts at most a year')
+      // Weeks already over keep their targets; every other week of the new end date comes in the body.
+      const dates = weeksBetween(plan.startDate, endDate)
+      const open = dates.filter((week) => week.endDate >= today)
+      checkWeeks(body.weeks, open)
+      const typed = new Map(body.weeks.map((week) => [week.weekNumber, week]))
+      plan.endDate = endDate
+      plan.weeks = dates.map((week, index) => {
+        const sent = typed.get(week.weekNumber)
+        return sent ? { ...week, ...sent } : { ...plan.weeks[index], ...week }
+      })
       return toResponse(userId, plan, today)
     },
   },
@@ -224,33 +271,17 @@ export const planRoutes = [
     method: 'PATCH',
     pattern: /^\/api\/study-plan$/,
     handle({ userId, body, today }) {
-      const state = stateOf(userId, today)
-      if (!state.plan) throw new HttpError(404, 'No study plan')
-      if (body.status !== 'ACTIVE' && body.status !== 'PAUSED') throw new HttpError(400, 'status must be ACTIVE or PAUSED')
-      state.plan = { ...state.plan, status: body.status }
-      return toResponse(userId, state.plan, today)
+      const plan = currentPlan(userId, today)
+      if (!plan) throw new HttpError(404, 'No study plan')
+      if (!['ACTIVE', 'PAUSED', 'COMPLETED'].includes(body.status)) throw new HttpError(400, 'status must be ACTIVE, PAUSED or COMPLETED')
+      plan.status = body.status
+      return toResponse(userId, plan, today)
     },
   },
   {
     method: 'GET',
     pattern: /^\/api\/study-plan\/suggestions$/,
     handle: ({ userId, today }) => suggestions(userId, today),
-  },
-  {
-    method: 'GET',
-    pattern: /^\/api\/study-plan\/reminder$/,
-    handle: ({ userId, today }) => stateOf(userId, today).reminder,
-  },
-  {
-    method: 'PUT',
-    pattern: /^\/api\/study-plan\/reminder$/,
-    handle({ userId, body, today }) {
-      if (typeof body.enabled !== 'boolean') throw new HttpError(400, 'enabled must be true or false')
-      if (typeof body.time !== 'string' || !TIME.test(body.time)) throw new HttpError(400, 'time must be HH:00 or HH:30')
-      const state = stateOf(userId, today)
-      state.reminder = { enabled: body.enabled, time: body.time }
-      return state.reminder
-    },
   },
 ]
 
@@ -269,7 +300,6 @@ export function newLearnerPlanReply(pathname) {
   }
   return undefined
 }
-
 
 /**
  * What the /__mock scenarios change on the plan endpoints ({} when nothing), or null for any other endpoint. Kept here

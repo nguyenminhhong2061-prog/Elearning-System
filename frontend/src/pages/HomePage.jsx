@@ -1,6 +1,7 @@
 import { Page } from '@/components/layout/Page'
 import { Avatar } from '@/components/ui/Avatar'
 import { useAuth } from '@/features/auth/context/useAuth'
+import { PlanNotice } from '@/features/plan/components/PlanNotice'
 import { Achievements } from '@/features/progress/components/Achievements'
 import { ActivityChart } from '@/features/progress/components/ActivityChart'
 import { ContinueCard } from '@/features/progress/components/ContinueCard'
@@ -30,6 +31,7 @@ export function HomePage() {
     >
       <WelcomeBanner />
       <OpenTestNotice />
+      <PlanNotice />
       <ProgressStats />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)]">
         <ActivityChart />

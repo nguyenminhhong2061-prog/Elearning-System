@@ -19,6 +19,29 @@ export function addDays(isoDate, days) {
   return date.toISOString().slice(0, 10)
 }
 
+/** "YYYY-MM-DD" plus whole months, minus one day: the last day of a period that starts on `isoDate`. */
+export function lastDayAfterMonths(isoDate, months) {
+  const date = asUtc(isoDate)
+  date.setUTCMonth(date.getUTCMonth() + months)
+  date.setUTCDate(date.getUTCDate() - 1)
+  return date.toISOString().slice(0, 10)
+}
+
+/** Days from `from` to `to`, both included. */
+export const daysInRange = (from, to) => Math.round((asUtc(to) - asUtc(from)) / 86_400_000) + 1
+
+/** The Monday-to-Sunday weeks from `from` to `to` (both included), the first and last cut to the range. */
+export function calendarWeeks(from, to) {
+  const weeks = []
+  for (let start = from; start <= to; ) {
+    const sunday = addDays(start, (7 - asUtc(start).getUTCDay()) % 7)
+    const end = sunday < to ? sunday : to
+    weeks.push({ start, end })
+    start = addDays(end, 1)
+  }
+  return weeks
+}
+
 /** "2026-09-28" -> "28/09". Built by hand: Intl's Vietnamese day/month separator differs between engines. */
 export function formatDayMonth(isoDate) {
   return `${isoDate.slice(8, 10)}/${isoDate.slice(5, 7)}`

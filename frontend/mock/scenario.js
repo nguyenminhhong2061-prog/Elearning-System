@@ -105,7 +105,7 @@ const APP_LINKS = [
   ['/exercises/lessons/25', 'Phát âm C1 "Câu dài và ngữ điệu" (tô màu từng từ, từ bị bỏ sót)'],
   ['/exercises/lessons/99', 'Bài chưa có câu hỏi nào'],
   ['/exercises/lessons/999', 'Bài không tồn tại'],
-  ['/plan', 'Kế hoạch học cá nhân (module D, D2): trình độ, việc nên làm, kế hoạch đang ở tuần 3, đặt lại mục tiêu, nhắc học'],
+  ['/plan', 'Kế hoạch học cá nhân (module D, D2): trình độ, việc nên làm, kế hoạch đang ở tuần 3, điều chỉnh, tạm dừng, kết thúc'],
 ]
 
 const CHECKLIST = [
@@ -127,12 +127,13 @@ const CHECKLIST = [
   ['Trợ lý: lịch sử trò chuyện', 'Chat vài câu, bấm "Lịch sử" rồi mở lại phiên cũ (còn cả sau khi tải lại trang). "Lỗi tải" làm lịch sử báo lỗi, "Chưa có bài" làm lịch sử trống.'],
   ['Trang chủ: người mới', 'Chọn "Người mới": lời chào và nút bắt đầu, biểu đồ trống, radar trống, thẻ "Học tiếp" thay cho "Tiếp tục". Hành trình trình độ trống cần trình độ rỗng trong DB (xem lệnh bên dưới).'],
   ['Trang chủ: đang chấm Nói, Viết', 'Chọn "Đang chấm Nói, Viết": radar chỉ có Nghe, Đọc và nhãn "Đang chấm".'],
-  ['Trang chủ: biểu đồ Ngày, Tuần, Tháng', 'Đổi khoảng thời gian và chỉ số. "Điểm kiểm tra": kỳ không làm bài để trống (—), không vẽ cột 0.'],
+  ['Trang chủ: biểu đồ Ngày, Tuần, Tháng', 'Đổi khoảng thời gian và chỉ số. "Điểm kiểm tra": kỳ không làm bài để trống (—), không vẽ cột 0. Nhập "Từ ngày", "Đến ngày" rồi "Xem" để thấy bảng số liệu (tối đa 31 cột; ngày sau hôm nay hoặc bắt đầu sau kết thúc thì báo lỗi).'],
   ['Trang chủ: thời gian học', 'Mở một bài tập hoặc phiên flashcard, thao tác trong hơn 1 phút rồi quay về trang chủ: cột hôm nay có thêm phút học và streak được giữ.'],
   ['Nhãn "Trình độ của bạn"', 'Cần trình độ trong DB thật (xem lệnh bên dưới), rồi tải lại trang.'],
-  ['Kế hoạch: theo dõi tuần này', 'Mở /plan: kế hoạch mẫu "Đạt B1 trong 3 tháng" đang ở tuần 3, số từ và bài tập mỗi tuần khớp biểu đồ trang chủ. Tuần vừa qua chưa đạt thì có cảnh báo nhẹ "chưa đạt mục tiêu" (tùy tài khoản).'],
-  ['Kế hoạch: đặt mục tiêu, xem trước, áp dụng', 'Bấm "Đặt lại mục tiêu", chọn mục tiêu (hoặc "Mục tiêu khác"), bấm "Gợi ý lộ trình" (AI nghĩ khoảng 1 giây), rồi "Áp dụng kế hoạch". Chọn "Người mới" để thấy màn chưa có kế hoạch.'],
-  ['Kế hoạch: AI lỗi, lỗi lưu, lỗi tải', 'Chọn "AI lỗi" rồi bấm "Gợi ý lộ trình"; "Lỗi lưu bài" rồi áp dụng kế hoạch, tạm dừng hoặc đổi giờ nhắc; "Lỗi tải" để thấy từng khối báo lỗi riêng.'],
+  ['Kế hoạch: theo dõi tuần này', 'Mở /plan: kế hoạch mẫu A2 → B1 "Giao tiếp khi đi du lịch" đang ở tuần 3, số từ và bài tập mỗi tuần khớp biểu đồ trang chủ; trang chủ nhắc mục tiêu tuần 3. Tuần vừa qua chưa đạt thì có cảnh báo nhẹ "chưa đạt mục tiêu" (tùy tài khoản).'],
+  ['Kế hoạch: điều chỉnh, tạm dừng, kết thúc', 'Bấm "Điều chỉnh kế hoạch": sửa mục tiêu tuần 3 trở đi, đổi ngày kết thúc (rút ngắn bỏ tuần, kéo dài thêm tuần trống), "Lưu" hoặc "Hủy". "Tạm dừng kế hoạch" và "Kết thúc kế hoạch" hỏi xác nhận; kết thúc xong thì trang hỏi mục tiêu mới.'],
+  ['Kế hoạch: đặt mục tiêu, xem trước, áp dụng', 'Chọn "Người mới" (hoặc kết thúc kế hoạch mẫu), chọn mục tiêu gợi ý hoặc "Mục tiêu khác", nhập mô tả và ngày, bấm "Gợi ý lộ trình" (AI nghĩ khoảng 1 giây), sửa mục tiêu từng tuần nếu muốn rồi "Áp dụng kế hoạch". Từ báo cáo kiểm tra tổng hợp, nút "Áp dụng lộ trình vào kế hoạch học →" điền sẵn trình độ và lộ trình.'],
+  ['Kế hoạch: AI lỗi, lỗi lưu, lỗi tải', 'Chọn "AI lỗi" rồi bấm "Gợi ý lộ trình": có nút "Tự lập kế hoạch" mở các tuần trống để tự nhập. "Lỗi lưu bài" rồi áp dụng, lưu điều chỉnh hoặc tạm dừng; "Lỗi tải" để thấy từng khối báo lỗi riêng.'],
 ]
 
 function page(current, notice) {

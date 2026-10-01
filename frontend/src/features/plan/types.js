@@ -3,7 +3,17 @@
 /**
  * @typedef {'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2'} CefrLevel
  * @typedef {{ min: number, max: number }} DailyMinutes
- * @typedef {{ targetLevel: CefrLevel, months: number, note: string | null }} Goal
+ * @typedef {{ targetLevel: CefrLevel, description: string }} Goal the dates are the plan's own startDate and endDate
+ */
+
+/**
+ * What "Gợi ý lộ trình" sends (POST /api/study-plan/preview).
+ * @typedef {object} GoalRequest
+ * @property {CefrLevel} targetLevel
+ * @property {string} startDate YYYY-MM-DD, not before today
+ * @property {string} endDate YYYY-MM-DD, after startDate, at most a year later
+ * @property {string} description required, at most 255 characters
+ * @property {number} [fromAttemptId] the comprehensive test whose roadmap the AI should follow (scenario 17, 2a)
  */
 
 /**
@@ -28,7 +38,7 @@
  * @property {string} startDate
  * @property {string} endDate
  * @property {'ACTIVE' | 'PAUSED' | 'COMPLETED'} status
- * @property {DailyMinutes} dailyMinutes
+ * @property {DailyMinutes | null} dailyMinutes null for a plan the learner wrote themselves
  * @property {string | null} summary
  * @property {number | null} currentWeek
  * @property {PlanWeek[]} weeks
@@ -57,7 +67,5 @@
  * @property {number} [count]
  * @property {number} [testId]
  */
-
-/** @typedef {{ enabled: boolean, time: string }} ReminderSetting */
 
 export {}

@@ -1,11 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { changePlanStatus, createPlan, getReminder, getStudyPlan, getSuggestions, previewPlan, saveReminder } from './planApi'
+import { changePlanStatus, createPlan, getStudyPlan, getSuggestions, previewPlan, updateSchedule } from './planApi'
 
 export const planKeys = {
   all: ['plan'],
   current: ['plan', 'current'],
   suggestions: ['plan', 'suggestions'],
-  reminder: ['plan', 'reminder'],
 }
 
 // Weekly progress and suggestions follow what the learner did on other screens, which do not know this cache: ask
@@ -20,22 +19,22 @@ export function useSuggestions() {
   return useQuery({ queryKey: planKeys.suggestions, queryFn: getSuggestions, ...FRESH_ON_OPEN })
 }
 
-export function useReminder() {
-  return useQuery({ queryKey: planKeys.reminder, queryFn: getReminder })
-}
-
 /** POST .../preview: nothing is cached, the draft only lives on the page until it is applied. */
 export function usePreviewPlan() {
   return useMutation({ mutationFn: previewPlan })
 }
 
-/** The saved plan replaces the one in the cache; goal options are kept (they depend on the level, not the plan). */
+/**
+ * The saved plan replaces the one in the cache; goal options are kept (they depend on the level, not the plan). An
+ * ended plan is no longer the learner's plan, so the page asks for a new goal.
+ */
 function useReplacePlan(mutationFn) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn,
     onSuccess: (plan) => {
-      queryClient.setQueryData(planKeys.current, (previous) => ({ goalOptions: previous?.goalOptions ?? [], plan }))
+      const current = plan.status === 'COMPLETED' ? null : plan
+      queryClient.setQueryData(planKeys.current, (previous) => ({ goalOptions: previous?.goalOptions ?? [], plan: current }))
     },
   })
 }
@@ -44,14 +43,10 @@ export function useCreatePlan() {
   return useReplacePlan(createPlan)
 }
 
-export function useChangePlanStatus() {
-  return useReplacePlan(changePlanStatus)
+export function useUpdateSchedule() {
+  return useReplacePlan(updateSchedule)
 }
 
-export function useSaveReminder() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: saveReminder,
-    onSuccess: (setting) => queryClient.setQueryData(planKeys.reminder, setting),
-  })
+export function useChangePlanStatus() {
+  return useReplacePlan(changePlanStatus)
 }

@@ -93,6 +93,7 @@ function routes(overrides = {}) {
     'GET /api/exercise-attempts/current': () => ({ data: { current: CURRENT } }),
     'GET /api/exercises': ({ params }) => ({ data: LESSONS[params.skill] ?? [] }),
     'GET /api/tests': () => ({ data: [] }),
+    'GET /api/study-plan': () => ({ data: { plan: null, goalOptions: [] } }),
     ...overrides,
   }
 }
@@ -141,6 +142,23 @@ describe('home page numbers', () => {
     expect(await screen.findByText('Kiểm tra tuần 41 – 2026 đang mở đến 11/10/2026')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Làm bài: Kiểm tra tuần 41 – 2026' })).toHaveAttribute('href', '/tests/41')
     expect(screen.queryByText(/Kiểm tra tuần 40/)).not.toBeInTheDocument()
+  })
+
+  it('reminds the learner of this week of the plan, and of a week that fell short (scenario 18, step 1)', async () => {
+    const week = (weekNumber, extra) => ({ weekNumber, startDate: '2026-10-12', endDate: '2026-10-18', description: '', targetWords: 40, targetExercises: 6, wordsDone: 0, exercisesDone: 0, status: 'PENDING', achieved: null, ...extra })
+    const plan = {
+      id: 5, status: 'ACTIVE', currentWeek: 3,
+      weeks: [
+        week(1, { status: 'DONE', achieved: true, wordsDone: 41, exercisesDone: 6 }),
+        week(2, { status: 'DONE', achieved: false, wordsDone: 32, exercisesDone: 4 }),
+        week(3, { status: 'IN_PROGRESS', targetWords: 50, targetExercises: 7, wordsDone: 6, exercisesDone: 1 }),
+      ],
+    }
+    renderHome({ 'GET /api/study-plan': () => ({ data: { plan, goalOptions: [] } }) })
+
+    expect(await screen.findByText('Tuần 3: mục tiêu 50 từ mới, 7 bài tập')).toBeInTheDocument()
+    expect(screen.getByText('Tuần 2 chưa đạt mục tiêu (32/40 từ)')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Xem kế hoạch →' })).toHaveAttribute('href', '/plan')
   })
 
   it('welcomes a learner who has not studied yet, with an empty chart', async () => {
