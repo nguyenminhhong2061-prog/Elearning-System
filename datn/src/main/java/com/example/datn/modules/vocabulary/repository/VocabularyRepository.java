@@ -102,6 +102,22 @@ public interface VocabularyRepository extends JpaRepository<Vocabulary, Long> {
             @Param("userId") Long userId,
             Pageable pageable);
 
+    /** Every word of a topic the user can see: what a game round on that topic is dealt from. */
+    @Query("select v from Vocabulary v where v.topicId = :topicId and (v.createdBy is null or v.createdBy = :userId)")
+    List<Vocabulary> findAllVisibleInTopic(@Param("topicId") Long topicId, @Param("userId") Long userId);
+
+    /** Every word of a personal list the user can see: what a game round on that list is dealt from. */
+    @Query("""
+            select v from Vocabulary v
+            where v.id in (select i.id.vocabularyId from CustomVocabularyListItem i where i.id.listId = :listId)
+              and (v.createdBy is null or v.createdBy = :userId)
+            """)
+    List<Vocabulary> findAllVisibleInList(@Param("listId") Long listId, @Param("userId") Long userId);
+
+    /** Every system word of a topic: what a game round is dealt from when the player chose no topic or list. */
+    @Query("select v from Vocabulary v where v.createdBy is null and v.topicId is not null")
+    List<Vocabulary> findAllSystemWordsInTopics();
+
     /** Words of a personal list the user has not started, easiest first, like {@link #findNewInTopic}. */
     @Query("""
             select v from Vocabulary v

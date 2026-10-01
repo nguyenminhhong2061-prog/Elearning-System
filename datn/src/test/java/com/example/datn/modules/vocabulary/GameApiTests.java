@@ -2,16 +2,14 @@ package com.example.datn.modules.vocabulary;
 
 import com.example.datn.common.enums.CefrLevel;
 import com.example.datn.modules.vocabulary.entity.Game;
-import com.example.datn.modules.vocabulary.entity.GameQuestion;
-import com.example.datn.modules.vocabulary.entity.GameQuestionOption;
 import com.example.datn.modules.vocabulary.entity.GameSession;
+import com.example.datn.modules.vocabulary.entity.Topic;
 import com.example.datn.modules.vocabulary.entity.Vocabulary;
 import com.example.datn.modules.vocabulary.enums.GameType;
 import com.example.datn.modules.vocabulary.enums.LeaderboardPeriod;
-import com.example.datn.modules.vocabulary.repository.GameQuestionOptionRepository;
-import com.example.datn.modules.vocabulary.repository.GameQuestionRepository;
 import com.example.datn.modules.vocabulary.repository.GameRepository;
 import com.example.datn.modules.vocabulary.repository.GameSessionRepository;
+import com.example.datn.modules.vocabulary.repository.TopicRepository;
 import com.example.datn.modules.vocabulary.repository.VocabularyRepository;
 import com.example.datn.modules.vocabulary.service.LeaderboardService;
 import com.example.datn.modules.vocabulary.service.PlayRound;
@@ -35,23 +33,24 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.nullValue;
-import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * API of docs/api/games.md on H2, with a small question bank built by each test (the seed migration only runs on
- * PostgreSQL, see GamePostgresIntegrationTests).
+ * API of docs/api/games.md (scenario 8) on H2: rounds dealt from the words of a topic or a personal list. Each test
+ * makes its own games and words; a word "{prefix}{n}" means "nghĩa {prefix}{n}", so a test finds the right option by
+ * its text, as a player who knows the words would.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -71,13 +70,10 @@ class GameApiTests {
     private GameRepository gameRepository;
 
     @Autowired
-    private GameQuestionRepository questionRepository;
-
-    @Autowired
-    private GameQuestionOptionRepository optionRepository;
-
-    @Autowired
     private GameSessionRepository sessionRepository;
+
+    @Autowired
+    private TopicRepository topicRepository;
 
     @Autowired
     private VocabularyRepository vocabularyRepository;
@@ -92,193 +88,281 @@ class GameApiTests {
     private StudyCalendar calendar;
 
     @Test
-    void listsTheGamesWithTheirQuestionsPerRoundAndTheBestScore() throws Exception {
-        Game guess = createGame("Đoán nghĩa", GameType.GUESS_MEANING, 90, 12);
-        createGame("Ghép từ", GameType.WORD_MATCH, 60, 4);
+    void listsTheGamesForTheWordsChosenWithTheBestScore() throws Exception {
+        Games games = createGames();
+        long travel = topicWithWords("trip", 12, 6);
+        long small = topicWithWords("tiny", 3, 3);
+        long noExamples = topicWithWords("bare", 6, 0);
 
-        as(PLAYER, get("/api/games"))
+        as(PLAYER, get("/api/games").param("topicId", String.valueOf(travel)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].name", contains("Đoán nghĩa", "Ghép từ")))
-                .andExpect(jsonPath("$[0].gameType").value("GUESS_MEANING"))
-                .andExpect(jsonPath("$[0].timeLimitSeconds").value(90))
-                .andExpect(jsonPath("$[0].questionCount").value(10))
-                // A bank smaller than a round: the round has every question of the bank.
-                .andExpect(jsonPath("$[1].questionCount").value(4))
+                .andExpect(jsonPath("$[*].name", contains("Đoán nghĩa", "Trắc nghiệm nhanh", "Ghép từ")))
+                .andExpect(jsonPath("$[*].timeLimitSeconds", contains(90, 60, 60)))
+                // Scenario 8: 5 sentences, 10 words, 8 pairs.
+                .andExpect(jsonPath("$[*].questionCount", contains(5, 10, 8)))
+                .andExpect(jsonPath("$[*].available", contains(true, true, true)))
+                .andExpect(jsonPath("$[0].unavailableReason").value(nullValue()))
                 .andExpect(jsonPath("$[0].myBestScore").value(nullValue()));
 
-        Round round = play(PLAYER, guess);
-        submit(PLAYER, guess, round.token(), round.answers(this::rightOption)).andExpect(status().isCreated());
+        // Branch 3a: fewer than 4 words cannot make four options.
+        as(PLAYER, get("/api/games").param("topicId", String.valueOf(small)))
+                .andExpect(jsonPath("$[*].available", contains(false, false, false)))
+                .andExpect(jsonPath("$[*].unavailableReason", contains("NOT_ENOUGH_WORDS", "NOT_ENOUGH_WORDS", "NOT_ENOUGH_WORDS")))
+                .andExpect(jsonPath("$[*].questionCount", contains(0, 0, 0)));
+        // A topic smaller than a round plays every word; GUESS_MEANING needs example sentences.
+        as(PLAYER, get("/api/games").param("topicId", String.valueOf(noExamples)))
+                .andExpect(jsonPath("$[*].available", contains(false, true, true)))
+                .andExpect(jsonPath("$[0].unavailableReason").value("NO_EXAMPLES"))
+                .andExpect(jsonPath("$[*].questionCount", contains(0, 6, 6)));
 
-        as(PLAYER, get("/api/games"))
-                .andExpect(jsonPath("$[0].myBestScore").isNumber())
-                .andExpect(jsonPath("$[1].myBestScore").value(nullValue()));
-        as(OTHER_PLAYER, get("/api/games")).andExpect(jsonPath("$[0].myBestScore").value(nullValue()));
+        Round round = play(PLAYER, games.quiz(), travel, null);
+        submit(PLAYER, games.quiz(), round.token(), round.answers(this::right)).andExpect(status().isCreated());
+        as(PLAYER, get("/api/games").param("topicId", String.valueOf(small)))
+                .andExpect(jsonPath("$[1].myBestScore").value(100))
+                .andExpect(jsonPath("$[0].myBestScore").value(nullValue()));
+        as(OTHER_PLAYER, get("/api/games")).andExpect(jsonPath("$[1].myBestScore").value(nullValue()));
+
+        as(PLAYER, get("/api/games").param("topicId", String.valueOf(travel)).param("listId", "1"))
+                .andExpect(status().isBadRequest());
+        as(PLAYER, get("/api/games").param("topicId", "999999")).andExpect(status().isNotFound());
+        as(PLAYER, get("/api/games").param("listId", "999999")).andExpect(status().isNotFound());
     }
 
     @Test
-    void aRoundNeverRevealsTheAnswers() throws Exception {
-        Game guess = createGame("Đoán nghĩa", GameType.GUESS_MEANING, 90, 12);
-        Game quiz = createGame("Trắc nghiệm nhanh", GameType.QUICK_QUIZ, 60, 14);
-        Game match = createGame("Ghép từ", GameType.WORD_MATCH, 60, 8);
+    void aRoundIsDealtFromTheTopicWithoutTheAnswers() throws Exception {
+        Games games = createGames();
+        long travel = topicWithWords("trip", 12, 6);
+        long other = topicWithWords("work", 12, 12);
+        Map<String, String> meanings = meaningsOf(travel);
 
-        String guessBody = as(PLAYER, get("/api/games/{id}/play", guess.getId()))
+        // Scenario 8, step 4: 10 words of the topic, each with its meaning and 3 wrong ones from the same topic.
+        String quiz = as(PLAYER, get("/api/games/{id}/play", games.quiz().getId()).param("topicId", String.valueOf(travel)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.gameType").value("GUESS_MEANING"))
-                .andExpect(jsonPath("$.timeLimitSeconds").value(90))
+                .andExpect(jsonPath("$.gameType").value("QUICK_QUIZ"))
+                .andExpect(jsonPath("$.timeLimitSeconds").value(60))
+                .andExpect(jsonPath("$.topicId").value(travel))
+                .andExpect(jsonPath("$.listId").value(nullValue()))
                 .andExpect(jsonPath("$.playToken").isNotEmpty())
-                .andExpect(jsonPath("$.questions.length()").value(10))
-                .andExpect(jsonPath("$.questions[0].options.length()").value(4))
-                .andExpect(jsonPath("$.questions[0].prompt").value(startsWith("word")))
-                .andExpect(jsonPath("$.questions[0].phonetic").isNotEmpty())
+                .andExpect(jsonPath("$.questions[*].id", contains(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)))
+                .andExpect(jsonPath("$.questions[0].options[*].id", contains(1, 2, 3, 4)))
+                .andExpect(jsonPath("$.questions[0].phonetic").value("/trɪp/"))
+                .andExpect(jsonPath("$.questions[0].example").value(nullValue()))
                 .andExpect(jsonPath("$.questions[0].points").value(1))
                 .andExpect(jsonPath("$.matchOptions").value(nullValue()))
                 .andReturn().getResponse().getContentAsString();
-        assertThat(guessBody).doesNotContainIgnoringCase("correct");
-        List<Integer> ids = JsonPath.read(guessBody, "$.questions[*].id");
-        assertThat(new HashSet<>(ids)).hasSize(10);
+        assertThat(quiz).doesNotContainIgnoringCase("correct");
+        List<String> prompts = JsonPath.read(quiz, "$.questions[*].prompt");
+        assertThat(meanings.keySet()).containsAll(prompts);
+        assertThat(new HashSet<>(prompts)).hasSize(10);
+        for (int index = 0; index < prompts.size(); index++) {
+            List<String> options = JsonPath.read(quiz, "$.questions[" + index + "].options[*].content");
+            assertThat(options).hasSize(4).doesNotHaveDuplicates().contains(meanings.get(prompts.get(index)));
+            assertThat(meanings.values()).containsAll(options);
+        }
 
-        as(PLAYER, get("/api/games/{id}/play", quiz.getId()))
-                .andExpect(jsonPath("$.questions.length()").value(12))
-                .andExpect(jsonPath("$.questions[0].prompt").value(startsWith("nghĩa")))
-                .andExpect(jsonPath("$.questions[0].phonetic").value(nullValue()))
-                .andExpect(jsonPath("$.questions[0].options[0].content").value(startsWith("word")));
-
-        String matchBody = as(PLAYER, get("/api/games/{id}/play", match.getId()))
-                .andExpect(jsonPath("$.questions.length()").value(6))
-                .andExpect(jsonPath("$.questions[0].options.length()").value(0))
-                .andExpect(jsonPath("$.matchOptions.length()").value(6))
+        // GUESS_MEANING: 5 words with their example sentence (only 6 of the topic have one).
+        String guess = as(PLAYER, get("/api/games/{id}/play", games.guess().getId()).param("topicId", String.valueOf(travel)))
+                .andExpect(jsonPath("$.questions.length()").value(5))
                 .andReturn().getResponse().getContentAsString();
-        assertThat(matchBody).doesNotContainIgnoringCase("correct");
-        // The meanings offered are exactly the right options of the round's questions.
-        List<Long> questionIds = longs(JsonPath.read(matchBody, "$.questions[*].id"));
-        List<Long> matchOptionIds = longs(JsonPath.read(matchBody, "$.matchOptions[*].id"));
-        assertThat(matchOptionIds).containsExactlyInAnyOrderElementsOf(
-                questionIds.stream().map(this::rightOption).toList());
+        List<String> guessPrompts = JsonPath.read(guess, "$.questions[*].prompt");
+        List<String> examples = JsonPath.read(guess, "$.questions[*].example");
+        for (int index = 0; index < guessPrompts.size(); index++) {
+            assertThat(examples.get(index)).isEqualTo("I like the " + guessPrompts.get(index) + " here.");
+        }
+
+        // WORD_MATCH: 8 words, and exactly their 8 meanings, shuffled.
+        String match = as(PLAYER, get("/api/games/{id}/play", games.match().getId()).param("topicId", String.valueOf(travel)))
+                .andExpect(jsonPath("$.questions.length()").value(8))
+                .andExpect(jsonPath("$.questions[0].options.length()").value(0))
+                .andExpect(jsonPath("$.matchOptions[*].id", contains(1, 2, 3, 4, 5, 6, 7, 8)))
+                .andReturn().getResponse().getContentAsString();
+        List<String> matchPrompts = JsonPath.read(match, "$.questions[*].prompt");
+        List<String> matchMeanings = JsonPath.read(match, "$.matchOptions[*].content");
+        assertThat(matchMeanings).containsExactlyInAnyOrderElementsOf(matchPrompts.stream().map(meanings::get).toList());
+
+        // Branch 3a: not enough words.
+        long small = topicWithWords("tiny", 3, 3);
+        as(PLAYER, get("/api/games/{id}/play", games.quiz().getId()).param("topicId", String.valueOf(small)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+        as(PLAYER, get("/api/games/{id}/play", 999_999).param("topicId", String.valueOf(other))).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void aRoundCanBeDealtFromThePlayersOwnList() throws Exception {
+        Games games = createGames();
+        long travel = topicWithWords("trip", 6, 6);
+        List<Long> ids = topicWords(travel).stream().map(Vocabulary::getId).toList();
+        String body = as(PLAYER, post("/api/custom-lists").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"Phỏng vấn\", \"vocabularyIds\": " + ids
+                                + ", \"newWords\": [{\"word\": \"icebreaker\", \"meaning\": \"câu mở đầu\"}]}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long listId = ((Number) JsonPath.read(body, "$.id")).longValue();
+
+        String round = as(PLAYER, get("/api/games/{id}/play", games.match().getId()).param("listId", String.valueOf(listId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.listId").value(listId))
+                .andExpect(jsonPath("$.questions.length()").value(7))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(round, "$.questions[*].prompt")).contains("icebreaker");
+
+        // Someone else's list does not exist for this player.
+        as(OTHER_PLAYER, get("/api/games/{id}/play", games.match().getId()).param("listId", String.valueOf(listId)))
+                .andExpect(status().isNotFound());
     }
 
     @Test
     void checkTellsWhetherAChoiceIsRightAndSavesNothing() throws Exception {
-        Game guess = createGame("Đoán nghĩa", GameType.GUESS_MEANING, 90, 12);
-        Game match = createGame("Ghép từ", GameType.WORD_MATCH, 60, 6);
-        Round round = play(PLAYER, guess);
-        long question = round.questionIds().get(0);
-        long right = rightOption(question);
+        Games games = createGames();
+        long travel = topicWithWords("trip", 12, 6);
+        Round round = play(PLAYER, games.quiz(), travel, null);
+        long right = right(round, 1);
+        long wrong = wrong(round, 1);
 
-        check(PLAYER, guess, round.token(), question, right)
+        check(PLAYER, games.quiz(), round.token(), 1, right)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.correct").value(true))
                 .andExpect(jsonPath("$.correctOptionId").value(right));
-        check(PLAYER, guess, round.token(), question, wrongOption(question))
+        check(PLAYER, games.quiz(), round.token(), 1, wrong)
                 .andExpect(jsonPath("$.correct").value(false))
                 .andExpect(jsonPath("$.correctOptionId").value(right));
 
         // WORD_MATCH never tells the right pair, or one wrong try would give it away.
-        Round matchRound = play(PLAYER, match);
-        long matchQuestion = matchRound.questionIds().get(0);
-        check(PLAYER, match, matchRound.token(), matchQuestion, rightOption(matchRound.questionIds().get(1)))
+        Round match = play(PLAYER, games.match(), travel, null);
+        check(PLAYER, games.match(), match.token(), 1, right(match, 2))
                 .andExpect(jsonPath("$.correct").value(false))
                 .andExpect(jsonPath("$.correctOptionId").value(nullValue()));
+        check(PLAYER, games.match(), match.token(), 1, right(match, 1)).andExpect(jsonPath("$.correct").value(true));
 
-        check(PLAYER, guess, round.token(), 999_999, right).andExpect(status().isBadRequest());
-        check(OTHER_PLAYER, guess, round.token(), question, right).andExpect(status().isBadRequest());
-        check(PLAYER, match, round.token(), question, right).andExpect(status().isBadRequest());
-        check(PLAYER, guess, round.token() + "x", question, right).andExpect(status().isBadRequest());
-        as(PLAYER, get("/api/games/{id}/play", 999_999)).andExpect(status().isNotFound());
+        check(PLAYER, games.quiz(), round.token(), 11, right).andExpect(status().isBadRequest());
+        check(PLAYER, games.quiz(), round.token(), 1, 5).andExpect(status().isBadRequest());
+        check(OTHER_PLAYER, games.quiz(), round.token(), 1, right).andExpect(status().isBadRequest());
+        check(PLAYER, games.match(), round.token(), 1, right).andExpect(status().isBadRequest());
+        check(PLAYER, games.quiz(), round.token() + "x", 1, right).andExpect(status().isBadRequest());
 
         assertThat(sessionRepository.count()).isZero();
     }
 
     @Test
-    void theServerGradesTheRoundFromTheAnswers() throws Exception {
-        Game guess = createGame("Đoán nghĩa", GameType.GUESS_MEANING, 90, 12);
+    void theServerGradesTheRoundAndListsTheWrongAnswers() throws Exception {
+        Games games = createGames();
+        long travel = topicWithWords("trip", 12, 6);
 
-        Round perfect = play(PLAYER, guess);
-        String body = submit(PLAYER, guess, perfect.token(), perfect.answers(this::rightOption))
+        Round perfect = play(PLAYER, games.quiz(), travel, null);
+        String body = submit(PLAYER, games.quiz(), perfect.token(), perfect.answers(this::right))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.sessionId").isNumber())
                 .andExpect(jsonPath("$.correctCount").value(10))
                 .andExpect(jsonPath("$.questionCount").value(10))
-                .andExpect(jsonPath("$.isPersonalBest").value(true))
-                .andReturn().getResponse().getContentAsString();
-        int bonus = JsonPath.read(body, "$.timeBonus");
-        int best = JsonPath.read(body, "$.score");
-        // All right within seconds: nearly the whole 90 seconds are left.
-        assertThat(bonus).isBetween(85, 90);
-        assertThat(best).isEqualTo(100 + bonus);
-        assertThat(JsonPath.<Integer>read(body, "$.bestScore")).isEqualTo(best);
-
-        long sessionId = ((Number) JsonPath.read(body, "$.sessionId")).longValue();
-        assertThat(jdbcTemplate.queryForObject(
-                "select count(*) from game_session_answers where session_id = ? and is_correct = true",
-                Integer.class, sessionId)).isEqualTo(10);
-
-        // Everything wrong, however fast: no points and no bonus.
-        Round wrong = play(PLAYER, guess);
-        submit(PLAYER, guess, wrong.token(), wrong.answers(this::wrongOption))
-                .andExpect(jsonPath("$.correctCount").value(0))
-                .andExpect(jsonPath("$.score").value(0))
+                .andExpect(jsonPath("$.score").value(100))
                 .andExpect(jsonPath("$.timeBonus").value(0))
-                .andExpect(jsonPath("$.bestScore").value(best))
-                .andExpect(jsonPath("$.isPersonalBest").value(false));
+                .andExpect(jsonPath("$.durationSeconds").isNumber())
+                .andExpect(jsonPath("$.bestScore").value(100))
+                .andExpect(jsonPath("$.isPersonalBest").value(true))
+                .andExpect(jsonPath("$.wrongAnswers.length()").value(0))
+                .andReturn().getResponse().getContentAsString();
+        long sessionId = ((Number) JsonPath.read(body, "$.sessionId")).longValue();
+        Map<String, Object> saved = jdbcTemplate.queryForMap("select * from game_sessions where id = ?", sessionId);
+        assertThat(saved.get("topic_id")).isEqualTo(travel);
+        assertThat(saved.get("custom_list_id")).isNull();
+        assertThat(saved.get("correct_count")).isEqualTo(10);
+        assertThat(saved.get("question_count")).isEqualTo(10);
+        assertThat(saved.get("score")).isEqualTo(100);
+        assertThat(saved.get("duration_seconds")).isNotNull();
 
-        // Half answered: the right answers count, but there is no bonus without every answer.
-        Round half = play(PLAYER, guess);
-        submit(PLAYER, guess, half.token(), half.answers((question, index) -> index % 2 == 0 ? rightOption(question) : null))
+        // Scenario 8: 8 right out of 10 make 80 points; the two wrong ones are listed with what was chosen.
+        Round eight = play(PLAYER, games.quiz(), travel, null);
+        submit(PLAYER, games.quiz(), eight.token(), eight.answers((round, question) -> question <= 8 ? right(round, question) : wrong(round, question)))
+                .andExpect(jsonPath("$.correctCount").value(8))
+                .andExpect(jsonPath("$.score").value(80))
+                .andExpect(jsonPath("$.bestScore").value(100))
+                .andExpect(jsonPath("$.isPersonalBest").value(false))
+                .andExpect(jsonPath("$.wrongAnswers[*].questionId", contains(9, 10)))
+                .andExpect(jsonPath("$.wrongAnswers[0].word").value(eight.prompt(9)))
+                .andExpect(jsonPath("$.wrongAnswers[0].correct").value("nghĩa " + eight.prompt(9)))
+                .andExpect(jsonPath("$.wrongAnswers[0].chosen").value(eight.content(9, wrong(eight, 9))));
+
+        // Branch 7a: the time ran out after 5 questions; the others are wrong, with nothing chosen.
+        Round half = play(PLAYER, games.quiz(), travel, null);
+        submit(PLAYER, games.quiz(), half.token(), half.answers((round, question) -> question <= 5 ? right(round, question) : null))
                 .andExpect(jsonPath("$.correctCount").value(5))
                 .andExpect(jsonPath("$.score").value(50))
-                .andExpect(jsonPath("$.timeBonus").value(0));
+                .andExpect(jsonPath("$.wrongAnswers.length()").value(5))
+                .andExpect(jsonPath("$.wrongAnswers[0].chosen").value(nullValue()));
     }
 
     @Test
     void answersHandedInAfterTheTimeLimitCountAsWrong() throws Exception {
-        Game guess = createGame("Đoán nghĩa", GameType.GUESS_MEANING, 90, 12);
-        List<Long> questionIds = play(PLAYER, guess).questionIds();
+        Games games = createGames();
+        long travel = topicWithWords("trip", 12, 6);
+        List<Long> ids = topicWords(travel).stream().map(Vocabulary::getId).toList();
+        // Each question offers its own word first: option 1 is always right.
+        List<PlayRound.Question> questions = ids.subList(0, 10).stream()
+                .map(id -> new PlayRound.Question(id, List.of(id, ids.get(10), ids.get(11), ids.get((int) (id % 10)))))
+                .toList();
+        String allFirst = "[" + java.util.stream.IntStream.rangeClosed(1, 10)
+                .mapToObj(n -> "{\"questionId\": " + n + ", \"optionId\": 1}").collect(Collectors.joining(",")) + "]";
+        Long gameId = games.quiz().getId();
 
-        // Started 100 seconds ago: past the 90 seconds and the 3 seconds of grace.
-        String late = tokens.sign(new PlayRound(guess.getId(), PLAYER, calendar.now().minusSeconds(100), "late", questionIds));
-        submit(PLAYER, guess, late, answers(questionIds, this::rightOption))
+        // Started 100 seconds ago: past the 60 seconds and the 3 seconds of grace.
+        String late = tokens.seal(new PlayRound(gameId, PLAYER, calendar.now().minusSeconds(100), "late", travel, null, questions, List.of()));
+        submit(PLAYER, games.quiz(), late, allFirst)
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.correctCount").value(0))
-                .andExpect(jsonPath("$.score").value(0));
+                .andExpect(jsonPath("$.score").value(0))
+                .andExpect(jsonPath("$.durationSeconds").value(60));
 
-        // Started 92 seconds ago: within the grace, the answers count but no second is left for a bonus.
-        String grace = tokens.sign(new PlayRound(guess.getId(), PLAYER, calendar.now().minusSeconds(92), "grace", questionIds));
-        submit(PLAYER, guess, grace, answers(questionIds, this::rightOption))
+        // Started 62 seconds ago: within the grace, the answers count; the time played stops at the limit.
+        String grace = tokens.seal(new PlayRound(gameId, PLAYER, calendar.now().minusSeconds(62), "grace", travel, null, questions, List.of()));
+        submit(PLAYER, games.quiz(), grace, allFirst)
                 .andExpect(jsonPath("$.correctCount").value(10))
-                .andExpect(jsonPath("$.timeBonus").value(0))
-                .andExpect(jsonPath("$.score").value(100));
+                .andExpect(jsonPath("$.score").value(100))
+                .andExpect(jsonPath("$.durationSeconds").value(60));
     }
 
     @Test
     void aRoundIsHandedInOnceAndOnlyWithItsOwnAnswers() throws Exception {
-        Game guess = createGame("Đoán nghĩa", GameType.GUESS_MEANING, 90, 12);
-        Round round = play(PLAYER, guess);
-        long first = round.questionIds().get(0);
+        Games games = createGames();
+        long travel = topicWithWords("trip", 12, 6);
+        Round round = play(PLAYER, games.quiz(), travel, null);
 
         // Refused answers do not use the round up...
-        submit(PLAYER, guess, round.token(), "[{\"questionId\": 999999, \"optionId\": null}]")
+        submit(PLAYER, games.quiz(), round.token(), "[{\"questionId\": 11, \"optionId\": null}]").andExpect(status().isBadRequest());
+        submit(PLAYER, games.quiz(), round.token(), "[{\"questionId\": 1, \"optionId\": 5}]").andExpect(status().isBadRequest());
+        submit(PLAYER, games.quiz(), round.token(), "[{\"questionId\": 1, \"optionId\": null}, {\"questionId\": 1, \"optionId\": null}]")
                 .andExpect(status().isBadRequest());
-        submit(PLAYER, guess, round.token(), "[{\"questionId\": " + first + ", \"optionId\": " + rightOption(round.questionIds().get(1)) + "}]")
+        submit(PLAYER, games.quiz(), round.token(), "[{\"questionId\": 1, \"optionId\": null, \"responseTimeMs\": -1}]")
                 .andExpect(status().isBadRequest());
-        submit(PLAYER, guess, round.token(), "[{\"questionId\": " + first + ", \"optionId\": null},"
-                        + " {\"questionId\": " + first + ", \"optionId\": null}]")
-                .andExpect(status().isBadRequest());
-        submit(PLAYER, guess, round.token(), "[{\"questionId\": " + first + ", \"optionId\": null, \"responseTimeMs\": -1}]")
-                .andExpect(status().isBadRequest());
-        submit(OTHER_PLAYER, guess, round.token(), round.answers(this::rightOption)).andExpect(status().isBadRequest());
+        submit(OTHER_PLAYER, games.quiz(), round.token(), round.answers(this::right)).andExpect(status().isBadRequest());
 
         // ...so the round can still be handed in, once.
-        submit(PLAYER, guess, round.token(), round.answers(this::rightOption)).andExpect(status().isCreated());
-        submit(PLAYER, guess, round.token(), round.answers(this::rightOption))
+        submit(PLAYER, games.quiz(), round.token(), round.answers(this::right)).andExpect(status().isCreated());
+        submit(PLAYER, games.quiz(), round.token(), round.answers(this::right))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400));
         assertThat(sessionRepository.count()).isEqualTo(1);
     }
 
     @Test
+    void withoutATopicOrListARoundUsesEverySystemWord() throws Exception {
+        Games games = createGames();
+        topicWithWords("trip", 3, 3);
+        topicWithWords("work", 3, 3);
+
+        // Six system words over two topics: enough for a round (the screens of before 02/10 choose no topic).
+        as(PLAYER, get("/api/games")).andExpect(jsonPath("$[1].questionCount").value(6));
+        as(PLAYER, get("/api/games/{id}/play", games.quiz().getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.topicId").value(nullValue()))
+                .andExpect(jsonPath("$.questions.length()").value(6));
+    }
+
+    @Test
     void theLeaderboardRanksPlayersByPeriodWithOnlyTheirGivenNames() throws Exception {
-        Game guess = createGame("Đoán nghĩa", GameType.GUESS_MEANING, 90, 12);
-        Game quiz = createGame("Trắc nghiệm nhanh", GameType.QUICK_QUIZ, 60, 14);
+        Games games = createGames();
+        Game guess = games.guess();
+        Game quiz = games.quiz();
         user(501, "Nguyễn Văn An");
         user(502, "Trần Thị Bình");
         user(503, "Lê Châu");
@@ -325,37 +409,75 @@ class GameApiTests {
 
     // --- helpers ---
 
-    private record Round(String token, List<Long> questionIds) {
-        String answers(BiFunction<Long, Integer, Long> choose) {
-            return GameApiTests.answers(questionIds, choose);
+    private record Games(Game guess, Game quiz, Game match) {
+    }
+
+    /**
+     * A round as played: its token, each question's prompt and options (id → text), and the WORD_MATCH meanings.
+     * Question n is at index n - 1.
+     */
+    private record Round(String token, List<String> prompts, List<Map<Long, String>> options, Map<Long, String> matchOptions) {
+
+        String prompt(long question) {
+            return prompts.get((int) question - 1);
         }
 
-        String answers(Function<Long, Long> choose) {
-            return answers((question, index) -> choose.apply(question));
+        Map<Long, String> optionsOf(long question) {
+            return matchOptions.isEmpty() ? options.get((int) question - 1) : matchOptions;
+        }
+
+        String content(long question, long option) {
+            return optionsOf(question).get(option);
+        }
+
+        String answers(BiFunction<Round, Long, Long> choose) {
+            List<String> items = new ArrayList<>();
+            for (long question = 1; question <= prompts.size(); question++) {
+                Long option = choose.apply(this, question);
+                items.add("{\"questionId\": " + question + ", \"optionId\": " + option + ", \"responseTimeMs\": 1500}");
+            }
+            return "[" + String.join(",", items) + "]";
         }
     }
 
-    private static String answers(List<Long> questionIds, Function<Long, Long> choose) {
-        return answers(questionIds, (question, index) -> choose.apply(question));
+    /** The option holding the question word's meaning. */
+    private long right(Round round, long question) {
+        String meaning = "nghĩa " + round.prompt(question);
+        return round.optionsOf(question).entrySet().stream()
+                .filter(entry -> entry.getValue().equals(meaning)).findFirst().orElseThrow().getKey();
     }
 
-    private static String answers(List<Long> questionIds, BiFunction<Long, Integer, Long> choose) {
-        List<String> items = new ArrayList<>();
-        for (int index = 0; index < questionIds.size(); index++) {
-            Long option = choose.apply(questionIds.get(index), index);
-            items.add("{\"questionId\": " + questionIds.get(index) + ", \"optionId\": " + option + ", \"responseTimeMs\": 1500}");
-        }
-        return "[" + String.join(",", items) + "]";
+    private long wrong(Round round, long question) {
+        long right = right(round, question);
+        return round.optionsOf(question).keySet().stream().filter(id -> id != right).findFirst().orElseThrow();
     }
 
-    private ResultActions as(long userId, MockHttpServletRequestBuilder request)
-            throws Exception {
+    private ResultActions as(long userId, MockHttpServletRequestBuilder request) throws Exception {
         return mockMvc.perform(request.with(TestAuth.learner(userId)));
     }
 
-    private Round play(long userId, Game game) throws Exception {
-        String body = as(userId, get("/api/games/{id}/play", game.getId())).andReturn().getResponse().getContentAsString();
-        return new Round(JsonPath.read(body, "$.playToken"), longs(JsonPath.read(body, "$.questions[*].id")));
+    private Round play(long userId, Game game, Long topicId, Long listId) throws Exception {
+        MockHttpServletRequestBuilder request = get("/api/games/{id}/play", game.getId());
+        if (topicId != null) {
+            request.param("topicId", String.valueOf(topicId));
+        }
+        if (listId != null) {
+            request.param("listId", String.valueOf(listId));
+        }
+        String body = as(userId, request).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        List<String> prompts = JsonPath.read(body, "$.questions[*].prompt");
+        List<Map<Long, String>> options = new ArrayList<>();
+        for (int index = 0; index < prompts.size(); index++) {
+            options.add(optionMap(JsonPath.read(body, "$.questions[" + index + "].options")));
+        }
+        List<Map<String, Object>> match = JsonPath.read(body, "$.matchOptions");
+        return new Round(JsonPath.read(body, "$.playToken"), prompts, options, match == null ? Map.of() : optionMap(match));
+    }
+
+    private static Map<Long, String> optionMap(List<Map<String, Object>> options) {
+        Map<Long, String> map = new LinkedHashMap<>();
+        options.forEach(option -> map.put(((Number) option.get("id")).longValue(), (String) option.get("content")));
+        return map;
     }
 
     private ResultActions check(long userId, Game game, String token, long questionId, long optionId) throws Exception {
@@ -368,44 +490,34 @@ class GameApiTests {
                 .content("{\"playToken\": \"" + token + "\", \"answers\": " + answers + "}"));
     }
 
-    private long rightOption(long questionId) {
-        return optionsOf(questionId).stream().filter(GameQuestionOption::isCorrect).findFirst().orElseThrow().getId();
+    /** The three games, with the time limits of the seed migration (H2 does not run migrations). */
+    private Games createGames() {
+        return new Games(
+                gameRepository.save(new Game("Đoán nghĩa", GameType.GUESS_MEANING, 90)),
+                gameRepository.save(new Game("Trắc nghiệm nhanh", GameType.QUICK_QUIZ, 60)),
+                gameRepository.save(new Game("Ghép từ", GameType.WORD_MATCH, 60)));
     }
 
-    private long wrongOption(long questionId) {
-        return optionsOf(questionId).stream().filter(option -> !option.isCorrect()).findFirst().orElseThrow().getId();
-    }
-
-    private List<GameQuestionOption> optionsOf(long questionId) {
-        return optionRepository.findAllByGameQuestionIdIn(List.of(questionId));
-    }
-
-    /**
-     * A game whose bank has one question per new word "word{n}" (meaning "nghĩa {n}"): the right option, plus three
-     * wrong ones taken from the other words for the choice games.
-     */
-    private Game createGame(String name, GameType type, Integer timeLimit, int bankSize) {
-        Game game = gameRepository.save(new Game(name, type, timeLimit));
-        List<Vocabulary> words = new ArrayList<>();
-        for (int n = 0; n < bankSize; n++) {
-            words.add(vocabularyRepository.save(new Vocabulary(
-                    null, null, "word" + game.getId() + "-" + n, "nghĩa " + game.getId() + "-" + n,
-                    null, "/wɜːd/", null, null, CefrLevel.A1)));
+    /** A topic of system words "{prefix}{n}" meaning "nghĩa {prefix}{n}"; the first {@code withExamples} have an example. */
+    private long topicWithWords(String prefix, int words, int withExamples) {
+        Topic topic = topicRepository.save(new Topic(prefix + " topic", null, null));
+        for (int n = 0; n < words; n++) {
+            String word = prefix + n;
+            vocabularyRepository.save(new Vocabulary(
+                    topic.getId(), null, word, "nghĩa " + word,
+                    n < withExamples ? "I like the " + word + " here." : null,
+                    "/" + (prefix.equals("trip") ? "trɪp" : prefix) + "/", null, null, CefrLevel.A1));
         }
-        for (int n = 0; n < words.size(); n++) {
-            Vocabulary word = words.get(n);
-            GameQuestion question = questionRepository.save(new GameQuestion(game.getId(), word.getId(), 1));
-            boolean quiz = type == GameType.QUICK_QUIZ;
-            optionRepository.save(new GameQuestionOption(question.getId(), quiz ? word.getWord() : word.getMeaning(), true));
-            if (type.hasOptionsPerQuestion()) {
-                for (int d = 1; d <= 3; d++) {
-                    Vocabulary other = words.get((n + d) % words.size());
-                    optionRepository.save(new GameQuestionOption(
-                            question.getId(), quiz ? other.getWord() : other.getMeaning(), false));
-                }
-            }
-        }
-        return game;
+        return topic.getId();
+    }
+
+    private List<Vocabulary> topicWords(long topicId) {
+        return vocabularyRepository.findAllVisibleInTopic(topicId, PLAYER).stream()
+                .sorted((a, b) -> Long.compare(a.getId(), b.getId())).toList();
+    }
+
+    private Map<String, String> meaningsOf(long topicId) {
+        return topicWords(topicId).stream().collect(Collectors.toMap(Vocabulary::getWord, Vocabulary::getMeaning));
     }
 
     private void user(long id, String fullName) {
@@ -416,10 +528,6 @@ class GameApiTests {
     }
 
     private void session(Game game, long userId, int score, Instant playedAt) {
-        sessionRepository.save(new GameSession(game.getId(), userId, score, playedAt));
-    }
-
-    private static List<Long> longs(List<Object> numbers) {
-        return numbers.stream().map(number -> ((Number) number).longValue()).collect(Collectors.toList());
+        sessionRepository.save(new GameSession(game.getId(), userId, null, null, score / 10, Math.max(10, score / 10), score, 30, playedAt));
     }
 }

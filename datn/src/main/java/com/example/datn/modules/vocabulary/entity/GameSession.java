@@ -9,7 +9,11 @@ import jakarta.persistence.Table;
 
 import java.time.Instant;
 
-/** A finished round, saved only when the player hands it in (a round left midway is not saved). */
+/**
+ * A finished round ("Lượt chơi trò chơi" of the Business model), saved only when the player hands it in (a round left
+ * midway is not saved): the game, the topic or personal list its words came from, the right answers out of the
+ * questions, the score and the time played.
+ */
 @Entity
 @Table(name = "game_sessions")
 public class GameSession {
@@ -21,12 +25,25 @@ public class GameSession {
     @Column(nullable = false)
     private Long gameId;
 
-    // Plain id: users belong to another module.
+    // Plain ids: users belong to another module; topics and lists are only referenced.
     @Column(nullable = false)
     private Long userId;
 
+    private Long topicId;
+
+    private Long customListId;
+
+    @Column(nullable = false)
+    private int correctCount;
+
+    @Column(nullable = false)
+    private int questionCount;
+
     @Column(nullable = false)
     private int score;
+
+    // Null only for the rounds played before it was recorded (V202610021010).
+    private Integer durationSeconds;
 
     @Column(nullable = false)
     private Instant playedAt;
@@ -34,10 +51,24 @@ public class GameSession {
     protected GameSession() {
     }
 
-    public GameSession(Long gameId, Long userId, int score, Instant playedAt) {
+    public GameSession(
+            Long gameId,
+            Long userId,
+            Long topicId,
+            Long customListId,
+            int correctCount,
+            int questionCount,
+            int score,
+            int durationSeconds,
+            Instant playedAt) {
         this.gameId = gameId;
         this.userId = userId;
+        this.topicId = topicId;
+        this.customListId = customListId;
+        this.correctCount = correctCount;
+        this.questionCount = questionCount;
         this.score = score;
+        this.durationSeconds = durationSeconds;
         this.playedAt = playedAt;
     }
 
@@ -53,8 +84,28 @@ public class GameSession {
         return userId;
     }
 
+    public Long getTopicId() {
+        return topicId;
+    }
+
+    public Long getCustomListId() {
+        return customListId;
+    }
+
+    public int getCorrectCount() {
+        return correctCount;
+    }
+
+    public int getQuestionCount() {
+        return questionCount;
+    }
+
     public int getScore() {
         return score;
+    }
+
+    public Integer getDurationSeconds() {
+        return durationSeconds;
     }
 
     public Instant getPlayedAt() {

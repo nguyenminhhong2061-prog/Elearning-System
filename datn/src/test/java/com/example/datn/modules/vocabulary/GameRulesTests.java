@@ -23,28 +23,25 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** The pure rules of docs/api/games.md: scoring, the playToken and the leaderboard ranking. */
+/** The pure rules of docs/api/games.md (scenario 8): scoring, the playToken and the leaderboard ranking. */
 class GameRulesTests {
 
     @Nested
     class Scoring {
 
-        // The cases of frontend/mock/routes/games.test.js.
         @Test
-        void theTimeBonusScalesTheRemainingSecondsByTheShareOfRightAnswers() {
-            assertThat(GameScoring.timeBonus(90, Duration.ofSeconds(17), 10, 10)).isEqualTo(73);
-            assertThat(GameScoring.timeBonus(90, Duration.ofSeconds(17), 5, 10)).isEqualTo(36);
+        void eachRightAnswerEarnsTenPointsWithoutATimeBonus() {
+            // Scenario 8, step 8: 8 right answers out of 10, 8 seconds left: 80 points.
+            assertThat(GameScoring.score(8, 1)).isEqualTo(80);
+            assertThat(GameScoring.score(0, 1)).isZero();
+            assertThat(GameScoring.score(3, 2)).isEqualTo(60);
         }
 
         @Test
-        void answeringEverythingWrongEarnsNoBonusHoweverFast() {
-            assertThat(GameScoring.timeBonus(90, Duration.ofSeconds(5), 0, 10)).isZero();
-        }
-
-        @Test
-        void thereIsNoBonusWithoutATimeLimitOrOnceTheTimeIsOver() {
-            assertThat(GameScoring.timeBonus(null, Duration.ofSeconds(10), 10, 10)).isZero();
-            assertThat(GameScoring.timeBonus(60, Duration.ofSeconds(61), 6, 6)).isZero();
+        void theTimePlayedIsRoundedAndNeverMoreThanTheLimit() {
+            assertThat(GameScoring.playedSeconds(60, Duration.ofMillis(51_600))).isEqualTo(52);
+            assertThat(GameScoring.playedSeconds(60, Duration.ofSeconds(62))).isEqualTo(60);
+            assertThat(GameScoring.playedSeconds(null, Duration.ofSeconds(125))).isEqualTo(125);
         }
 
         @Test
@@ -61,25 +58,43 @@ class GameRulesTests {
         private final MovableClock clock = new MovableClock(Instant.parse("2026-09-25T03:00:00Z"));
         private final PlayTokenService tokens = new PlayTokenService(new StudyCalendar(clock));
 
+        private PlayRound round(Long topicId, Long listId) {
+            return tokens.newRound(1L, 42L, topicId, listId, List.of(
+                    new PlayRound.Question(11L, List.of(14L, 11L, 12L, 13L)),
+                    new PlayRound.Question(12L, List.of(12L, 13L, 14L, 11L))), List.of());
+        }
+
         @Test
-        void aSignedRoundComesBackIdentical() {
-            PlayRound round = tokens.newRound(1L, 42L, List.of(11L, 12L, 13L));
+        void aSealedRoundComesBackIdentical() {
+            PlayRound round = round(7L, null);
+            PlayRound match = tokens.newRound(3L, 42L, null, 9L,
+                    List.of(new PlayRound.Question(11L, List.of()), new PlayRound.Question(12L, List.of())), List.of(12L, 11L));
 
-            PlayRound verified = tokens.verify(tokens.sign(round), 1L, 42L);
+            assertThat(tokens.verify(tokens.seal(round), 1L, 42L)).isEqualTo(round);
+            assertThat(tokens.verify(tokens.seal(match), 3L, 42L)).isEqualTo(match);
+            assertThat(tokens.verify(tokens.seal(round(null, null)), 1L, 42L).topicId()).isNull();
+        }
 
-            assertThat(verified).isEqualTo(round);
+        @Test
+        void theTokenDoesNotShowTheAnswers() {
+            String token = tokens.seal(round(7L, null));
+
+            // The round is encrypted: none of its word ids can be read from the token.
+            for (String part : token.split("\\.")) {
+                String decoded = new String(java.util.Base64.getUrlDecoder().decode(part), java.nio.charset.StandardCharsets.ISO_8859_1);
+                assertThat(decoded).doesNotContain("11,").doesNotContain("42:");
+            }
         }
 
         @Test
         void aChangedTokenIsRejected() {
-            String token = tokens.sign(tokens.newRound(1L, 42L, List.of(11L, 12L)));
+            String token = tokens.seal(round(7L, null));
             String[] parts = token.split("\\.");
-            // Same signature, but a payload with an extra question the server never handed out.
-            String forgedPayload = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(
-                    new String(java.util.Base64.getUrlDecoder().decode(parts[0])).concat(",99").getBytes());
+            byte[] ciphertext = java.util.Base64.getUrlDecoder().decode(parts[1]);
+            ciphertext[0] ^= 1;
+            String flipped = parts[0] + "." + java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(ciphertext);
 
-            assertThatThrownBy(() -> tokens.verify(forgedPayload + "." + parts[1], 1L, 42L))
-                    .isInstanceOf(InvalidPlayTokenException.class);
+            assertThatThrownBy(() -> tokens.verify(flipped, 1L, 42L)).isInstanceOf(InvalidPlayTokenException.class);
             assertThatThrownBy(() -> tokens.verify(parts[0] + "." + parts[1].substring(1), 1L, 42L))
                     .isInstanceOf(InvalidPlayTokenException.class);
             assertThatThrownBy(() -> tokens.verify("not-a-token", 1L, 42L)).isInstanceOf(InvalidPlayTokenException.class);
@@ -88,7 +103,7 @@ class GameRulesTests {
 
         @Test
         void aTokenOnlyWorksForItsGameItsPlayerAndThisServer() {
-            String token = tokens.sign(tokens.newRound(1L, 42L, List.of(11L)));
+            String token = tokens.seal(round(7L, null));
             PlayTokenService otherServer = new PlayTokenService(new StudyCalendar(clock));
 
             assertThatThrownBy(() -> tokens.verify(token, 2L, 42L)).isInstanceOf(InvalidPlayTokenException.class);
@@ -98,7 +113,7 @@ class GameRulesTests {
 
         @Test
         void aTokenExpiresAfterAnHour() {
-            String token = tokens.sign(tokens.newRound(1L, 42L, List.of(11L)));
+            String token = tokens.seal(round(7L, null));
 
             clock.advance(Duration.ofMinutes(59));
             assertThat(tokens.verify(token, 1L, 42L).gameId()).isEqualTo(1L);
@@ -108,11 +123,11 @@ class GameRulesTests {
 
         @Test
         void aRoundIsHandedInOnlyOnce() {
-            PlayRound round = tokens.newRound(1L, 42L, List.of(11L));
-            PlayRound another = tokens.newRound(1L, 42L, List.of(11L));
+            PlayRound first = round(7L, null);
+            PlayRound another = round(7L, null);
 
-            assertThat(tokens.markHandedIn(round)).isTrue();
-            assertThat(tokens.markHandedIn(round)).isFalse();
+            assertThat(tokens.markHandedIn(first)).isTrue();
+            assertThat(tokens.markHandedIn(first)).isFalse();
             assertThat(tokens.markHandedIn(another)).isTrue();
         }
     }

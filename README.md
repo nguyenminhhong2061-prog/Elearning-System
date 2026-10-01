@@ -535,5 +535,6 @@ Contract API của module A nằm trong `docs/api/` (`vocabulary.md`, `learning.
 - **Enum chữ thường trong DB:** `@Enumerated(EnumType.STRING)` ghi chữ hoa và bị `CHECK` của Postgres từ chối. Dùng
   `LowercaseEnumConverter`. H2 không phát hiện lỗi này, nên thêm test kế thừa `AbstractPostgresIntegrationTest` cho
   mỗi entity có enum.
-- Các bảng trò chơi (`games`, `game_questions`, `game_question_options`, `game_sessions`, `game_session_answers`,
-  `leaderboard`) thuộc module A. Cần điểm trò chơi thì dùng `GET /api/games`, `GET /api/games/leaderboard`.
+- Các bảng trò chơi (`games`, `game_sessions`, `leaderboard`; ba bảng ngân hàng câu hỏi `game_questions`,
+  `game_question_options`, `game_session_answers` không còn dùng từ 02/10/2026) và bảng lượt ôn `vocabulary_reviews`
+  thuộc module A. Cần điểm trò chơi thì dùng `GET /api/games`, `GET /api/games/leaderboard`.

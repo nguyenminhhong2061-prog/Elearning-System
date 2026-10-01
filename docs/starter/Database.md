@@ -65,7 +65,13 @@ Quan hệ: users 1-n user_level_history. Module dùng: Tiến độ, Kiểm tra 
 - review_count INT
 - next_review_at DATE -- quyết định "từ cần ôn hôm nay"
 - last_reviewed_at, first_learned_at
-- interval_days INT NULL -- bậc ôn hiện tại tính bằng ngày (1, 3, 7, 14, 30), NULL khi chưa ôn lần nào. Thêm ở migration `V202609252000` (Phase 3) vì không suy ra được bậc từ các cột khác ("Chưa nhớ" đưa về bậc đầu)
+- interval_days INT NULL -- khoảng cách ôn hiện tại k tính bằng ngày, NULL khi chưa ôn lần nào. Thêm ở migration `V202609252000` (Phase 3) vì không suy ra được từ các cột khác. Từ 02/10/2026 theo luật của Business model: "Chưa nhớ" → 1, "Nhớ mơ hồ" → max(1, k), "Nhớ rõ" → max(2, 2k), thuộc (`mastered`) khi k ≥ 16 (`docs/api/learning.md`)
+
+## vocabulary_reviews (lượt ôn từ, thêm 02/10/2026)
+
+- id BIGINT PK, user_vocabulary_id FK→user_vocabulary.id ON DELETE CASCADE
+- result ENUM(forgot, vague, remembered), reviewed_at TIMESTAMPTZ
+- Một dòng mỗi lần người học đánh giá một thẻ (migration `V202610021000`); dùng cho tổng kết phiên học. Module A.
 
 ## custom_vocabulary_lists
 
@@ -220,6 +226,10 @@ Module dùng: Kiểm tra định kỳ (C1), Kiểm tra tổng hợp (C2) → ngu
 
 - id BIGINT UNSIGNED PK, name, game_type ENUM(GUESS_MEANING, QUICK_QUIZ, WORD_MATCH), time_limit_seconds nullable
 
+> Từ 02/10/2026 (`docs/api/games.md` bản 2), một ván lấy từ của chủ đề hoặc danh sách riêng người chơi chọn và được
+> chia lúc bắt đầu ván. Ba bảng `game_questions`, `game_question_options`, `game_session_answers` không còn được đọc
+> hay ghi; dữ liệu cũ giữ nguyên cho đến khi nhóm đồng ý xóa.
+
 ## game_questions
 
 - id BIGINT UNSIGNED PK, game_id FK→games.id, vocabulary_id FK→vocabulary.id
@@ -232,6 +242,8 @@ Module dùng: Kiểm tra định kỳ (C1), Kiểm tra tổng hợp (C2) → ngu
 ## game_sessions
 
 - id BIGINT UNSIGNED PK, game_id FK→games.id, user_id FK→users.id, score INT DEFAULT 0, played_at
+- topic_id FK→topics.id nullable, custom_list_id FK→custom_vocabulary_lists.id nullable (nguồn từ của ván, nhiều nhất một trong hai, `ON DELETE SET NULL`)
+- correct_count INT, question_count INT, duration_seconds INT nullable (NULL với ván chơi trước 02/10/2026). Thêm ở migration `V202610021010`
 
 ## game_session_answers
 
@@ -295,8 +307,10 @@ exercise_lessons 1-n pronunciation_items 1-n pronunciation_attempts n-1 exercise
 users 1-n chat_sessions 1-n chat_messages n-n knowledge_chunks (qua chat_message_sources)
 users 1-n test_attempts n-1 tests 1-n test_questions n-1 vocabulary (nullable)
 test_attempts 1-n test_attempt_answers n-1 test_questions
-users 1-n game_sessions n-1 games 1-n game_questions n-1 vocabulary
-game_sessions 1-n game_session_answers
+users 1-n game_sessions n-1 games 1-n game_questions n-1 vocabulary (ngân hàng câu hỏi, không dùng từ 02/10/2026)
+game_sessions n-1 topics (nullable), n-1 custom_vocabulary_lists (nullable)
+game_sessions 1-n game_session_answers (không dùng từ 02/10/2026)
+user_vocabulary 1-n vocabulary_reviews
 games/game_sessions -> leaderboard (batch job tổng hợp)
 users 1-n user_progress, 1-n user_badges n-1 badges, 1-n study_plans 1-n study_plan_schedule, 1-n reminders
 ```
