@@ -53,7 +53,7 @@ class LearningPostgresIntegrationTests extends AbstractPostgresIntegrationTest {
 
         review(learner, words.get(0), "VAGUE").andExpect(status().isOk()).andExpect(jsonPath("$.intervalDays").value(1));
         review(learner, words.get(1), "REMEMBERED").andExpect(status().isOk());
-        review(learner, words.get(1), "REMEMBERED").andExpect(status().isOk()).andExpect(jsonPath("$.intervalDays").value(7));
+        review(learner, words.get(1), "REMEMBERED").andExpect(status().isOk()).andExpect(jsonPath("$.intervalDays").value(4));
         // The test transaction never commits, so write the pending update before reading the table with plain JDBC.
         entityManager.flush();
 
@@ -62,9 +62,16 @@ class LearningPostgresIntegrationTests extends AbstractPostgresIntegrationTest {
         assertThat(row.get("status")).isEqualTo("learning");
         assertThat(row.get("last_review_result")).isEqualTo("remembered");
         assertThat(row.get("review_count")).isEqualTo(2);
-        assertThat(row.get("interval_days")).isEqualTo(7);
-        assertThat(row.get("next_review_at").toString()).isEqualTo(calendar.today().plusDays(7).toString());
+        assertThat(row.get("interval_days")).isEqualTo(4);
+        assertThat(row.get("next_review_at").toString()).isEqualTo(calendar.today().plusDays(4).toString());
         assertThat(row.get("first_learned_at")).isNotNull();
+
+        // Every rating is a review row (V202610021000), written with the lower-case values its CHECK constraint accepts.
+        assertThat(jdbcTemplate.queryForList("""
+                select r.result from vocabulary_reviews r
+                join user_vocabulary uv on uv.id = r.user_vocabulary_id
+                where uv.user_id = ? order by r.id
+                """, String.class, learner)).containsExactly("vague", "remembered", "remembered");
 
         // The new column keeps its CHECK constraint.
         assertThatThrownBy(() -> jdbcTemplate.update(
@@ -76,6 +83,8 @@ class LearningPostgresIntegrationTests extends AbstractPostgresIntegrationTest {
     void sessionSummaryAndHistoryRunOnTheRealSchema() throws Exception {
         long learner = createLearner();
         long topic = topicId("Du lịch");
+        java.time.Instant since = calendar.now().minusSeconds(1);
+        long topicWords = jdbcTemplate.queryForObject("select count(*) from vocabulary where topic_id = ?", Long.class, topic);
         List<Long> words = jdbcTemplate.queryForList(
                 "select id from vocabulary where topic_id = ? order by id limit 2", Long.class, topic);
         review(learner, words.get(0), "FORGOT").andExpect(status().isOk());
@@ -87,7 +96,8 @@ class LearningPostgresIntegrationTests extends AbstractPostgresIntegrationTest {
         mockMvc.perform(get("/api/learning/session").param("topicId", String.valueOf(topic))
                         .with(TestAuth.learner(learner)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.cards.length()").value(20))
+                // Every card: the due word and every word not studied yet (the other reviewed word is not due).
+                .andExpect(jsonPath("$.cards.length()").value((int) topicWords - 1))
                 .andExpect(jsonPath("$.cards[0].id").value(words.get(0)))
                 .andExpect(jsonPath("$.cards[0].lastReviewResult").value("FORGOT"))
                 .andExpect(jsonPath("$.cards[1].learningStatus").value("NEW"))
@@ -102,7 +112,15 @@ class LearningPostgresIntegrationTests extends AbstractPostgresIntegrationTest {
                 .andExpect(jsonPath("$.learningCount").value(2))
                 .andExpect(jsonPath("$.masteredCount").value(0))
                 .andExpect(jsonPath("$.reviewedToday").value(2))
-                .andExpect(jsonPath("$.upcoming[2].count").value(1));
+                .andExpect(jsonPath("$.upcoming[1].count").value(1));
+
+        mockMvc.perform(get("/api/learning/session-summary").param("since", since.toString()).with(TestAuth.learner(learner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reviewedCount").value(2))
+                .andExpect(jsonPath("$.results.FORGOT").value(1))
+                .andExpect(jsonPath("$.results.REMEMBERED").value(1))
+                // The forgotten word is due today and will still be due tomorrow.
+                .andExpect(jsonPath("$.dueTomorrow.count").value(1));
 
         mockMvc.perform(get("/api/learning/history").with(TestAuth.learner(learner)))
                 .andExpect(status().isOk())

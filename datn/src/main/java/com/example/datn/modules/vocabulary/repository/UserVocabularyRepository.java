@@ -22,8 +22,8 @@ public interface UserVocabularyRepository extends JpaRepository<UserVocabulary, 
     Optional<UserVocabulary> findByUserIdAndVocabularyId(Long userId, Long vocabularyId);
 
     /**
-     * Words of one user due on or before {@code today}, optionally only in one topic or one personal list: the words
-     * last rated VAGUE first, then the longest overdue, then by id.
+     * Words of one user due on or before {@code today}, optionally only in one topic or one personal list, in the order
+     * of scenario 6: by the latest rating (FORGOT, then VAGUE, then REMEMBERED), then the longest overdue, then by id.
      */
     @Query("""
             select new com.example.datn.modules.vocabulary.repository.WordProgress(v, uv)
@@ -35,15 +35,34 @@ public interface UserVocabularyRepository extends JpaRepository<UserVocabulary, 
               and (:topicId is null or v.topicId = :topicId)
               and (:listId is null
                    or v.id in (select i.id.vocabularyId from CustomVocabularyListItem i where i.id.listId = :listId))
-            order by case when uv.lastReviewResult = :vague then 0 else 1 end, uv.nextReviewAt, v.id
+            order by case when uv.lastReviewResult = :forgot then 0
+                          when uv.lastReviewResult = :vague then 1
+                          else 2 end,
+                     uv.nextReviewAt, v.id
             """)
     List<WordProgress> findDue(
             @Param("userId") Long userId,
             @Param("topicId") Long topicId,
             @Param("listId") Long listId,
             @Param("today") LocalDate today,
+            @Param("forgot") ReviewResult forgot,
             @Param("vague") ReviewResult vague,
             Pageable pageable);
+
+    /** How many words of one user are due on or before {@code day}. */
+    @Query("select count(uv) from UserVocabulary uv where uv.userId = :userId and uv.nextReviewAt <= :day")
+    long countDueBy(@Param("userId") Long userId, @Param("day") LocalDate day);
+
+    /** The words of one user due on or before {@code day}, the earliest due first, then alphabetically. */
+    @Query("""
+            select v.word
+            from UserVocabulary uv
+            join Vocabulary v on v.id = uv.vocabularyId
+            where uv.userId = :userId
+              and uv.nextReviewAt <= :day
+            order by uv.nextReviewAt, lower(v.word), v.id
+            """)
+    List<String> findWordsDueBy(@Param("userId") Long userId, @Param("day") LocalDate day, Pageable pageable);
 
     /**
      * The four counts of the summary in one query. Learning and mastered words are counted among the reviewed ones
