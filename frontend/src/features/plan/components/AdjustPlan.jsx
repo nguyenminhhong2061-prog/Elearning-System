@@ -124,7 +124,7 @@ export function AdjustPlan({ plan, onSave, saving, error, onCancel, onStatus }) 
           <Button variant="outline" size="sm" onClick={() => onStatus(paused ? 'ACTIVE' : 'PAUSED')} disabled={saving}>
             {paused ? 'Tiếp tục kế hoạch' : 'Tạm dừng kế hoạch'}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => onStatus('COMPLETED')} disabled={saving} className="text-danger">
+          <Button variant="outline" size="sm" onClick={() => onStatus('COMPLETED')} disabled={saving} className="text-danger! hover:bg-danger-bg!">
             Kết thúc kế hoạch
           </Button>
         </div>
