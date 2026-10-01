@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -39,6 +39,22 @@ const WEEK_ACTIVITY = {
   }),
   totals: { ...zeroCounts, wordsLearned: 66 },
 }
+// Scenario 16, step 6: weeks 36 to 39 of 2026, chosen with "Từ ngày" 31/08 and "Đến ngày" 27/09.
+const RANGE_WEEKS = [
+  ['2026-08-31', '2026-09-06', 18, 2, 1, 55, 180],
+  ['2026-09-07', '2026-09-13', 20, 3, 1, 60, 210],
+  ['2026-09-14', '2026-09-20', 15, 2, 0, null, 150],
+  ['2026-09-21', '2026-09-27', 17, 4, 1, 70, 200],
+]
+const RANGE_ACTIVITY = {
+  period: 'WEEK',
+  from: '2026-08-31',
+  to: '2026-09-27',
+  items: RANGE_WEEKS.map(([start, end, wordsLearned, exercisesCompleted, testsCompleted, averageTestScore, studyMinutes]) => ({
+    start, end, wordsLearned, exercisesCompleted, testsCompleted, averageTestScore, studyMinutes,
+  })),
+  totals: { wordsLearned: 70, exercisesCompleted: 11, testsCompleted: 3, averageTestScore: 62, studyMinutes: 740 },
+}
 const GRADED = {
   attemptId: 42,
   testTitle: 'Kiểm tra tổng hợp tháng 9',
@@ -70,8 +86,8 @@ function routes(overrides = {}) {
   return {
     'GET /api/users/me': () => ({ data: { ...learner, currentLevel: 'B1' } }),
     'GET /api/learning/summary': () => ({ data: { dueToday: 12, learningCount: 160, masteredCount: 88, reviewedToday: 3, upcoming: [] } }),
-    'GET /api/progress/summary': () => ({ data: { streak: { current: 14, activeToday: false }, totals: { exercisesCompleted: 37, testsCompleted: 4, studyMinutes: 1260 } } }),
-    'GET /api/progress/activity': ({ params }) => ({ data: params.period === 'WEEK' ? WEEK_ACTIVITY : DAY_ACTIVITY }),
+    'GET /api/progress/summary': () => ({ data: { streak: { current: 14, activeToday: false }, totals: { exercisesCompleted: 37, testsCompleted: 4, studyMinutes: 1260, averageTestScore: 67 } } }),
+    'GET /api/progress/activity': ({ params }) => ({ data: params.from ? RANGE_ACTIVITY : params.period === 'WEEK' ? WEEK_ACTIVITY : DAY_ACTIVITY }),
     'GET /api/progress/skills': () => ({ data: { latest: GRADED } }),
     'GET /api/progress/badges': () => ({ data: BADGES }),
     'GET /api/exercise-attempts/current': () => ({ data: { current: CURRENT } }),
@@ -104,6 +120,9 @@ describe('home page numbers', () => {
     expect(await screen.findByText('14 ngày')).toBeInTheDocument()
     expect(screen.getByText('Học hôm nay để giữ chuỗi 14 ngày')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Bạn có 12 từ cần ôn hôm nay. Ôn tập ngay' })).toHaveAttribute('href', '/vocabulary/review')
+    // Scenario 16, step 4: tests taken, with their average score.
+    const tests = screen.getByText('Bài kiểm tra đã làm').parentElement
+    expect(tests).toHaveTextContent('Bài kiểm tra đã làm4Điểm trung bình 67/100')
   })
 
   it('announces the open periodic test the learner has not taken yet (scenarios 2 and 14)', async () => {
@@ -153,20 +172,81 @@ describe('activity chart', () => {
     const user = userEvent.setup()
     const chart = await section('Hoạt động học tập')
 
-    const table = await within(chart).findByRole('table', { name: 'Từ mới, 7 ngày qua' })
-    expect(within(table).getByRole('row', { name: 'Chủ Nhật 27/09 9 từ' })).toBeInTheDocument()
+    const table = await within(chart).findByRole('table', { name: 'Số liệu theo ngày, 7 ngày qua' })
+    expect(within(table).getByRole('row', { name: 'Chủ Nhật 27/09 9 1 0 Không làm bài kiểm tra 42 phút' })).toBeInTheDocument()
+    expect(within(table).getByRole('row', { name: 'Thứ Năm 24/09 8 1 1 62 26 phút' })).toBeInTheDocument()
     expect(within(chart).getByText(/^7 ngày qua: 43 từ mới · 5 bài tập · 1 bài kiểm tra, trung bình 62 điểm/)).toBeInTheDocument()
 
     await user.click(within(chart).getByRole('button', { name: 'Điểm kiểm tra' }))
     expect(within(chart).getByRole('button', { name: 'Điểm kiểm tra' })).toHaveAttribute('aria-pressed', 'true')
-    const scores = within(chart).getByRole('table', { name: 'Điểm kiểm tra, 7 ngày qua' })
-    expect(within(scores).getByRole('row', { name: 'Thứ Năm 24/09 62 điểm' })).toBeInTheDocument()
-    expect(within(scores).getByRole('row', { name: 'Thứ Sáu 25/09 Không làm bài kiểm tra' })).toBeInTheDocument()
+    expect(within(chart).getByText('Kỳ không làm bài kiểm tra để trống (—), không tính là 0 điểm.')).toBeInTheDocument()
     expect(app.callsTo('GET /api/progress/activity')).toHaveLength(1)
 
     await user.click(within(chart).getByRole('button', { name: 'Tuần' }))
-    expect(await within(chart).findByRole('table', { name: 'Điểm kiểm tra, 12 tuần qua' })).toBeInTheDocument()
+    expect(await within(chart).findByRole('table', { name: 'Số liệu theo tuần, 12 tuần qua' })).toBeInTheDocument()
     expect(app.callsTo('GET /api/progress/activity').map((call) => call.params)).toEqual([{ period: 'DAY' }, { period: 'WEEK' }])
+  })
+
+  it('shows a chosen range by week with every metric in a table (scenario 16, steps 5 and 6)', async () => {
+    const app = renderHome()
+    const user = userEvent.setup()
+    const chart = await section('Hoạt động học tập')
+    await within(chart).findByRole('table', { name: 'Số liệu theo ngày, 7 ngày qua' })
+    expect(within(chart).getByRole('button', { name: 'Xem bảng số liệu' })).toHaveAttribute('aria-expanded', 'false')
+
+    await user.click(within(chart).getByRole('button', { name: 'Tuần' }))
+    fireEvent.change(within(chart).getByLabelText('Từ ngày'), { target: { value: '2026-08-31' } })
+    fireEvent.change(within(chart).getByLabelText('Đến ngày'), { target: { value: '2026-09-27' } })
+    await user.click(within(chart).getByRole('button', { name: 'Xem' }))
+
+    const table = await within(chart).findByRole('table', { name: 'Số liệu theo tuần, từ 31/08/2026 đến 27/09/2026' })
+    expect(within(table).getAllByRole('row').map((row) => row.textContent)).toEqual([
+      'TuầnSố từ đã họcBài tập hoàn thànhBài kiểm traĐiểm TB kiểm traThời gian học',
+      '36 (31/08–06/09)182155180 phút',
+      '37 (07/09–13/09)203160210 phút',
+      '38 (14/09–20/09)1520—Không làm bài kiểm tra150 phút',
+      '39 (21/09–27/09)174170200 phút',
+      'Tổng7011362740 phút',
+    ])
+    expect(within(chart).getByRole('button', { name: 'Ẩn bảng số liệu' })).toHaveAttribute('aria-expanded', 'true')
+    expect(within(chart).getByText(/^Từ 31\/08\/2026 đến 27\/09\/2026: 70 từ mới · 11 bài tập · 3 bài kiểm tra, trung bình 62 điểm/)).toBeInTheDocument()
+    expect(app.callsTo('GET /api/progress/activity').at(-1).params).toEqual({ period: 'WEEK', from: '2026-08-31', to: '2026-09-27' })
+
+    await user.click(within(chart).getByRole('button', { name: 'Bỏ chọn ngày' }))
+    expect(await within(chart).findByRole('table', { name: 'Số liệu theo tuần, 12 tuần qua' })).toBeInTheDocument()
+    expect(within(chart).getByLabelText('Từ ngày')).toHaveValue('')
+  })
+
+  it('says what is wrong with the dates and asks nothing (scenario 16, branch 5a)', async () => {
+    const app = renderHome()
+    const user = userEvent.setup()
+    const chart = await section('Hoạt động học tập')
+    await within(chart).findByRole('table', { name: 'Số liệu theo ngày, 7 ngày qua' })
+
+    fireEvent.change(within(chart).getByLabelText('Từ ngày'), { target: { value: '2026-09-10' } })
+    fireEvent.change(within(chart).getByLabelText('Đến ngày'), { target: { value: '2026-09-01' } })
+    await user.click(within(chart).getByRole('button', { name: 'Xem' }))
+    expect(within(chart).getByRole('alert')).toHaveTextContent('Ngày bắt đầu phải trước hoặc trùng ngày kết thúc.')
+    expect(within(chart).getByLabelText('Từ ngày')).toHaveAttribute('aria-invalid', 'true')
+
+    fireEvent.change(within(chart).getByLabelText('Đến ngày'), { target: { value: '2099-01-01' } })
+    await user.click(within(chart).getByRole('button', { name: 'Xem' }))
+    expect(within(chart).getByRole('alert')).toHaveTextContent('Ngày kết thúc không được sau hôm nay.')
+
+    fireEvent.change(within(chart).getByLabelText('Từ ngày'), { target: { value: '2026-07-01' } })
+    fireEvent.change(within(chart).getByLabelText('Đến ngày'), { target: { value: '2026-09-27' } })
+    await user.click(within(chart).getByRole('button', { name: 'Xem' }))
+    expect(within(chart).getByRole('alert')).toHaveTextContent('Khoảng thời gian quá dài: mỗi lần xem được tối đa 31 ngày.')
+    expect(app.callsTo('GET /api/progress/activity').every((call) => !call.params.from)).toBe(true)
+
+    // The same range by week is fine; back to days, it is too long again and the chart returns to the default range.
+    await user.click(within(chart).getByRole('button', { name: 'Tuần' }))
+    await user.click(within(chart).getByRole('button', { name: 'Xem' }))
+    await within(chart).findByRole('table', { name: /^Số liệu theo tuần, từ / })
+    expect(within(chart).queryByRole('alert')).not.toBeInTheDocument()
+    await user.click(within(chart).getByRole('button', { name: 'Ngày' }))
+    expect(within(chart).getByRole('alert')).toHaveTextContent('tối đa 31 ngày')
+    expect(await within(chart).findByRole('table', { name: 'Số liệu theo ngày, 7 ngày qua' })).toBeInTheDocument()
   })
 })
 
@@ -220,7 +300,7 @@ describe('level journey and achievements', () => {
 
     await user.click(within(achievements).getByRole('button', { name: 'Xem tất cả thành tích' }))
     const dialog = screen.getByRole('dialog', { name: 'Thành tích · 1/3 đã đạt' })
-    expect(within(dialog).getByText('Đạt 24/09')).toBeInTheDocument()
+    expect(within(dialog).getByText('Đạt 24/09/2026')).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Đóng' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })

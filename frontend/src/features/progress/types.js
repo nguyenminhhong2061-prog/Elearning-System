@@ -5,7 +5,7 @@
  *
  * @typedef {object} ProgressSummary
  * @property {{ current: number, activeToday: boolean }} streak
- * @property {{ exercisesCompleted: number, testsCompleted: number, studyMinutes: number }} totals
+ * @property {{ exercisesCompleted: number, testsCompleted: number, studyMinutes: number, averageTestScore: number | null }} totals
  *
  * @typedef {object} ActivityCounts
  * @property {number} wordsLearned
@@ -19,8 +19,8 @@
  * @typedef {object} Activity
  * @property {Period} period
  * @property {string} from first day of the first bucket
- * @property {string} to today
- * @property {ActivityBucket[]} items 7, 12 or 6 buckets, oldest first
+ * @property {string} to today, or the last day of the chosen range
+ * @property {ActivityBucket[]} items 7, 12 or 6 buckets, or up to 31 for a chosen range, oldest first
  * @property {ActivityCounts} totals over from..to
  *
  * @typedef {{ score: number | null, level: import('@/api/types').CefrLevel | null }} SkillScore null while the AI grades it

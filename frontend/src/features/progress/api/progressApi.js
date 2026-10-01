@@ -9,12 +9,13 @@ export async function getProgressSummary() {
 }
 
 /**
- * Counts per period for the chart: 7 days, 12 weeks or 6 months, the last one current.
+ * Counts per period for the chart: 7 days, 12 weeks or 6 months up to today, or the learner's chosen range.
  * @param {import('../types').Period} period
+ * @param {{ from: string, to: string } | null} range "YYYY-MM-DD" days, both included
  * @returns {Promise<import('../types').Activity>}
  */
-export async function getActivity(period) {
-  const { data } = await httpClient.get('/api/progress/activity', { params: { period } })
+export async function getActivity(period, range = null) {
+  const { data } = await httpClient.get('/api/progress/activity', { params: range ? { period, ...range } : { period } })
   return data
 }
 

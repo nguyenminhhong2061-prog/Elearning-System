@@ -4,7 +4,7 @@ import { getActivity, getBadges, getProgressSummary, getSkills } from './progres
 export const progressKeys = {
   all: ['progress'],
   summary: ['progress', 'summary'],
-  activity: (period) => ['progress', 'activity', period],
+  activity: (period, range) => ['progress', 'activity', period, range],
   skills: ['progress', 'skills'],
   badges: ['progress', 'badges'],
 }
@@ -17,9 +17,14 @@ export function useProgressSummary() {
   return useQuery({ queryKey: progressKeys.summary, queryFn: getProgressSummary, ...FRESH_ON_OPEN })
 }
 
-/** Switching the period keeps the previous bars on screen until the new ones arrive. */
-export function useActivity(period) {
-  return useQuery({ queryKey: progressKeys.activity(period), queryFn: () => getActivity(period), placeholderData: keepPreviousData, ...FRESH_ON_OPEN })
+/** Switching the period or the range keeps the previous bars on screen until the new ones arrive. */
+export function useActivity(period, range = null) {
+  return useQuery({
+    queryKey: progressKeys.activity(period, range),
+    queryFn: () => getActivity(period, range),
+    placeholderData: keepPreviousData,
+    ...FRESH_ON_OPEN,
+  })
 }
 
 export function useSkills() {

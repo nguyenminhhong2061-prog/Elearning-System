@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { HttpError } from '../http.js'
-import { activity, badges, cefrOf, currentStreak, periodsFor, progressRoutes, summary } from './progress'
+import { activity, badges, cefrOf, chosenRange, currentStreak, periodsBetween, periodsFor, progressRoutes, summary } from './progress'
 
 // Rules of docs/api/progress.md, as the mock applies them (the backend must behave the same way).
 
@@ -45,6 +45,35 @@ describe('activity', () => {
     }
   })
 
+  it('cuts a chosen range into weeks clipped to it, and counts only the days inside (scenario 16)', () => {
+    expect(periodsBetween('WEEK', '2026-08-31', '2026-09-23')).toEqual([
+      { start: '2026-08-31', end: '2026-09-06' },
+      { start: '2026-09-07', end: '2026-09-13' },
+      { start: '2026-09-14', end: '2026-09-20' },
+      { start: '2026-09-21', end: '2026-09-23' },
+    ])
+    expect(periodsBetween('MONTH', '2026-08-15', '2026-09-10').map((month) => [month.start, month.end])).toEqual([
+      ['2026-08-15', '2026-08-31'],
+      ['2026-09-01', '2026-09-10'],
+    ])
+
+    const range = activity('u-activity', 'WEEK', TODAY, { from: '2026-08-31', to: '2026-09-23' })
+    expect(range).toMatchObject({ from: '2026-08-31', to: '2026-09-23' })
+    const byDay = activity('u-activity', 'DAY', TODAY, { from: '2026-08-31', to: '2026-09-23' })
+    expect(range.totals).toEqual(byDay.totals)
+  })
+
+  it('refuses a range that is backwards, ends after today or holds too many periods', () => {
+    const params = (from, to) => new URLSearchParams({ from, to })
+    expect(chosenRange('DAY', new URLSearchParams(), TODAY)).toBeNull()
+    expect(chosenRange('DAY', params('2026-09-01', '2026-09-27'), TODAY)).toEqual({ from: '2026-09-01', to: '2026-09-27' })
+    expect(() => chosenRange('DAY', params('2026-09-10', '2026-09-01'), TODAY)).toThrow(HttpError)
+    expect(() => chosenRange('DAY', params('2026-09-01', '2026-09-28'), TODAY)).toThrow(HttpError)
+    expect(() => chosenRange('DAY', params('2026-08-01', '2026-09-27'), TODAY)).toThrow(HttpError)
+    expect(() => chosenRange('DAY', new URLSearchParams({ from: '2026-09-01' }), TODAY)).toThrow(HttpError)
+    expect(chosenRange('WEEK', params('2026-08-01', '2026-09-27'), TODAY)).not.toBeNull()
+  })
+
   it('rejects an unknown period', () => {
     const route = progressRoutes.find((candidate) => candidate.pattern.test('/api/progress/activity'))
     expect(() => route.handle({ userId: 'u', searchParams: new URLSearchParams({ period: 'YEAR' }) })).toThrow(HttpError)
@@ -64,6 +93,12 @@ describe('streak', () => {
     const { streak } = summary('u-streak', TODAY)
     expect(streak.current).toBeGreaterThan(0)
     expect(streak.activeToday).toBe(false) // today only has what happens live
+  })
+
+  it('gives the average score of every test taken so far (scenario 16, "Bài kiểm tra đã làm")', () => {
+    const { totals } = summary('u-streak', TODAY)
+    expect(totals.testsCompleted).toBeGreaterThan(0)
+    expect(totals.averageTestScore).toBeGreaterThan(0)
   })
 })
 

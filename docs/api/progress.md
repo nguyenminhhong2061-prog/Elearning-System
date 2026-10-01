@@ -39,8 +39,9 @@ Enum trong JSON viết **chữ hoa**. Dùng các bảng có sẵn trong `V1__ini
 | Thẻ "Từ đã học" | `GET /api/learning/summary`: `learningCount + masteredCount` | Hồng, đã có |
 | Thẻ "Từ cần ôn hôm nay" | `GET /api/learning/summary`: `dueToday` | Hồng, đã có |
 | Thẻ "Bài tập đã hoàn thành" | `GET /api/progress/summary`: `totals.exercisesCompleted` | **Nhân** |
+| Thẻ "Bài kiểm tra đã làm" kèm điểm trung bình (kịch bản 16) | `GET /api/progress/summary`: `totals.testsCompleted`, `totals.averageTestScore` | **Nhân** |
 | Thẻ "Streak" | `GET /api/progress/summary`: `streak` | **Nhân** |
-| Biểu đồ "Hoạt động học tập": 4 chỉ số, theo Ngày / Tuần / Tháng | `GET /api/progress/activity?period=` | **Nhân** |
+| Biểu đồ "Hoạt động học tập": 4 chỉ số, theo Ngày / Tuần / Tháng, mặc định hoặc theo "Từ ngày", "Đến ngày"; bảng số liệu dưới biểu đồ | `GET /api/progress/activity?period=` (thêm `&from=&to=`) | **Nhân** |
 | Biểu đồ "Điểm theo kỹ năng" (radar Nghe, Nói, Đọc, Viết) | `GET /api/progress/skills` | **Nhân** |
 | "Hành trình trình độ" (A1 → C2) | Frontend tính từ `currentLevel` của `/api/users/me`, không cần API | — |
 | "Thành tích" (huy hiệu đã đạt, sắp đạt) | `GET /api/progress/badges` | **Nhân** |
@@ -56,7 +57,7 @@ Thứ tự đề xuất cho backend: `summary` → `activity` → `study-time` �
 ```json
 {
   "streak": { "current": 14, "activeToday": true },
-  "totals": { "exercisesCompleted": 37, "testsCompleted": 4, "studyMinutes": 1260 }
+  "totals": { "exercisesCompleted": 37, "testsCompleted": 4, "studyMinutes": 1260, "averageTestScore": 67 }
 }
 ```
 
@@ -65,6 +66,7 @@ Thứ tự đề xuất cho backend: `summary` → `activity` → `study-time` �
 | `streak.current` | Số ngày học liên tiếp **tính đến hôm nay**. Nếu hôm nay chưa học thì đếm đến hôm qua: chuỗi chưa mất cho đến hết ngày. Không có ngày học nào: `0` |
 | `streak.activeToday` | Hôm nay đã có ngày học chưa. Giao diện dùng để nhắc "Học hôm nay để giữ chuỗi 14 ngày" |
 | `totals` | Tổng từ trước tới nay, cộng từ `user_progress`. Không có số từ đã học: xem nguyên tắc "một con số chỉ có một nguồn" |
+| `totals.averageTestScore` | **Đề xuất 01/10 (kịch bản 16, thẻ "Bài kiểm tra đã làm").** Điểm trung bình (0–100, làm tròn) mọi bài kiểm tra đã nộp, cả định kỳ lẫn tổng hợp; chưa có bài nào: `null`. Giao diện chịu được khi trường này chưa có (chỉ hiện số bài) |
 
 "Ngày học" là ngày có dòng `user_progress` với ít nhất một số đếm lớn hơn `0` (xem câu hỏi mở 1).
 
@@ -80,6 +82,19 @@ chọn khoảng thời gian khác".
 | `MONTH` | 6 | một tháng dương lịch | tháng hiện tại (chưa hết tháng) |
 
 Giá trị khác trả `400`.
+
+**Khoảng ngày tự chọn (đề xuất 01/10, kịch bản 16 bước 5–6):** thêm `from` và `to` (`YYYY-MM-DD`, giờ Việt Nam, tính cả
+hai đầu), ví dụ `?period=WEEK&from=2026-08-31&to=2026-10-06`.
+
+- Phải có **cả hai** hoặc **không có cả hai**. Không có thì như bảng trên (7 ngày, 12 tuần, 6 tháng đến hôm nay).
+- Cột là các ngày, tuần (thứ Hai đến Chủ nhật) hoặc tháng **giao với khoảng**; cột đầu và cột cuối bị cắt theo khoảng:
+  `from=2026-08-31&to=2026-10-06` theo tuần cho 6 cột, cột cuối `start = 2026-10-05`, `end = 2026-10-06`. Số liệu chỉ
+  tính các ngày trong khoảng.
+- `400` khi: thiếu một trong hai, sai định dạng, `from > to`, `to` sau hôm nay, hoặc khoảng cho **quá 31 cột** (31 ngày,
+  31 tuần, 31 tháng). Giao diện kiểm tra trước các luật này và báo lỗi dưới ô ngày ("Ngày bắt đầu phải trước hoặc trùng
+  ngày kết thúc.", "Ngày kết thúc không được sau hôm nay.", "Khoảng thời gian quá dài: mỗi lần xem được tối đa 31
+  ngày."), nên `400` chỉ là lớp bảo vệ.
+- Phản hồi cùng hình dạng; `from` là ngày đầu của cột đầu (bằng `from` đã gửi), `to` là `to` đã gửi.
 
 ```json
 {
@@ -109,8 +124,8 @@ Giá trị khác trả `400`.
 
 | Trường | Ý nghĩa |
 |---|---|
-| `from`, `to` | Ngày đầu của cột đầu tiên; `to` là **hôm nay** (giờ Việt Nam) |
-| `items` | **Đúng 7, 12 hoặc 6 phần tử**, cũ trước mới sau. Kỳ không có dòng `user_progress` thì các số đếm bằng `0` |
+| `from`, `to` | Ngày đầu của cột đầu tiên; `to` là **hôm nay** (giờ Việt Nam), hoặc `to` đã gửi khi chọn khoảng |
+| `items` | **Đúng 7, 12 hoặc 6 phần tử** (khoảng tự chọn: 1 đến 31), cũ trước mới sau. Kỳ không có dòng `user_progress` thì các số đếm bằng `0` |
 | `start`, `end` | Ngày đầu, ngày cuối của kỳ (với `DAY` thì bằng nhau). `end` của cột cuối có thể sau hôm nay |
 | `wordsLearned` … `studyMinutes` | Tổng các cột cùng tên của `user_progress` trong kỳ |
 | `averageTestScore` | Điểm trung bình (0–100, làm tròn) các bài kiểm tra **đã nộp** trong kỳ. **Không có bài nào: `null`**, không phải `0`: giao diện để trống cột, vì "không làm bài" khác "được 0 điểm" |
@@ -224,7 +239,8 @@ không tự có; tài khoản demo nên học sau khi module D lên, hoặc dùn
 | Việc | Gọi |
 |---|---|
 | Mở trang chủ | Song song: `users/me` (đã có sẵn), `learning/summary`, `progress/summary`, `progress/activity?period=DAY`, `progress/skills`, `progress/badges`, `exercise-attempts/current` (và `exercises?skill=GRAMMAR` khi không có lượt dở) |
-| Đổi Ngày / Tuần / Tháng trên biểu đồ | `GET /api/progress/activity?period=WEEK` hoặc `MONTH` |
+| Đổi Ngày / Tuần / Tháng trên biểu đồ | `GET /api/progress/activity?period=WEEK` hoặc `MONTH` (kèm `from`, `to` nếu đang xem khoảng tự chọn; khoảng quá 31 cột theo kỳ mới thì giao diện bỏ khoảng, báo lỗi và quay về mặc định) |
+| Nhập "Từ ngày", "Đến ngày" rồi bấm "Xem" | Kiểm tra ở giao diện, hợp lệ thì `GET /api/progress/activity?period=…&from=…&to=…`; bảng số liệu (mọi chỉ số, dòng "Tổng") hiện dưới biểu đồ |
 | Đổi chỉ số (Từ mới, Bài tập, Điểm kiểm tra, Thời gian học) | Không gọi lại: cùng một phản hồi `activity` |
 | Học xong một thẻ, một bài, một bài kiểm tra | Làm mới dữ liệu `progress` cùng dữ liệu của module đó |
 | Hành trình trình độ | Không gọi API: trình độ dưới `currentLevel` là "Đạt", bằng là "Hiện tại", trên là "Chưa đạt"; `currentLevel = null` thì mọi ô "Chưa đạt" và gợi ý làm bài kiểm tra tổng hợp |
