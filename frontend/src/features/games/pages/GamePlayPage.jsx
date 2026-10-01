@@ -64,6 +64,8 @@ export function GamePlayPage() {
   const [score, setScore] = useState(0)
   const [startError, setStartError] = useState(null)
   const [confirmingExit, setConfirmingExit] = useState(false)
+  const [playedSeconds, setPlayedSeconds] = useState(0)
+  const pausedAt = useRef(null)
   const answers = useRef(new Map())
   const lastSubmission = useRef(null)
   // The last pair and the end of the time can land in the same moment; the round must be handed in only once.
@@ -97,6 +99,7 @@ export function GamePlayPage() {
   function finish() {
     if (phase !== 'playing' || handedIn.current) return
     handedIn.current = true
+    setPlayedSeconds(Math.min(round.timeLimitSeconds ?? Infinity, Math.round((Date.now() - startedAt) / 1000)))
     setPhase('finished')
     setConfirmingExit(false)
     lastSubmission.current = {
@@ -113,7 +116,21 @@ export function GamePlayPage() {
     startedAt: phase === 'playing' ? startedAt : null,
     limitSeconds: round?.timeLimitSeconds ?? null,
     onExpire: finish,
+    paused: confirmingExit,
   })
+
+  // The clock stops while the learner is asked about leaving, and goes on from where it was (scenario 8, branch 6a).
+  function askToExit() {
+    pausedAt.current = Date.now()
+    setConfirmingExit(true)
+  }
+
+  function keepPlaying() {
+    const pausedFor = pausedAt.current === null ? 0 : Date.now() - pausedAt.current
+    pausedAt.current = null
+    setStartedAt((previous) => previous + pausedFor)
+    setConfirmingExit(false)
+  }
 
   if (gameId === null || (games.data && !games.data.some((game) => game.id === gameId))) {
     return (
@@ -174,7 +191,15 @@ export function GamePlayPage() {
         <ChoiceRound key={roundNumber} round={round} onAnswer={recordAnswer} onComplete={finish} />
       )
   } else if (submit.isSuccess) {
-    body = <GameResult result={submit.data} onPlayAgain={start} />
+    body = (
+      <GameResult
+        result={submit.data}
+        playedSeconds={playedSeconds}
+        round={round}
+        answers={answers.current}
+        onPlayAgain={start}
+      />
+    )
   } else if (submit.isError) {
     body = (
       <div className="flex flex-col items-start gap-3">
@@ -211,7 +236,7 @@ export function GamePlayPage() {
               <button
                 type="button"
                 aria-label="Thoát ván"
-                onClick={() => setConfirmingExit(true)}
+                onClick={askToExit}
                 className="flex size-8 cursor-pointer items-center justify-center rounded-full bg-white/18 text-sm text-white hover:bg-white/28 focus-visible:outline-2 focus-visible:outline-white"
               >
                 ✕
@@ -223,10 +248,10 @@ export function GamePlayPage() {
         {body}
       </GameBoard>
 
-      <Dialog open={confirmingExit} onClose={() => setConfirmingExit(false)} title="Thoát ván này?">
-        <p className="text-sm text-ink-soft">Điểm của ván đang chơi sẽ không được lưu.</p>
+      <Dialog open={confirmingExit} onClose={keepPlaying} title="Thoát ván này?">
+        <p className="text-sm text-ink-soft">Thoát bây giờ sẽ không lưu điểm ván này. Bạn có chắc?</p>
         <div className="flex gap-2 pt-1.5">
-          <Button variant="outline" size="sm" className="flex-1" onClick={() => setConfirmingExit(false)}>
+          <Button variant="outline" size="sm" className="flex-1" onClick={keepPlaying}>
             Chơi tiếp
           </Button>
           <Button variant="danger" size="sm" className="flex-1" onClick={() => navigate(GAMES_PATH)}>

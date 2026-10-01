@@ -21,7 +21,7 @@ function optionStyle(optionId, feedback) {
  *
  * @param {object} props
  * @param {import('../types').GameRound} props.round
- * @param {(answer: { questionId: number, optionId: number, correct: boolean, points: number, responseTimeMs: number }) => void} props.onAnswer
+ * @param {(answer: { questionId: number, optionId: number, correct: boolean, correctOptionId: number | null, points: number, responseTimeMs: number }) => void} props.onAnswer
  * @param {() => void} props.onComplete after the last question
  */
 export function ChoiceRound({ round, onAnswer, onComplete }) {
@@ -39,11 +39,13 @@ export function ChoiceRound({ round, onAnswer, onComplete }) {
     setError(null)
     try {
       const result = await checkAnswer(round.gameId, { playToken: round.playToken, questionId: question.id, optionId: option.id })
-      setFeedback({ chosenId: option.id, correctOptionId: result.correctOptionId ?? (result.correct ? option.id : null), correct: result.correct })
+      const correctOptionId = result.correctOptionId ?? (result.correct ? option.id : null)
+      setFeedback({ chosenId: option.id, correctOptionId, correct: result.correct })
       onAnswer({
         questionId: question.id,
         optionId: option.id,
         correct: result.correct,
+        correctOptionId,
         points: question.points,
         responseTimeMs: elapsedSince(shownAt.current),
       })
