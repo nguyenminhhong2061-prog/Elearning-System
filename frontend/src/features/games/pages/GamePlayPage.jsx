@@ -65,6 +65,7 @@ export function GamePlayPage() {
   const [startError, setStartError] = useState(null)
   const [confirmingExit, setConfirmingExit] = useState(false)
   const [playedSeconds, setPlayedSeconds] = useState(0)
+  const [finalAnswers, setFinalAnswers] = useState(() => new Map())
   const pausedAt = useRef(null)
   const answers = useRef(new Map())
   const lastSubmission = useRef(null)
@@ -100,6 +101,7 @@ export function GamePlayPage() {
     if (phase !== 'playing' || handedIn.current) return
     handedIn.current = true
     setPlayedSeconds(Math.min(round.timeLimitSeconds ?? Infinity, Math.round((Date.now() - startedAt) / 1000)))
+    setFinalAnswers(new Map(answers.current))
     setPhase('finished')
     setConfirmingExit(false)
     lastSubmission.current = {
@@ -196,7 +198,7 @@ export function GamePlayPage() {
         result={submit.data}
         playedSeconds={playedSeconds}
         round={round}
-        answers={answers.current}
+        answers={finalAnswers}
         onPlayAgain={start}
       />
     )
