@@ -77,7 +77,7 @@ const BADGES = [
 ]
 const CURRENT = {
   attemptId: 57,
-  lesson: { id: 3, skill: 'GRAMMAR', title: 'Thì hiện tại hoàn thành', cefrLevel: 'B1', itemCount: 10 },
+  lesson: { id: 3, skill: 'READING', title: 'Thì hiện tại hoàn thành', cefrLevel: 'B1', itemCount: 10 },
   doneCount: 4,
   lastActivityAt: '2026-09-26T14:10:00Z',
 }
@@ -329,16 +329,16 @@ describe('continue card', () => {
     renderHome()
 
     const card = await screen.findByRole('link', { name: /Tiếp tục: Thì hiện tại hoàn thành/ })
-    expect(card).toHaveTextContent('Ngữ pháp · Đã làm 4/10 câu · còn 6 câu')
+    expect(card).toHaveTextContent('Đọc hiểu · Đã làm 4/10 câu · còn 6 câu')
     expect(card).toHaveAttribute('href', '/exercises/lessons/3')
   })
 
-  it('suggests the next grammar lesson when nothing is unfinished', async () => {
+  it('suggests the next reading lesson when nothing is unfinished', async () => {
     const app = renderHome({ 'GET /api/exercise-attempts/current': () => ({ data: { current: null } }) })
 
     const card = await screen.findByRole('link', { name: /Học tiếp: Câu bị động/ })
-    expect(card).toHaveTextContent('Ngữ pháp · B2 · 5 câu')
+    expect(card).toHaveTextContent('Đọc hiểu · B2 · 5 câu')
     expect(card).toHaveAttribute('href', '/exercises/lessons/5')
-    expect(app.callsTo('GET /api/exercises')[0].params).toEqual({ skill: 'GRAMMAR' })
+    expect(app.callsTo('GET /api/exercises')[0].params).toEqual({ skill: 'READING' })
   })
 })

@@ -3,7 +3,7 @@ import { cx } from '@/lib/cx'
 import { SKILL_INFO, SKILL_ORDER, skillPath } from '../constants'
 
 /**
- * The design's pill tabs of the exercise section (Ngữ pháp / Nghe hiểu / Phát âm). Each tab is a link, so the chosen
+ * The design's pill tabs of the exercise section (Đọc hiểu / Viết / Nghe hiểu / Phát âm, scenario 9 step 2). Each tab is a link, so the chosen
  * skill lives in the URL (?skill=) and survives reloads and the back button, like the vocabulary tabs.
  *
  * @param {{ current: import('../types').Skill }} props

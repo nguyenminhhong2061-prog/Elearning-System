@@ -80,7 +80,7 @@ function useCompletionSummary(skill) {
 }
 
 /**
- * /exercises: the lessons of one skill (?skill=grammar|listening|pronunciation, grammar by default) with the learner's
+ * /exercises: the lessons of one skill (?skill=reading|writing|listening|pronunciation, reading by default) with the learner's
  * best scores. The AI assistant is available here too, for general questions.
  */
 export function ExercisesPage() {

@@ -1,8 +1,12 @@
 // Sample lessons of module B for `npm run dev:mock` (docs/api/exercises.md). Unlike the API, questions here carry their
-// answers (correctOptionId, accepted) and explanations; the mock strips them before sending a lesson. Lesson titles
-// follow the design. The backend's seed migration can reuse this content.
+// answers (correctOptionId, accepted, sampleAnswers) and explanations; the mock strips them before sending a lesson.
+// Lesson titles follow the design and scenarios 9 and 10. The backend's seed migration can reuse this content.
+// Writing questions also carry what the fake AI grader of the mock needs: `rules` (an answer containing this text gets
+// these points and this feedback) and `perfect` (the feedback for an answer equal to a sample).
 
 const KEYS = 'ABCD'
+
+const NOT_WRITING = { passageId: null, starter: null, sampleAnswers: [] }
 
 function choice(id, prompt, options, correctIndex, explanation, hint = null) {
   return {
@@ -15,11 +19,20 @@ function choice(id, prompt, options, correctIndex, explanation, hint = null) {
     correctOptionId: id * 10 + correctIndex + 1,
     accepted: [],
     explanation,
+    ...NOT_WRITING,
   }
 }
 
 function blank(id, prompt, accepted, explanation, hint = null) {
-  return { id, type: 'FILL_BLANK', prompt, hint, points: 1, options: [], correctOptionId: null, accepted, explanation }
+  return { id, type: 'FILL_BLANK', prompt, hint, points: 1, options: [], correctOptionId: null, accepted, explanation, ...NOT_WRITING }
+}
+
+/** A question about a reading passage of the lesson (scenario 9, step 13). */
+const about = (passageId, question) => ({ ...question, passageId })
+
+/** A writing question, graded by the AI (here a fake grader in routes/exercises.js), worth 2 points by default. */
+function writing(id, type, prompt, sampleAnswers, explanation, { starter = null, hint = null, points = 2, rules = [], perfect = null } = {}) {
+  return { id, type, prompt, hint, points, options: [], correctOptionId: null, accepted: [], explanation, passageId: null, starter, sampleAnswers, rules, perfect }
 }
 
 function segments(lessonId, rows) {
@@ -38,13 +51,13 @@ function items(lessonId, rows) {
   return rows.map(([text, ipa, notes], index) => ({ id: lessonId * 100 + index + 1, text, ipa, audioUrl: null, notes }))
 }
 
-const lesson = (fields) => ({ description: null, topic: null, questions: [], passage: null, pronunciationItems: [], ...fields })
+const lesson = (fields) => ({ description: null, topic: null, questions: [], readingPassages: [], passage: null, pronunciationItems: [], ...fields })
 
 export const MOCK_LESSONS = [
-  // Grammar
+  // Reading: grammar multiple choice, fill in the blank, and questions about a passage (scenario 9)
   lesson({
     id: 1,
-    skill: 'GRAMMAR',
+    skill: 'READING',
     title: 'Thì hiện tại đơn',
     description: 'Thói quen, sự thật hiển nhiên và cách chia động từ với ngôi thứ ba số ít.',
     topic: 'Thì của động từ',
@@ -61,7 +74,7 @@ export const MOCK_LESSONS = [
   }),
   lesson({
     id: 2,
-    skill: 'GRAMMAR',
+    skill: 'READING',
     title: 'Mạo từ a, an, the',
     description: 'Chọn a hay an theo âm đầu, và khi nào dùng the.',
     topic: 'Mạo từ',
@@ -78,7 +91,7 @@ export const MOCK_LESSONS = [
   }),
   lesson({
     id: 3,
-    skill: 'GRAMMAR',
+    skill: 'READING',
     title: 'Thì hiện tại hoàn thành',
     description: 'Hành động bắt đầu trong quá khứ và còn liên quan tới hiện tại; phân biệt với quá khứ đơn.',
     topic: 'Thì của động từ',
@@ -92,11 +105,53 @@ export const MOCK_LESSONS = [
       choice(304, '___ you ever been to Japan?', ['Did', 'Have', 'Were', 'Do'], 1, '"Have you ever + V3?" hỏi về trải nghiệm từ trước tới nay.'),
       choice(305, 'He ___ his keys yesterday, so he couldn’t get in.', ['has lost', 'lost', 'loses', 'has been losing'], 1, 'Có mốc thời gian đã kết thúc (yesterday) thì dùng quá khứ đơn, không dùng hiện tại hoàn thành.', 'Chú ý từ "yesterday".'),
       blank(306, 'They have just ___ (finish) their homework.', ['finished'], '"have just + V3": hành động vừa mới xong. finish → finished.'),
+      about(71, choice(307, "Why hasn't Anna been to Sa Pa yet?", ["She doesn't like cold weather", 'She has been busy with her new job', 'She has already been there twice', 'She lives too far away'], 1, 'Câu cuối của đoạn 1 nêu lý do: because she has been busy with her new job.')),
+      about(71, choice(308, 'How many times has Anna visited Ha Long Bay?', ['Once', 'Twice', 'Three times', 'Never'], 1, 'Đoạn 1: "She has visited Ha Long Bay twice".', 'Tìm "Ha Long Bay" trong đoạn 1.')),
+      about(71, choice(309, 'Which sentence is TRUE about Anna?', ['She has learned some Vietnamese', 'She moved to Hanoi in 2022', 'She has never eaten pho', 'She works in a hospital'], 0, 'Đoạn 2: "She has learned some Vietnamese, so she can now order food at the market."')),
+    ],
+    readingPassages: [
+      {
+        id: 71,
+        title: "Anna's life in Hanoi",
+        content: [
+          "Anna is a teacher from Australia. She has lived in Hanoi since 2020. She has visited Ha Long Bay twice, but she hasn't been to Sa Pa yet because she has been busy with her new job.",
+          'At first, life in Hanoi was not easy. The traffic was loud and she could not read the street signs. Since then, she has learned some Vietnamese, so she can now order food at the market and chat with her neighbours.',
+          'Anna has tried many Vietnamese dishes. Her favourite is bun cha, which she has eaten almost every week. She has also learned to cook pho, but she says it is never as good as the one near her school.',
+          'Next year, Anna wants to travel to the south. She has already bought a guidebook, and she has saved enough money for the trip.',
+        ].join('\n\n'),
+      },
+    ],
+  }),
+  lesson({
+    id: 8,
+    skill: 'READING',
+    title: 'A trip to Ha Long Bay',
+    description: 'Đọc một bài viết ngắn về chuyến du lịch và trả lời câu hỏi.',
+    topic: 'Du lịch',
+    cefrLevel: 'A2',
+    difficulty: 'MEDIUM',
+    estimatedMinutes: 7,
+    questions: [
+      about(72, choice(801, 'How did Minh and his family get to Ha Long Bay?', ['By train', 'By bus', 'By plane', 'By motorbike'], 1, 'Đoạn 1: "We went there by bus from Hanoi."')),
+      about(72, choice(802, 'How long did they stay on the boat?', ['One night', 'Two nights', 'Three days', 'One week'], 0, 'Đoạn 2: "We spent one night on a boat."')),
+      about(72, blank(803, 'In the morning, they went ___ in a cave. (one word)', ['kayaking'], 'Đoạn 2: "In the morning, we went kayaking near a cave."', 'Tìm hoạt động buổi sáng ở đoạn 2.')),
+      about(72, choice(804, 'Why does Minh want to go back?', ['The food was cheap', 'He wants to see the islands in summer', 'He left his bag there', 'His friends live there'], 1, 'Đoạn 3: "I want to go back in summer to see the islands under the sun."')),
+    ],
+    readingPassages: [
+      {
+        id: 72,
+        title: 'A trip to Ha Long Bay',
+        content: [
+          'Last month, my family visited Ha Long Bay. We went there by bus from Hanoi. The trip took about three hours.',
+          'We spent one night on a boat. In the evening, we ate fresh seafood and watched the sunset. In the morning, we went kayaking near a cave. The water was calm and very green.',
+          'It was cold and cloudy, so we could not swim. I want to go back in summer to see the islands under the sun.',
+        ].join('\n\n'),
+      },
     ],
   }),
   lesson({
     id: 4,
-    skill: 'GRAMMAR',
+    skill: 'READING',
     title: 'Câu điều kiện loại 2',
     description: 'Giả định không có thật ở hiện tại: If + quá khứ đơn, would + động từ nguyên mẫu.',
     topic: 'Câu điều kiện',
@@ -112,7 +167,7 @@ export const MOCK_LESSONS = [
   }),
   lesson({
     id: 5,
-    skill: 'GRAMMAR',
+    skill: 'READING',
     title: 'Câu bị động',
     description: 'Bị động ở các thì thường gặp: be + quá khứ phân từ.',
     topic: 'Câu bị động',
@@ -129,7 +184,7 @@ export const MOCK_LESSONS = [
   }),
   lesson({
     id: 6,
-    skill: 'GRAMMAR',
+    skill: 'READING',
     title: 'Đảo ngữ với trạng từ phủ định',
     description: 'Never, rarely, not only, hardly… đứng đầu câu thì đảo trợ động từ lên trước chủ ngữ.',
     topic: 'Cấu trúc câu',
@@ -148,7 +203,7 @@ export const MOCK_LESSONS = [
   }),
   lesson({
     id: 7,
-    skill: 'GRAMMAR',
+    skill: 'READING',
     title: 'Thức giả định',
     description: 'Insist that he submit, it is essential that…, wish, if only.',
     topic: 'Thức giả định',
@@ -162,6 +217,84 @@ export const MOCK_LESSONS = [
       choice(704, 'If only she ___ told me earlier!', ['has', 'had', 'would', 'did'], 1, '"If only + quá khứ hoàn thành" diễn tả tiếc nuối về quá khứ: had told.'),
       // A long prompt, to see how questions and answers wrap.
       choice(705, 'Had the government invested more heavily in renewable energy two decades ago, the country ___ so dependent on imported fuel today.', ['would not be', 'would not have been', 'will not be', 'is not'], 0, 'Câu điều kiện hỗn hợp: đảo ngữ "Had + chủ ngữ + V3" (điều kiện trong quá khứ), kết quả ở hiện tại (today): would not be.', 'Chú ý "two decades ago" và "today".'),
+    ],
+  }),
+
+  // Writing: translate, rewrite, write with keywords; graded by the AI (scenario 10)
+  lesson({
+    id: 31,
+    skill: 'WRITING',
+    title: 'Viết câu về gia đình',
+    description: 'Câu ngắn về các thành viên trong gia đình.',
+    topic: 'Gia đình',
+    cefrLevel: 'A1',
+    difficulty: 'EASY',
+    estimatedMinutes: 6,
+    questions: [
+      writing(3101, 'TRANSLATION', 'Gia đình tôi có bốn người.', ['There are four people in my family.', 'My family has four people.'], 'Nói số người trong gia đình: There are + số + people in my family.'),
+      writing(3102, 'KEYWORD_SENTENCE', 'mother / cook / every day', ['My mother cooks every day.', 'My mother cooks dinner every day.'], 'Chủ ngữ số ít ở thì hiện tại đơn: động từ thêm -s (cooks).', { hint: 'Chủ ngữ "my mother" là ngôi thứ ba số ít.' }),
+      writing(3103, 'REWRITE', 'My father is a teacher.', ['My father works as a teacher.'], 'work as + nghề nghiệp: làm nghề gì.', { starter: 'My father works' }),
+      writing(3104, 'TRANSLATION', 'Em gái tôi mười tuổi.', ['My younger sister is ten years old.', 'My little sister is ten.'], 'Nói tuổi dùng be + số + years old, không dùng have.', { rules: [{ includes: 'has ten', points: 0.5, feedback: 'Tiếng Anh không dùng "have" để nói tuổi: dùng "is ten (years old)". Câu gợi ý: My younger sister is ten years old.' }] }),
+    ],
+  }),
+  lesson({
+    id: 32,
+    skill: 'WRITING',
+    title: 'Gọi món ở nhà hàng',
+    description: 'Cách gọi món và nhờ phục vụ lịch sự.',
+    topic: 'Thức ăn',
+    cefrLevel: 'A2',
+    difficulty: 'EASY',
+    estimatedMinutes: 6,
+    questions: [
+      writing(3201, 'TRANSLATION', 'Cho tôi một ly nước cam, làm ơn.', ["Can I have a glass of orange juice, please?", "I'd like a glass of orange juice, please."], 'Gọi món lịch sự: Can I have …, please? hoặc I’d like …'),
+      writing(3202, 'REWRITE', 'I want the chicken soup.', ["I'd like the chicken soup, please.", "I'd like the chicken soup."], 'I’d like … lịch sự hơn I want … khi gọi món.', { starter: "I'd like" }),
+      writing(3203, 'KEYWORD_SENTENCE', 'bring / bill / please', ['Could you bring the bill, please?', 'Please bring us the bill.'], 'Nhờ ai làm gì lịch sự: Could you + động từ nguyên mẫu …, please?'),
+    ],
+  }),
+  lesson({
+    id: 33,
+    skill: 'WRITING',
+    title: 'Viết về chuyến đi',
+    description: 'Dịch câu, viết lại câu và viết câu theo từ khóa về du lịch.',
+    topic: 'Du lịch',
+    cefrLevel: 'A2',
+    difficulty: 'MEDIUM',
+    estimatedMinutes: 10,
+    questions: [
+      writing(3301, 'TRANSLATION', 'Tôi đã đặt phòng khách sạn trước hai tuần.', ['I booked the hotel room two weeks in advance.', 'I booked a hotel room two weeks ahead.'], 'in advance nghĩa là trước một thời điểm; before chỉ đứng sau khoảng thời gian khi có mốc đi kèm, ví dụ two weeks before the trip.', {
+        hint: "Chú ý cách nói 'trước bao lâu' trong tiếng Anh",
+        rules: [{ includes: 'before two weeks', points: 1, feedback: "Chia đúng thì quá khứ đơn và đủ ý. 'before two weeks' không phải cách nói tự nhiên; để nói làm việc gì trước bao lâu, dùng 'two weeks in advance' hoặc 'two weeks ahead'. Câu gợi ý: I booked the hotel room two weeks in advance." }],
+      }),
+      writing(3302, 'REWRITE', 'It took us three hours to get to Da Lat.', ['We spent three hours getting to Da Lat.'], 'It took + người + thời gian + to V = người + spent + thời gian + V-ing.', {
+        starter: 'We spent',
+        perfect: 'Chính xác, giữ nguyên nghĩa câu gốc và dùng đúng cấu trúc spend + thời gian + V-ing.',
+      }),
+      writing(3303, 'KEYWORD_SENTENCE', 'luggage / heavy / carry', ['My luggage was too heavy to carry.', "The luggage was so heavy that I couldn't carry it."], 'too + tính từ + to V: quá … đến nỗi không thể.', {
+        perfect: 'Dùng đủ ba từ khóa, câu đúng ngữ pháp (too + tính từ + to V).',
+      }),
+      writing(3304, 'TRANSLATION', 'Chuyến bay của chúng tôi bị hoãn vì thời tiết xấu.', ['Our flight was delayed because of bad weather.', 'Our flight was delayed due to bad weather.'], 'Bị động ở quá khứ đơn: was/were + V3 (was delayed).', {
+        rules: [{ includes: 'was delay because', points: 1.5, feedback: 'Đủ ý và đúng "because of". Câu bị động cần "was delayed" (be + V3), không phải "was delay".' }],
+      }),
+      writing(3305, 'REWRITE', 'This is the first time I have visited Hue.', ['I have never visited Hue before.'], 'This is the first time + hiện tại hoàn thành = have never + V3 + before.', { starter: 'I have never' }),
+      writing(3306, 'KEYWORD_SENTENCE', 'passport / check / airport', ['The officer checked my passport at the airport.', 'They checked our passports at the airport.'], 'Việc đã xảy ra dùng quá khứ đơn: check → checked.', {
+        rules: [{ includes: 'officer check my', points: 1.5, feedback: 'Dùng đủ từ khóa và đúng ý. Chia động từ ở quá khứ: "checked".' }],
+      }),
+    ],
+  }),
+  lesson({
+    id: 34,
+    skill: 'WRITING',
+    title: 'Email công việc ngắn',
+    description: 'Mở đầu, nhờ vả và kết thúc một email trang trọng.',
+    topic: 'Công việc',
+    cefrLevel: 'B1',
+    difficulty: 'MEDIUM',
+    estimatedMinutes: 8,
+    questions: [
+      writing(3401, 'TRANSLATION', 'Tôi viết thư này để hỏi về cuộc họp vào thứ Hai.', ['I am writing to ask about the meeting on Monday.', "I'm writing to ask about Monday's meeting."], 'Mở đầu email trang trọng: I am writing to + động từ; "vào thứ Hai" là on Monday.'),
+      writing(3402, 'REWRITE', 'Please send me the report soon.', ['I would be grateful if you could send me the report soon.'], 'I would be grateful if you could … là cách nhờ vả trang trọng trong email.', { starter: 'I would be grateful if' }),
+      writing(3403, 'KEYWORD_SENTENCE', 'look forward / hearing / you', ['I look forward to hearing from you.', 'I am looking forward to hearing from you.'], 'look forward to + V-ing: "to" ở đây là giới từ.', { hint: 'Câu kết quen thuộc của email.' }),
     ],
   }),
 
@@ -365,7 +498,7 @@ export const MOCK_LESSONS = [
   // Not listed (no questions): only reachable by URL, /exercises/lessons/99, for the "no questions yet" screen.
   lesson({
     id: 99,
-    skill: 'GRAMMAR',
+    skill: 'READING',
     title: 'Bài đang soạn',
     description: null,
     topic: null,

@@ -10,20 +10,23 @@ import { useLesson, useLessons } from '../api/exercisesQueries'
 import { ChatAssistant } from '../chat/ChatAssistant'
 import { ExerciseHeading } from '../components/ExerciseHeading'
 import { EXERCISES_PATH, SKILLS, skillPath } from '../constants'
-import { GrammarExercise } from '../grammar/GrammarExercise'
 import { ListeningExercise } from '../listening/ListeningExercise'
 import { PronunciationExercise } from '../pronunciation/PronunciationExercise'
+import { ReadingExercise } from '../reading/ReadingExercise'
 import { useAttempt } from '../useAttempt'
+import { WritingExercise } from '../writing/WritingExercise'
 
 const EXERCISES = {
-  [SKILLS.GRAMMAR]: GrammarExercise,
+  [SKILLS.READING]: ReadingExercise,
+  [SKILLS.WRITING]: WritingExercise,
   [SKILLS.LISTENING]: ListeningExercise,
   [SKILLS.PRONUNCIATION]: PronunciationExercise,
 }
 
 /** What the AI assistant offers to ask before the first message, by skill. */
 const CHAT_SUGGESTIONS = {
-  [SKILLS.GRAMMAR]: ['Giải thích câu này giúp tôi', 'Cho tôi thêm ví dụ tương tự', 'Mẹo để nhớ cấu trúc này'],
+  [SKILLS.READING]: ['Giải thích câu này giúp tôi', 'Đáp án nằm ở đoạn nào của bài đọc?', 'Cho tôi thêm ví dụ tương tự'],
+  [SKILLS.WRITING]: ['Câu của tôi sai ở đâu?', 'Viết câu này theo cách khác', 'Cách diễn đạt nào tự nhiên hơn?'],
   [SKILLS.LISTENING]: ['Giải thích đoạn hội thoại này', 'Những cụm từ nào đáng học trong bài?', 'Làm sao nghe tốt hơn?'],
   [SKILLS.PRONUNCIATION]: ['Làm sao phát âm từ này cho đúng?', 'Trọng âm của từ này ở đâu?', 'Tôi hay sai âm nào?'],
 }
@@ -139,9 +142,9 @@ function LessonPlayer({ lessonId }) {
 }
 
 /**
- * /exercises/lessons/:lessonId: one lesson of any skill. Opening it picks up the unfinished attempt (grammar,
- * pronunciation) or starts one; the screen then depends on the skill (grammar question by question, a listening test,
- * or pronunciation practice). Keyed by lesson so moving to "Bài tiếp theo" opens that lesson afresh.
+ * /exercises/lessons/:lessonId: one lesson of any skill. Opening it picks up the unfinished attempt (reading, writing,
+ * pronunciation) or starts one; the screen then depends on the skill (reading or writing question by question, a
+ * listening test, or pronunciation practice). Keyed by lesson so moving to "Bài tiếp theo" opens that lesson afresh.
  */
 export function LessonPage() {
   const lessonId = parseId(useParams().lessonId)

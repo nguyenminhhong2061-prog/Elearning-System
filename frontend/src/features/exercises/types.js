@@ -1,9 +1,10 @@
 // JSON shapes of the exercise and chatbot APIs (docs/api/exercises.md, docs/api/chatbot.md). No runtime code.
 
 /**
- * @typedef {'GRAMMAR' | 'LISTENING' | 'PRONUNCIATION'} Skill
+ * @typedef {'READING' | 'WRITING' | 'LISTENING' | 'PRONUNCIATION'} Skill
  * @typedef {'EASY' | 'MEDIUM' | 'HARD'} Difficulty
- * @typedef {'MULTIPLE_CHOICE' | 'FILL_BLANK'} QuestionType
+ * @typedef {'TRANSLATION' | 'REWRITE' | 'KEYWORD_SENTENCE'} WritingType
+ * @typedef {'MULTIPLE_CHOICE' | 'FILL_BLANK' | WritingType} QuestionType
  *
  * @typedef {object} LessonProgress
  * @property {number} attemptCount completed attempts only
@@ -21,7 +22,7 @@
  * @property {import('@/api/types').CefrLevel} cefrLevel
  * @property {Difficulty} difficulty
  * @property {number | null} estimatedMinutes
- * @property {number} itemCount questions (grammar, listening) or items to say (pronunciation)
+ * @property {number} itemCount questions (reading, writing, listening) or items to say (pronunciation)
  * @property {LessonProgress} progress
  *
  * @typedef {object} Question
@@ -30,7 +31,11 @@
  * @property {string} prompt
  * @property {string | null} hint
  * @property {number} points
- * @property {Array<{ id: number, key: string, text: string }>} options empty for FILL_BLANK
+ * @property {Array<{ id: number, key: string, text: string }>} options empty for FILL_BLANK and writing questions
+ * @property {number | null} [passageId] the reading passage a reading question is about
+ * @property {string | null} [starter] the given start of a REWRITE answer ("We spent")
+ *
+ * @typedef {{ id: number, title: string, content: string }} ReadingPassage content: paragraphs split by a blank line
  *
  * @typedef {object} Segment
  * @property {number} id
@@ -54,7 +59,7 @@
  * @property {string | null} notes
  *
  * @typedef {Omit<LessonSummary, 'itemCount' | 'progress'> & {
- *   questions: Question[], passage: Passage | null, pronunciationItems: PronunciationItem[]
+ *   questions: Question[], readingPassages?: ReadingPassage[], passage: Passage | null, pronunciationItems: PronunciationItem[]
  * }} Lesson
  *
  * @typedef {{ questionId: number, optionId?: number, answer?: string }} ResponseInput
@@ -69,12 +74,23 @@
  *
  * @typedef {object} ReviewItem
  * @property {number} questionId
- * @property {boolean} correct
+ * @property {boolean | null} correct null for a writing question
  * @property {number | null} optionId
  * @property {string | null} answer
  * @property {number | null} correctOptionId
- * @property {string} correctAnswer
+ * @property {string | null} correctAnswer null for a writing question
  * @property {string | null} explanation
+ *
+ * The result of a writing question (scenario 10): the AI's points and feedback, or nothing yet when it could not grade.
+ * @typedef {object} WritingResult
+ * @property {number} questionId
+ * @property {boolean} graded false: saved, waiting to be sent to the AI again
+ * @property {number | null} awardedPoints 0 to maxPoints, in steps of 0.5
+ * @property {number} maxPoints
+ * @property {string | null} feedback
+ * @property {string[]} sampleAnswers empty until graded
+ * @property {string | null} explanation
+ * @property {string | null} [answer] what the learner wrote (in a review and a picked-up attempt)
  *
  * @typedef {object} AttemptResult
  * @property {number} attemptId
@@ -105,7 +121,7 @@
  *
  * @typedef {object} AttemptProgress what was already done in an attempt when the lesson was opened
  * @property {boolean} resumed true when an unfinished attempt was picked up
- * @property {ReviewItem[]} responses questions answered (grammar)
+ * @property {Array<ReviewItem | WritingResult>} responses questions answered (reading, writing)
  * @property {Array<{ itemId: number, tryCount: number, bestScore: number }>} pronunciation items recorded
  *
  * @typedef {AttemptProgress & { attemptId: number, startedAt: string }} AttemptStart

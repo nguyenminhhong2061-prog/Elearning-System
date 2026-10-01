@@ -19,7 +19,8 @@ import {
 describe('suggestionLink', () => {
   it('opens the exercises tab that practises the skill, and the other screens by id', () => {
     expect(suggestionLink({ type: 'PRACTICE_SKILL', skill: 'SPEAKING' })).toBe('/exercises?skill=pronunciation')
-    expect(suggestionLink({ type: 'PRACTICE_SKILL', skill: 'WRITING' })).toBe('/exercises?skill=grammar')
+    expect(suggestionLink({ type: 'PRACTICE_SKILL', skill: 'WRITING' })).toBe('/exercises?skill=writing')
+    expect(suggestionLink({ type: 'PRACTICE_SKILL', skill: 'READING' })).toBe('/exercises?skill=reading')
     expect(suggestionLink({ type: 'LEARN_TOPIC', topicId: 4 })).toBe('/vocabulary/topics/4')
     expect(suggestionLink({ type: 'REVIEW_WORDS', count: 3 })).toBe('/vocabulary/review')
     expect(suggestionLink({ type: 'TAKE_TEST', testId: 200 })).toBe('/tests/200')

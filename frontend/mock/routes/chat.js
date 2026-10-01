@@ -1,6 +1,6 @@
 import { delay, HttpError } from '../http.js'
 import { MOCK_LESSONS } from '../exerciseFixtures.js'
-import { findAttempt, findLesson } from './exercises.js'
+import { findAttempt, findLesson, isWriting } from './exercises.js'
 
 // docs/api/chatbot.md. There is no AI here: answers are written from the lesson data, following the rule the contract
 // suggests for the real assistant (a hint before the learner has answered, the full explanation afterwards).
@@ -80,11 +80,31 @@ function generalReply(content) {
   return 'Mình là trợ lý giả của `npm run dev:mock`. Khi có backend thật, câu trả lời sẽ do AI tạo ra dựa trên bài bạn đang làm.'
 }
 
+/** A writing question (scenario 10): hints before the learner wrote anything, the AI's grading and samples after. */
+function writingReply(lesson, question, response) {
+  const sources = [{ title: `Bài: ${lesson.title}` }]
+  if (!response) {
+    return {
+      content: `Bạn chưa viết câu này nên mình gợi ý thôi nhé:\n\n- ${question.hint ?? 'Xác định thì và cấu trúc câu cần dùng trước.'}\n- Viết một câu ngắn, đúng ngữ pháp, rồi mới làm cho tự nhiên hơn.\n\nViết xong và được chấm, hỏi lại để xem câu mẫu.`,
+      sources,
+    }
+  }
+  if (!response.graded) {
+    return { content: 'Câu của bạn đã được lưu nhưng **chưa được chấm**. Bấm "Gửi chấm lại", chấm xong mình giải thích kỹ hơn nhé.', sources }
+  }
+  const samples = question.sampleAnswers.map((sample) => `- *${sample}*`).join('\n')
+  return {
+    content: `Câu của bạn được **${response.awardedPoints}/${response.maxPoints}** điểm. ${response.feedback}\n\nCâu mẫu:\n${samples}\n\n${question.explanation ?? ''}`,
+    sources,
+  }
+}
+
 function replyFor(userId, session, body) {
   const found = body.questionId ? findQuestion(body.questionId) : null
   if (found) {
     const { lesson, question } = found
     const attempt = body.attemptId ? findAttempt(userId, body.attemptId) : undefined
+    if (isWriting(question)) return writingReply(lesson, question, attempt?.responses.get(question.id))
     const answered = attempt?.responses.has(question.id)
     if (!answered) {
       return {

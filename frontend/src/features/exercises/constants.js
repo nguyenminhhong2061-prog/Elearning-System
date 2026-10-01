@@ -1,6 +1,7 @@
 /** skill values as the API returns them (docs/api/exercises.md). */
 export const SKILLS = Object.freeze({
-  GRAMMAR: 'GRAMMAR',
+  READING: 'READING',
+  WRITING: 'WRITING',
   LISTENING: 'LISTENING',
   PRONUNCIATION: 'PRONUNCIATION',
 })
@@ -9,25 +10,40 @@ export const EXERCISES_PATH = '/exercises'
 
 /**
  * How each skill appears: the ?skill= value of its tab, the tab label, the list title, what its lessons are called in
- * counts ("4 bài nghe") and what one item is called ("10 câu", "15 mục"). Tabs follow the design's order.
+ * counts ("4 bài nghe") and what one item is called ("10 câu", "15 mục"). Tabs follow the order of scenario 9: reading
+ * and writing (which replaced grammar on 01/10/2026), listening, pronunciation.
  */
 export const SKILL_INFO = Object.freeze({
-  GRAMMAR: { param: 'grammar', tab: 'Ngữ pháp', title: 'Bài tập ngữ pháp', lessons: 'bài ngữ pháp', unit: 'câu' },
+  READING: { param: 'reading', tab: 'Đọc hiểu', title: 'Bài tập đọc hiểu', lessons: 'bài đọc hiểu', unit: 'câu' },
+  WRITING: { param: 'writing', tab: 'Viết', title: 'Bài tập viết', lessons: 'bài viết', unit: 'câu' },
   LISTENING: { param: 'listening', tab: 'Nghe hiểu', title: 'Bài tập nghe hiểu', lessons: 'bài nghe', unit: 'câu' },
   PRONUNCIATION: { param: 'pronunciation', tab: 'Phát âm', title: 'Bài tập phát âm', lessons: 'bài phát âm', unit: 'mục' },
 })
 
-export const SKILL_ORDER = [SKILLS.GRAMMAR, SKILLS.LISTENING, SKILLS.PRONUNCIATION]
+export const SKILL_ORDER = [SKILLS.READING, SKILLS.WRITING, SKILLS.LISTENING, SKILLS.PRONUNCIATION]
 
-/** The skill of a ?skill= value; grammar (the first tab) when it is missing or unknown. */
+/** The skill of a ?skill= value; reading (the first tab) when it is missing or unknown, old ?skill=grammar links included. */
 export function skillFromParam(param) {
-  return SKILL_ORDER.find((skill) => SKILL_INFO[skill].param === param) ?? SKILLS.GRAMMAR
+  return SKILL_ORDER.find((skill) => SKILL_INFO[skill].param === param) ?? SKILLS.READING
 }
 
-/** List page of a skill. Grammar is the default tab, so it keeps the bare /exercises. */
+/** List page of a skill. Reading is the default tab, so it keeps the bare /exercises. */
 export function skillPath(skill) {
-  return skill === SKILLS.GRAMMAR ? EXERCISES_PATH : `${EXERCISES_PATH}?skill=${SKILL_INFO[skill].param}`
+  return skill === SKILLS.READING ? EXERCISES_PATH : `${EXERCISES_PATH}?skill=${SKILL_INFO[skill].param}`
 }
+
+/**
+ * The three kinds of writing question (scenario 10): their tag, and the line put before the prompt, which holds only
+ * the sentence to translate, the sentence to rewrite or the keywords.
+ */
+export const WRITING_TYPES = Object.freeze({
+  TRANSLATION: { label: 'Dịch câu', instruction: 'Dịch sang tiếng Anh:' },
+  REWRITE: { label: 'Viết lại câu', instruction: 'Viết lại câu sao cho nghĩa không đổi:' },
+  KEYWORD_SENTENCE: { label: 'Viết câu theo từ khóa', instruction: 'Viết một câu có dùng các từ gợi ý:' },
+})
+
+/** Longest writing answer the API takes. */
+export const MAX_WRITING_LENGTH = 1000
 
 export function lessonPath(lessonId) {
   return `${EXERCISES_PATH}/lessons/${lessonId}`

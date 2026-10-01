@@ -36,7 +36,7 @@ const MARK = {
  * @param {(optionId: number) => void} props.onSelect
  * @param {{ correctOptionId: number | null } | null} [props.graded]
  * @param {boolean} [props.disabled] locks the answers without grading them (a listening file that failed to load)
- * @param {boolean} [props.shortcuts] announce keys 1-4 (the grammar screen listens for them)
+ * @param {boolean} [props.shortcuts] announce keys 1-4 (the reading screen listens for them)
  */
 export function ChoiceOptions({ name, label, options, selectedId, onSelect, graded = null, shortcuts = false, disabled = false }) {
   return (

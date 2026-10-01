@@ -34,7 +34,7 @@ function toResponse(question, answer) {
  * screens). Questions can be answered before the audio ends (exception of B2). The whole test is handed in at once;
  * the server grades it and returns the right answers and the translation of each segment to compare with.
  *
- * @param {object} props see GrammarExercise
+ * @param {object} props see ReadingExercise
  */
 export function ListeningExercise({ lesson, attemptId, nextLesson, onRestart, restarting, restartError, onChatContext, onAskAssistant }) {
   const { passage, questions } = lesson

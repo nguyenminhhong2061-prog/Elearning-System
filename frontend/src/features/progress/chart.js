@@ -86,7 +86,7 @@ export function summaryLine(activity, label = rangeOf(activity.period)) {
 }
 
 /**
- * The lesson "Học tiếp" suggests when nothing is unfinished: the first grammar lesson never completed at the learner's
+ * The lesson "Học tiếp" suggests when nothing is unfinished: the first reading lesson never completed at the learner's
  * level (A1 when unknown), else the first one never completed above it. `lessons` come sorted A1 to C2 by the API.
  *
  * @param {import('@/features/exercises/types').LessonSummary[]} lessons

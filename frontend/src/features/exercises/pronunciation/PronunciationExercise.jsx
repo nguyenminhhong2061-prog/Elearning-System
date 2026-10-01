@@ -70,7 +70,7 @@ function firstOpenItem(items, practiced) {
  * like, skip an item, or go on; at the end the attempt is completed with each item's best score. A picked-up attempt
  * keeps the best scores already earned and opens at the first item not recorded yet.
  *
- * @param {object} props see GrammarExercise
+ * @param {object} props see ReadingExercise
  */
 export function PronunciationExercise({ lesson, attemptId, progress, nextLesson, onRestart, restarting, restartError, onChatContext }) {
   const items = lesson.pronunciationItems

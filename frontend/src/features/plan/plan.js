@@ -3,8 +3,8 @@ import { calendarWeeks, daysInRange, formatDayMonth, lastDayAfterMonths } from '
 
 // Pure helpers of the study plan page (D2). The contract is docs/api/plans.md.
 
-/** Tab of the exercises page that practises each tested skill (grammar covers reading and writing). */
-const EXERCISE_TAB = { LISTENING: 'listening', SPEAKING: 'pronunciation', READING: 'grammar', WRITING: 'grammar' }
+/** Tab of the exercises page that practises each tested skill. */
+const EXERCISE_TAB = { LISTENING: 'listening', SPEAKING: 'pronunciation', READING: 'reading', WRITING: 'writing' }
 
 /**
  * Where the "Bắt đầu" button of a suggestion leads, or null for a type this version does not know.
@@ -13,7 +13,7 @@ const EXERCISE_TAB = { LISTENING: 'listening', SPEAKING: 'pronunciation', READIN
 export function suggestionLink(item) {
   switch (item.type) {
     case 'PRACTICE_SKILL':
-      return `/exercises?skill=${EXERCISE_TAB[item.skill] ?? 'grammar'}`
+      return `/exercises?skill=${EXERCISE_TAB[item.skill] ?? 'reading'}`
     case 'LEARN_TOPIC':
       return `/vocabulary/topics/${item.topicId}`
     case 'REVIEW_WORDS':

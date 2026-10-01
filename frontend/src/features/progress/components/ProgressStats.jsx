@@ -56,7 +56,7 @@ export function ProgressStats() {
       <StatCard
         label="Bài tập đã hoàn thành"
         value={shown(progress, (data) => formatCount(data.totals.exercisesCompleted))}
-        caption="Ngữ pháp, nghe hiểu, phát âm"
+        caption="Đọc hiểu, viết, nghe hiểu, phát âm"
       />
       <StatCard
         label="Bài kiểm tra đã làm"

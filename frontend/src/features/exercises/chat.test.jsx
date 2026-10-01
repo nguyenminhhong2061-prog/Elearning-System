@@ -126,7 +126,7 @@ describe('AI assistant', () => {
     await screen.findByText('Câu 1/2')
     const panel = await openAssistant(user)
 
-    await user.click(within(panel).getByRole('button', { name: 'Mẹo để nhớ cấu trúc này' }))
+    await user.click(within(panel).getByRole('button', { name: 'Cho tôi thêm ví dụ tương tự' }))
 
     expect(await within(panel).findByText('ok', { selector: 'strong' })).toBeInTheDocument()
     expect(panel.querySelector('img')).toBeNull()
@@ -197,8 +197,8 @@ describe('AI assistant', () => {
     await user.type(screen.getByRole('textbox', { name: 'Đáp án của bạn' }), 'seen{Enter}')
     await user.click(await screen.findByRole('button', { name: 'Xem kết quả' }))
 
-    const review = (await screen.findByRole('heading', { name: 'Câu cần xem lại (1)' })).closest('section')
-    await user.click(within(review).getByRole('button', { name: 'Hỏi trợ lý AI về câu này →' }))
+    const review = (await screen.findByRole('heading', { name: /^Xem lại từng câu/ })).closest('section')
+    await user.click(within(review).getAllByRole('button', { name: 'Hỏi trợ lý AI về câu này →' })[0])
     const panel = screen.getByRole('dialog', { name: 'Trợ lý AI' })
     expect(within(panel).getByText(/^Câu 1 – .*Bạn chọn: lives \(sai\)$/)).toBeInTheDocument()
     await user.type(within(panel).getByRole('textbox', { name: 'Câu hỏi cho trợ lý AI' }), 'Vì sao sai?{Enter}')
