@@ -257,6 +257,41 @@ describe('taking a test', () => {
     expect(callsTo('POST /api/tests/100/attempts')[0].params).toEqual({ restart: true })
   })
 
+  it('asks before signing out in the middle of a test, and keeps the attempt (scenario 3, 4a)', async () => {
+    const user = userEvent.setup()
+    renderSignedIn('/tests/100', takingRoutes())
+
+    await user.click(await screen.findByRole('button', { name: 'Bắt đầu' }))
+    await user.click(await screen.findByRole('button', { name: /Câu tiếp theo/ }))
+    await user.type(await screen.findByLabelText('Câu trả lời của bạn'), 'seen')
+
+    const logout = screen.getAllByRole('button', { name: '← Đăng xuất' })[0]
+    await user.click(logout)
+    let dialog = await screen.findByRole('dialog', { name: 'Đăng xuất?' })
+    expect(within(dialog).getByText(/Bài kiểm tra đang làm sẽ được lưu ở trạng thái đang làm/)).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Ở lại làm bài' }))
+    expect(screen.getByTestId('location')).toHaveTextContent('/tests/100')
+
+    await user.click(logout)
+    dialog = await screen.findByRole('dialog', { name: 'Đăng xuất?' })
+    await user.click(within(dialog).getByRole('button', { name: 'Đăng xuất' }))
+
+    expect(await screen.findByRole('heading', { name: 'Đăng nhập' })).toBeInTheDocument()
+    // The typed answer was saved before leaving, and nothing was submitted.
+    expect(callsTo('PUT /api/test-attempts/57/answers/12').at(-1).body).toEqual({ text: 'seen' })
+    expect(callsTo('POST /api/test-attempts/57/submit')).toHaveLength(0)
+  })
+
+  it('signs out at once when no test is open', async () => {
+    const user = userEvent.setup()
+    renderSignedIn('/tests/100', takingRoutes())
+
+    await user.click((await screen.findAllByRole('button', { name: '← Đăng xuất' }))[0])
+
+    expect(await screen.findByRole('heading', { name: 'Đăng nhập' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Đăng xuất?' })).not.toBeInTheDocument()
+  })
+
   it('keeps an answer that could not be saved and sends it again on retry', async () => {
     const user = userEvent.setup()
     let failures = 1

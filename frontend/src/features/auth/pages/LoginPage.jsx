@@ -28,7 +28,8 @@ export function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '' },
+    // Coming from registration, the new account's email is already filled in.
+    defaultValues: { email: location.state?.email ?? '', password: '' },
   })
 
   async function onSubmit(values) {

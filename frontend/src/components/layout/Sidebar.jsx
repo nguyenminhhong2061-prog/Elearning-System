@@ -1,7 +1,11 @@
+import { useContext, useState } from 'react'
 import { NavLink } from 'react-router'
 import { Avatar } from '@/components/ui/Avatar'
+import { Button } from '@/components/ui/Button'
+import { Dialog } from '@/components/ui/Dialog'
 import { useAuth } from '@/features/auth/context/useAuth'
 import { cx } from '@/lib/cx'
+import { LogoutGuardContext } from './logoutGuard'
 import { NAV_ITEMS } from './navItems'
 
 const ROW = 'flex items-center gap-3 rounded-lg px-3 py-2.75 transition-colors focus-visible:outline-2 focus-visible:outline-brand'
@@ -16,11 +20,25 @@ const SECONDARY_ROW = 'text-label font-medium text-muted-light hover:bg-sidebar-
  */
 export function SidebarContent({ onNavigate }) {
   const { user, logout } = useAuth()
+  const { guard } = useContext(LogoutGuardContext)
+  const [confirming, setConfirming] = useState(false)
 
-  function handleLogout() {
+  function signOut() {
     onNavigate?.()
     // The route guard sees the session end and sends the user to the login page.
     logout()
+  }
+
+  // While a test is open, ask first (scenario 3, branch 4a); its answers are saved before leaving.
+  function handleLogout() {
+    if (guard) setConfirming(true)
+    else signOut()
+  }
+
+  async function confirmLogout() {
+    setConfirming(false)
+    await guard?.beforeLogout?.()
+    signOut()
   }
 
   return (
@@ -79,6 +97,16 @@ export function SidebarContent({ onNavigate }) {
           ← Đăng xuất
         </button>
       </div>
+
+      <Dialog open={confirming} onClose={() => setConfirming(false)} title="Đăng xuất?">
+        <p className="text-body text-ink-soft">{guard?.message}</p>
+        <div className="flex flex-wrap justify-end gap-3">
+          <Button variant="outline" onClick={() => setConfirming(false)}>
+            Ở lại làm bài
+          </Button>
+          <Button onClick={confirmLogout}>Đăng xuất</Button>
+        </div>
+      </Dialog>
     </div>
   )
 }

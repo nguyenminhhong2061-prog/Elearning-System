@@ -33,10 +33,9 @@ export function RegisterPage() {
   async function onSubmit({ fullName, email, password }) {
     setSubmitError(null)
     try {
-      const { signedIn } = await registerAccount({ fullName, email, password })
-      // When signed in, GuestRoute redirects to the home page. If only the automatic login failed, the account
-      // exists, so the user is sent to log in by hand.
-      if (!signedIn) navigate('/login', { replace: true, state: { registered: true } })
+      await registerAccount({ fullName, email, password })
+      // The login page says the account was created and fills in its email (scenario 1, step 7).
+      navigate('/login', { replace: true, state: { registered: true, email: email.trim() } })
     } catch (error) {
       if (error?.status === 409) {
         setError(

@@ -152,7 +152,7 @@ describe('registration', () => {
     await user.click(screen.getByRole('button', { name: /Đăng ký →/ }))
   }
 
-  it('creates the account, signs the new learner in and lands on the home page', async () => {
+  it('creates the account and sends the learner to log in, with the email filled in', async () => {
     backend = installFakeBackend({
       'POST /api/auth/register': () => ({ status: 201, data: learner }),
       'POST /api/auth/login': () => ({ data: loginResponse() }),
@@ -163,14 +163,21 @@ describe('registration', () => {
     await heading('Tạo tài khoản')
     await fillRegistration(user)
 
+    await heading('Đăng nhập')
+    expect(screen.getByRole('status')).toHaveTextContent('Tạo tài khoản thành công. Hãy đăng nhập để bắt đầu học.')
+    expect(screen.getByLabelText('Email')).toHaveValue('hong@example.com')
+    // The confirmation field is a browser-only check and must not be sent to the server; nobody is signed in yet.
+    expect(backend.calls).toEqual([
+      {
+        key: 'POST /api/auth/register',
+        body: { fullName: 'Nguyễn Minh Hồng', email: 'hong@example.com', password: 'matkhau123' },
+        authorization: undefined,
+      },
+    ])
+
+    await user.type(screen.getByLabelText('Mật khẩu'), 'matkhau123')
+    await user.click(screen.getByRole('button', { name: /Đăng nhập →/ }))
     await heading(/Chào Hồng/)
-    // The confirmation field is a browser-only check and must not be sent to the server.
-    expect(backend.calls[0]).toEqual({
-      key: 'POST /api/auth/register',
-      body: { fullName: 'Nguyễn Minh Hồng', email: 'hong@example.com', password: 'matkhau123' },
-      authorization: undefined,
-    })
-    expect(backend.calls[1].key).toBe('POST /api/auth/login')
   })
 
   it('reports an email that is already registered on the email field', async () => {
@@ -200,20 +207,6 @@ describe('registration', () => {
     expect(backend.calls).toHaveLength(0)
   })
 
-  it('sends the user to the login page when the account was created but the automatic login failed', async () => {
-    backend = installFakeBackend({
-      'POST /api/auth/register': () => ({ status: 201, data: learner }),
-      'POST /api/auth/login': () => ({ status: 500, data: { status: 500, message: 'boom' } }),
-    })
-    const user = userEvent.setup()
-
-    renderApp('/register')
-    await heading('Tạo tài khoản')
-    await fillRegistration(user)
-
-    await heading('Đăng nhập')
-    expect(screen.getByRole('status')).toHaveTextContent('Tạo tài khoản thành công')
-  })
 })
 
 describe('session on start-up', () => {

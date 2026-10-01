@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { describeApiError } from '@/api/errorMessages'
+import { useLogoutGuard } from '@/components/layout/logoutGuard'
 import { Page } from '@/components/layout/Page'
 import { Alert } from '@/components/ui/Alert'
 import { Button, ButtonLink } from '@/components/ui/Button'
@@ -114,6 +115,15 @@ function AttemptRunner({ test, attempt }) {
   const [confirming, setConfirming] = useState(false)
   const saver = useAnswerSaver(attempt.attemptId, attempt.answers)
   const submit = useSubmitAttempt()
+  // Signing out in the middle asks first; the attempt stays in progress with the answers saved (scenario 3, 4a).
+  const logoutGuard = useMemo(
+    () => ({
+      message: 'Bài kiểm tra đang làm sẽ được lưu ở trạng thái đang làm. Bạn có muốn đăng xuất?',
+      beforeLogout: saver.flush,
+    }),
+    [saver.flush],
+  )
+  useLogoutGuard(submit.isSuccess ? null : logoutGuard)
 
   const question = questions[currentIndex]
   const unanswered = unansweredQuestions(questions, answers)

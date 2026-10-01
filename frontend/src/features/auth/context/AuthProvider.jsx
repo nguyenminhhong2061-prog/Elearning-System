@@ -76,20 +76,10 @@ export function AuthProvider({ children }) {
     return user
   }, [])
 
-  const register = useCallback(
-    async ({ fullName, email, password }) => {
-      // Registration returns no token, so the new learner is logged in right after. If only that second step
-      // fails, the account exists and the caller sends the user to the login page.
-      await authApi.register({ fullName, email, password })
-      try {
-        await login({ email, password })
-        return { signedIn: true }
-      } catch {
-        return { signedIn: false }
-      }
-    },
-    [login],
-  )
+  // Registration only creates the account: the new learner then signs in on the login page (scenario 1, step 7).
+  const register = useCallback(async ({ fullName, email, password }) => {
+    await authApi.register({ fullName, email, password })
+  }, [])
 
   // Tokens are stateless on the server, so signing out is just forgetting the token (see AuthController).
   const logout = useCallback(() => {
