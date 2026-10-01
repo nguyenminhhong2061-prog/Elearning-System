@@ -21,18 +21,21 @@ const isControl = (target) => target instanceof HTMLElement && target.closest('b
  *
  * @param {object} props
  * @param {import('../types').LearningCard[]} props.cards
+ * @param {string} props.summaryTitle heading of the summary card
  * @param {string} props.backTo
  * @param {string} props.backLabel
  * @param {() => void} props.onContinue starts a new session from the same source
  */
-export function FlashcardSession({ cards, backTo, backLabel, onContinue }) {
+export function FlashcardSession({ cards, summaryTitle, backTo, backLabel, onContinue }) {
   const [index, setIndex] = useState(0)
+  // "Kết thúc" ends the session early; the card on screen is not counted (scenario 5, step 13).
+  const [ended, setEnded] = useState(false)
   const [flipped, setFlipped] = useState(false)
   const [results, setResults] = useState([])
   const [autoSpeak, setAutoSpeak] = useAutoSpeak()
   const review = useSubmitReview()
 
-  const done = index >= cards.length
+  const done = ended || index >= cards.length
   const card = cards[index]
 
   async function rate(result) {
@@ -75,12 +78,14 @@ export function FlashcardSession({ cards, backTo, backLabel, onContinue }) {
   useEffect(() => stopPronouncing, [])
 
   if (done) {
-    return <SessionComplete results={results} backTo={backTo} backLabel={backLabel} onContinue={onContinue} />
+    return (
+      <SessionComplete title={summaryTitle} results={results} backTo={backTo} backLabel={backLabel} onContinue={onContinue} />
+    )
   }
 
   return (
     <div className="flex flex-col gap-5">
-      <SessionProgress results={results} total={cards.length} backTo={backTo} />
+      <SessionProgress results={results} total={cards.length} onFinish={() => setEnded(true)} />
 
       <p className="sr-only" aria-live="polite">
         {flipped ? `Nghĩa: ${card.meaning}` : `Thẻ ${index + 1} trên ${cards.length}: ${card.word}`}

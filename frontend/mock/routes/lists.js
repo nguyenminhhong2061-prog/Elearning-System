@@ -32,6 +32,13 @@ function validName(value) {
   return name
 }
 
+/** One learner's lists cannot share a name, ignoring case (409, docs/api/custom-lists.md). */
+function uniqueName(user, name, excludedId = null) {
+  const taken = user.lists.some((list) => list.id !== excludedId && list.name.toLowerCase() === name.toLowerCase())
+  if (taken) throw new HttpError(409, `A list named "${name}" already exists`)
+  return name
+}
+
 /** A NewWord checked and turned into a vocabulary row owned by the user (not saved yet). */
 function buildNewWord(userId, input, defaultLevel) {
   const word = typeof input?.word === 'string' ? input.word.trim() : ''
@@ -75,7 +82,7 @@ export const listRoutes = [
     status: 201,
     handle: ({ user, userId, today, body }) => {
       // Everything is checked before anything is saved: creating a list is all or nothing.
-      const name = validName(body.name)
+      const name = uniqueName(user, validName(body.name))
       const existingIds = [...new Set(body.vocabularyIds ?? [])]
       if (existingIds.some((id) => !findWord(user, id))) throw new HttpError(400, 'vocabularyIds contains an unknown word')
       const newRows = (body.newWords ?? []).map((input) => buildNewWord(userId, input, DEFAULT_LEVEL))
@@ -101,7 +108,7 @@ export const listRoutes = [
     pattern: /^\/api\/custom-lists\/(\d+)$/,
     handle: ({ user, today, match, body }) => {
       const list = requireList(user, match)
-      list.name = validName(body.name)
+      list.name = uniqueName(user, validName(body.name), list.id)
       return toList(user, list, today)
     },
   },

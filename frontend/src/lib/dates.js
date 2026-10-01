@@ -24,6 +24,11 @@ export function formatDayMonth(isoDate) {
   return `${isoDate.slice(8, 10)}/${isoDate.slice(5, 7)}`
 }
 
+/** "2026-09-28" -> "28/09/2026". */
+export function formatDate(isoDate) {
+  return `${formatDayMonth(isoDate)}/${isoDate.slice(0, 4)}`
+}
+
 /** "2026-09-28" -> "Thứ Hai". */
 export function formatWeekday(isoDate) {
   const name = weekday.format(asUtc(isoDate))

@@ -1,4 +1,3 @@
-import { Link } from 'react-router'
 import { cx } from '@/lib/cx'
 import { reviewOption } from '../constants'
 
@@ -10,10 +9,11 @@ const RESULT_SEGMENT = {
 }
 
 /**
- * Top row of the design's flashcard screen: one segment per card, "3/20", and the close button.
- * @param {{ results: string[], total: number, backTo: string }} props
+ * Top row of the design's flashcard screen: one segment per card, "3/20", and "Kết thúc", which ends the session and
+ * shows its summary (scenario 5, step 13).
+ * @param {{ results: string[], total: number, onFinish: () => void }} props
  */
-export function SessionProgress({ results, total, backTo }) {
+export function SessionProgress({ results, total, onFinish }) {
   const current = Math.min(results.length + 1, total)
 
   return (
@@ -41,14 +41,14 @@ export function SessionProgress({ results, total, backTo }) {
       <span className="font-mono text-label font-semibold text-ink-soft">
         {current}/{total}
       </span>
-      <Link
-        to={backTo}
-        aria-label="Thoát phiên học"
-        title="Thoát (các thẻ đã đánh giá vẫn được lưu)"
-        className="flex size-7.5 flex-none items-center justify-center rounded-lg border border-line bg-white text-sm text-ink-soft hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-brand"
+      <button
+        type="button"
+        onClick={onFinish}
+        title="Kết thúc phiên học (các thẻ đã đánh giá vẫn được lưu)"
+        className="flex-none cursor-pointer rounded-lg border border-line bg-white px-3 py-1.5 text-label font-semibold text-ink-soft hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-brand"
       >
-        ✕
-      </Link>
+        Kết thúc
+      </button>
     </div>
   )
 }

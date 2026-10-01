@@ -5,7 +5,7 @@ import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
-import { useCreateList } from '../api/listsQueries'
+import { useCreateList, useCustomLists } from '../api/listsQueries'
 import { useWordSearch, WORD_SEARCH_MIN_LENGTH } from '../api/queries'
 import { parseWordEntry } from './wordEntry'
 
@@ -13,12 +13,22 @@ const MAX_NAME = 150
 const MAX_SUGGESTIONS = 5
 const INPUT =
   'w-full rounded-lg border border-line bg-white px-3.5 py-3 text-sm text-ink outline-none placeholder:text-muted-light focus:border-brand focus:ring-2 focus:ring-brand/25'
+const NAME_TAKEN = 'Bạn đã có danh sách tên này.'
+
+/** Same rule as the server: a learner's lists cannot share a name, ignoring case (scenario 7, branch 11a). */
+const sameName = (a, b) => a.trim().toLocaleLowerCase('vi') === b.trim().toLocaleLowerCase('vi')
 
 /** Words from the shared vocabulary matching what is being typed ("chọn từ kho có sẵn" of A3). */
 function Suggestions({ term, excluded, onPick }) {
   const search = useWordSearch(term)
-  const words = (search.data?.items ?? []).filter((word) => !excluded.has(word.id)).slice(0, MAX_SUGGESTIONS)
-  if (term.length < WORD_SEARCH_MIN_LENGTH || words.length === 0) return null
+  const found = search.data?.items ?? []
+  const words = found.filter((word) => !excluded.has(word.id)).slice(0, MAX_SUGGESTIONS)
+  if (term.length < WORD_SEARCH_MIN_LENGTH || !search.isSuccess || search.isPlaceholderData) return null
+  // Scenario 7, branch 6a: nothing in the shared vocabulary contains the term.
+  if (found.length === 0) {
+    return <p className="text-xs text-muted">Không tìm thấy từ phù hợp. Bạn có thể tự nhập theo dạng “từ — nghĩa”.</p>
+  }
+  if (words.length === 0) return null
 
   return (
     <div className="flex flex-col gap-1">
@@ -51,11 +61,14 @@ function Suggestions({ term, excluded, onPick }) {
 function CreateListForm({ onClose }) {
   const navigate = useNavigate()
   const create = useCreateList()
+  const lists = useCustomLists()
   const nameId = useId()
   const entryId = useId()
   const entryErrorId = useId()
+  const nameErrorId = useId()
 
   const [name, setName] = useState('')
+  const [nameError, setNameError] = useState(null)
   const [entry, setEntry] = useState('')
   const [entryError, setEntryError] = useState(null)
   // Chosen words: { key, label, vocabularyId } for words of the shared vocabulary, { key, label, newWord } for typed ones.
@@ -83,7 +96,14 @@ function CreateListForm({ onClose }) {
 
   async function submit(event) {
     event.preventDefault()
-    if (!name.trim()) return
+    if (!name.trim()) {
+      setNameError('Vui lòng nhập tên danh sách.')
+      return
+    }
+    if (lists.data?.some((list) => sameName(list.name, name))) {
+      setNameError(NAME_TAKEN)
+      return
+    }
     try {
       const list = await create.mutateAsync({
         name: name.trim(),
@@ -92,8 +112,9 @@ function CreateListForm({ onClose }) {
       })
       onClose()
       navigate(`/vocabulary/lists/${list.id}`)
-    } catch {
-      // Shown below.
+    } catch (error) {
+      // A list created meanwhile in another tab: the server refuses the name (409). Other errors are shown below.
+      if (error?.status === 409) setNameError(NAME_TAKEN)
     }
   }
 
@@ -109,11 +130,21 @@ function CreateListForm({ onClose }) {
           id={nameId}
           value={name}
           maxLength={MAX_NAME}
-          onChange={(event) => setName(event.target.value)}
+          onChange={(event) => {
+            setName(event.target.value)
+            setNameError(null)
+          }}
           placeholder="VD: Từ vựng du lịch cá nhân"
+          aria-invalid={nameError ? true : undefined}
+          aria-describedby={nameError ? nameErrorId : undefined}
           className={INPUT}
           autoFocus
         />
+        {nameError && (
+          <p id={nameErrorId} className="text-xs text-danger">
+            {nameError}
+          </p>
+        )}
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -177,7 +208,7 @@ function CreateListForm({ onClose }) {
         ))}
       </ul>
 
-      {create.isError && (
+      {create.isError && create.error?.status !== 409 && (
         <Alert variant="error">{describeApiError(create.error, 'Không tạo được danh sách. Vui lòng thử lại.')}</Alert>
       )}
 
@@ -185,7 +216,7 @@ function CreateListForm({ onClose }) {
         <Button variant="outline" size="sm" className="flex-1" onClick={onClose}>
           Hủy
         </Button>
-        <Button type="submit" size="sm" className="flex-1" disabled={!name.trim()} loading={create.isPending}>
+        <Button type="submit" size="sm" className="flex-1" loading={create.isPending}>
           Tạo danh sách
         </Button>
       </div>

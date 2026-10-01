@@ -12,6 +12,7 @@ import com.example.datn.modules.vocabulary.entity.CustomVocabularyListItem;
 import com.example.datn.modules.vocabulary.entity.CustomVocabularyListItemId;
 import com.example.datn.modules.vocabulary.entity.Vocabulary;
 import com.example.datn.modules.vocabulary.enums.LearningStatus;
+import com.example.datn.modules.vocabulary.exception.DuplicateListNameException;
 import com.example.datn.modules.vocabulary.exception.InvalidListWordsException;
 import com.example.datn.modules.vocabulary.exception.ListNotFoundException;
 import com.example.datn.modules.vocabulary.exception.VocabularyNotFoundException;
@@ -77,6 +78,7 @@ public class CustomListService {
      */
     public CustomListResponse create(CreateCustomListRequest request) {
         Long userId = currentUser.id();
+        requireUniqueName(userId, request.name(), null);
         Set<Long> existingIds = new LinkedHashSet<>(request.vocabularyIds());
         requireVisibleWords(existingIds, userId);
 
@@ -97,8 +99,17 @@ public class CustomListService {
 
     public CustomListResponse rename(Long id, String name) {
         CustomVocabularyList list = requireOwnList(id);
+        requireUniqueName(list.getUserId(), name, list.getId());
         list.rename(name);
         return toResponse(list);
+    }
+
+    /** Two lists of one learner cannot share a name, ignoring case (scenario 7, branch 11a): 409 otherwise. */
+    private void requireUniqueName(Long userId, String name, Long excludedId) {
+        // -1 matches no list: a new list has nothing to exclude.
+        if (listRepository.existsByUserIdAndNameIgnoreCaseAndIdNot(userId, name, excludedId == null ? -1L : excludedId)) {
+            throw new DuplicateListNameException(name);
+        }
     }
 
     /** Deletes the list and its items; the learner's own words stay, since their learning history still needs them. */

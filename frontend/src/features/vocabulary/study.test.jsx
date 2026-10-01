@@ -89,7 +89,9 @@ const announced = (text) => screen.findByText(text) // the screen-reader live re
 
 describe('studying a topic', () => {
   it('flips cards, rates them with buttons, keys or a click, saves each rating, and ends with a summary', async () => {
-    renderAt('/vocabulary/topics/1')
+    renderAt('/vocabulary/topics/1', {
+      'GET /api/learning/summary': () => ({ data: { ...summary(0), upcoming: [{ date: '2026-10-07', count: 5 }] } }),
+    })
     const user = userEvent.setup()
 
     // Due words plus words never studied: min(20, 3 + 26 - 12) = 17.
@@ -117,7 +119,8 @@ describe('studying a topic', () => {
     await announced('Nghĩa: ngân sách')
     await user.keyboard('1')
 
-    expect(await screen.findByRole('heading', { name: 'Hoàn thành phiên ôn tập' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Hoàn thành phiên học · Kinh doanh' })).toBeInTheDocument()
+    expect(await screen.findByText('Cần ôn vào ngày mai (07/10/2026): 5 từ')).toBeInTheDocument()
     expect(screen.getByText('Nhớ rõ: 1')).toBeInTheDocument()
     expect(screen.getByText('Nhớ mơ hồ: 1')).toBeInTheDocument()
     expect(screen.getByText('Chưa nhớ: 1')).toBeInTheDocument()
@@ -157,7 +160,7 @@ describe('studying a topic', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('keeps what was already rated when the learner leaves halfway', async () => {
+  it('ends the session early with "Kết thúc", summing up only the cards already rated', async () => {
     renderAt('/vocabulary/topics/1/study')
     const user = userEvent.setup()
 
@@ -166,10 +169,15 @@ describe('studying a topic', () => {
     await user.keyboard('3')
     await announced('Thẻ 2 trên 3: profit')
 
-    await user.click(screen.getByRole('link', { name: 'Thoát phiên học' }))
+    await user.click(screen.getByRole('button', { name: 'Kết thúc' }))
 
-    expect(await screen.findByRole('heading', { name: 'Kinh doanh · 26 từ' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Hoàn thành phiên học · Kinh doanh' })).toBeInTheDocument()
+    expect(screen.getByText('Nhớ rõ: 1')).toBeInTheDocument()
+    expect(screen.getByText('Nhớ mơ hồ: 0')).toBeInTheDocument()
     expect(callsTo('POST /api/learning/reviews')).toHaveLength(1)
+
+    await user.click(screen.getByRole('link', { name: 'Về chủ đề' }))
+    expect(await screen.findByRole('heading', { name: 'Kinh doanh · 26 từ' })).toBeInTheDocument()
   })
 
   it('says so when a topic has nothing left to study', async () => {
@@ -259,5 +267,6 @@ describe('review reminder (A2)', () => {
     })
 
     expect(await screen.findByText(/Hôm nay bạn không có từ nào cần ôn/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Học theo chủ đề →' })).toHaveAttribute('href', '/vocabulary')
   })
 })
