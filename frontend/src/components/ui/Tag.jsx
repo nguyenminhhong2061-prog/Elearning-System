@@ -12,7 +12,7 @@ const VARIANTS = {
 export function Tag({ variant = 'neutral', className, children, ...props }) {
   return (
     <span
-      className={cx('inline-flex flex-none items-center rounded-full px-2.5 py-1 text-tag font-semibold', VARIANTS[variant], className)}
+      className={cx('inline-flex flex-none items-center rounded-full px-2.5 py-1 text-tag font-semibold whitespace-nowrap', VARIANTS[variant], className)}
       {...props}
     >
       {children}

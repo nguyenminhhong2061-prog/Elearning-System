@@ -40,6 +40,10 @@
   --color-ink-soft: #475551;
   --color-muted: #77857F;
   --color-muted-light: #9BAAA5;
+  /* Secondary text of the admin area: the design's #5E6B66 passes 4.5:1 on white, --color-muted (3.9:1) does not. */
+  --color-muted-strong: #5E6B66;
+  /* Text on --color-brand-soft (admin badge, initials): 7.6:1. */
+  --color-brand-ink: #0B4F48;
 
   /* Sidebar (dark) */
   --color-sidebar: #16211F;
@@ -85,6 +89,19 @@
     to {
       opacity: 1;
       transform: translateY(0);
+    }
+  }
+
+  /* Admin side panel ("Sửa từ"): slides in from the right edge. */
+  --animate-drawer-in: drawer-in 0.24s ease;
+  @keyframes drawer-in {
+    from {
+      transform: translateX(24px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
     }
   }
 

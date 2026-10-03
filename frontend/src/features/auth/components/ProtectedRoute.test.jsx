@@ -41,4 +41,25 @@ describe('ProtectedRoute with roles', () => {
     expect(await screen.findByRole('heading', { name: 'Không có quyền truy cập' })).toBeInTheDocument()
     expect(screen.queryByText('Bảng điều khiển quản trị')).not.toBeInTheDocument()
   })
+
+  it('sends a user whose role is not allowed to redirectTo when it is given', async () => {
+    tokenStorage.save({ accessToken: 'stored-token', expiresIn: 3600 })
+    backend = installFakeBackend({ 'GET /api/users/me': () => ({ data: admin }) })
+
+    render(
+      <MemoryRouter initialEntries={['/vocabulary']}>
+        <AuthProvider>
+          <Routes>
+            <Route element={<ProtectedRoute roles={[ROLES.LEARNER]} redirectTo="/admin" />}>
+              <Route path="/vocabulary" element={<p>Từ vựng của người học</p>} />
+            </Route>
+            <Route path="/admin" element={<p>Bảng điều khiển quản trị</p>} />
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('Bảng điều khiển quản trị')).toBeInTheDocument()
+    expect(screen.queryByText('Từ vựng của người học')).not.toBeInTheDocument()
+  })
 })
