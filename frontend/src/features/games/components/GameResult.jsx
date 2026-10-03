@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
-import { formatCount } from '@/features/vocabulary/topicProgress'
+import { paths } from '@/config/paths'
+import { formatCount } from '@/lib/format'
 
 const optionText = (question, optionId) => question.options.find((option) => option.id === optionId)?.content ?? '—'
 
@@ -82,7 +83,7 @@ export function GameResult({ result, playedSeconds, round, answers, onPlayAgain 
           Chơi lại
         </button>
         <Link
-          to="/vocabulary/games"
+          to={paths.games}
           className="flex-1 rounded-lg bg-white/16 px-4 py-3 text-center text-label font-semibold text-white hover:bg-white/24 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         >
           Chọn trò chơi khác

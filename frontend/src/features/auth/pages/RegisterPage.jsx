@@ -7,6 +7,7 @@ import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { PasswordField } from '@/components/ui/PasswordField'
 import { TextField } from '@/components/ui/TextField'
+import { paths } from '@/config/paths'
 import { useAuth } from '../context/useAuth'
 import { registerSchema } from '../schemas'
 
@@ -35,7 +36,7 @@ export function RegisterPage() {
     try {
       await registerAccount({ fullName, email, password })
       // The login page says the account was created and fills in its email (scenario 1, step 7).
-      navigate('/login', { replace: true, state: { registered: true, email: email.trim() } })
+      navigate(paths.login, { replace: true, state: { registered: true, email: email.trim() } })
     } catch (error) {
       if (error?.status === 409) {
         setError(
@@ -92,7 +93,7 @@ export function RegisterPage() {
 
       <p className="text-center text-label text-muted">
         Đã có tài khoản?{' '}
-        <Link to="/login" className="font-semibold">
+        <Link to={paths.login} className="font-semibold">
           Đăng nhập
         </Link>
       </p>

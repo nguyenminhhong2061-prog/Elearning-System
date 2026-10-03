@@ -7,6 +7,7 @@ import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { PasswordField } from '@/components/ui/PasswordField'
 import { TextField } from '@/components/ui/TextField'
+import { paths } from '@/config/paths'
 import { useAuth } from '../context/useAuth'
 import { loginSchema } from '../schemas'
 
@@ -79,7 +80,7 @@ export function LoginPage() {
 
       <p className="text-center text-label text-muted">
         Chưa có tài khoản?{' '}
-        <Link to="/register" className="font-semibold">
+        <Link to={paths.register} className="font-semibold">
           Đăng ký
         </Link>
       </p>

@@ -1,12 +1,14 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getLearningHistory, getLearningSummary, getStudySession, submitReview } from './learningApi'
+import { nextPageParam } from '@/api/pagination'
+import { HISTORY_PAGE_SIZE } from '../constants'
 import { learningKeys, listKeys, vocabularyKeys } from './keys'
+import { getLearningHistory, getLearningSummary, getStudySession, submitReview } from './learningApi'
+
+// Hooks for flashcard sessions, reviews and the learning history.
 
 // Deliberately outside the roots of keys.js: invalidating progress after each review must not refetch the session that
 // is being studied, which would reshuffle the cards under the learner's hands.
 const sessionKey = (source, round) => ['study-session', source, round]
-
-export const HISTORY_PAGE_SIZE = 20
 
 /** Due count and statistics; used by the review reminder and the history tab. */
 export function useLearningSummary() {
@@ -23,7 +25,7 @@ export function useLearningHistory(filter = {}) {
     queryKey: learningKeys.history(filter),
     queryFn: ({ pageParam }) => getLearningHistory({ ...filter, page: pageParam, size: HISTORY_PAGE_SIZE }),
     initialPageParam: 0,
-    getNextPageParam: (last) => (last.page + 1 < last.totalPages ? last.page + 1 : undefined),
+    getNextPageParam: nextPageParam,
   })
 }
 

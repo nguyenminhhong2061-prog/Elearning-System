@@ -1,17 +1,19 @@
 import { Page } from '@/components/layout/Page'
 import { TabLinks } from '@/components/ui/TabLinks'
+import { paths } from '@/config/paths'
+import { formatCount } from '@/lib/format'
 import { useCustomLists } from '../api/listsQueries'
-import { useTopics } from '../api/queries'
-import { formatCount, summarizeTopics } from '../topicProgress'
-import { GamesBanner } from '@/features/games/components/GamesBanner'
+import { useTopics } from '../api/vocabularyQueries'
+import { summarizeTopics } from '../utils/topicProgress'
 import { DueReviewBanner } from './DueReview'
+import { GamesBanner } from './GamesBanner'
 
 function useVocabularyTabs() {
   const { data: lists } = useCustomLists()
   return [
-    { id: 'topics', label: 'Chủ đề có sẵn', to: '/vocabulary' },
-    { id: 'lists', label: lists ? `Danh sách của tôi (${lists.length})` : 'Danh sách của tôi', to: '/vocabulary?tab=lists' },
-    { id: 'history', label: 'Lịch sử học', to: '/vocabulary?tab=history' },
+    { id: 'topics', label: 'Chủ đề có sẵn', to: paths.vocabulary },
+    { id: 'lists', label: lists ? `Danh sách của tôi (${lists.length})` : 'Danh sách của tôi', to: paths.vocabularyLists },
+    { id: 'history', label: 'Lịch sử học', to: paths.vocabularyHistory() },
   ]
 }
 

@@ -1,7 +1,7 @@
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useLearningSummary } from '@/features/vocabulary/api/learningQueries'
 import { DueReviewCard } from '@/features/vocabulary/components/DueReview'
-import { formatCount } from '@/features/vocabulary/topicProgress'
+import { formatCount } from '@/lib/format'
 import { cx } from '@/lib/cx'
 import { useProgressSummary } from '../api/progressQueries'
 

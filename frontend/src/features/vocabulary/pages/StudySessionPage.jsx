@@ -1,25 +1,28 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { Page } from '@/components/layout/Page'
+import { BackLink } from '@/components/ui/BackLink'
 import { ButtonLink } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { LoadError } from '@/components/ui/LoadError'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { paths } from '@/config/paths'
 import { useStudyTime } from '@/features/progress/useStudyTime'
+import { parseId } from '@/lib/routeParams'
 import { useStudySession } from '../api/learningQueries'
-import { parseId, VOCABULARY_PATH } from '../routeParams'
-import { FlashcardSession } from '../study/FlashcardSession'
+import { FlashcardSession } from '../components/study/FlashcardSession'
 
 // The flashcard column: 520px as in the design, larger on big screens so the card does not look lost in the window.
 const SESSION_WIDTH = '2xl:max-w-180'
 
 // Where a session's cards come from, and where "back" leads. `param` names the id in the URL.
 const MODES = {
-  topic: { param: 'topicId', back: (id) => `/vocabulary/topics/${id}`, backLabel: 'Về chủ đề', title: 'Học chủ đề' },
-  list: { param: 'listId', back: (id) => `/vocabulary/lists/${id}`, backLabel: 'Về danh sách', title: 'Học danh sách' },
-  due: { param: null, back: () => VOCABULARY_PATH, backLabel: 'Về từ vựng', title: 'Ôn tập hôm nay' },
+  topic: { param: 'topicId', back: paths.topic, backLabel: 'Về chủ đề', title: 'Học chủ đề' },
+  list: { param: 'listId', back: paths.list, backLabel: 'Về danh sách', title: 'Học danh sách' },
+  due: { param: null, back: () => paths.vocabulary, backLabel: 'Về từ vựng', title: 'Ôn tập hôm nay' },
 }
 
+/** A message instead of the cards (not found, nothing to study), with the way back. */
 function Message({ title, backTo, backLabel, extra, children }) {
   return (
     <Page title={title} width="focus">
@@ -37,26 +40,29 @@ function Message({ title, backTo, backLabel, extra, children }) {
 }
 
 /**
- * A flashcard session (A1, A2): mode "topic" and "list" study one topic or personal list, mode "due" reviews every
- * word due today.
+ * A flashcard session (A1, A2): mode "topic" and "list" study one topic or personal list (/vocabulary/topics/:id/study,
+ * /vocabulary/lists/:id/study), mode "due" reviews every word due today (/vocabulary/review).
  * @param {{ mode: 'topic' | 'list' | 'due' }} props
  */
 export function StudySessionPage({ mode }) {
   useStudyTime()
+
+  // 1. What the URL asks for.
   const config = MODES[mode]
   const params = useParams()
   const id = config.param ? parseId(params[config.param]) : null
   const invalid = config.param !== null && id === null
   const source = useMemo(() => (config.param ? { [config.param]: id } : {}), [config.param, id])
-  const backTo = invalid ? VOCABULARY_PATH : config.back(id)
+  const backTo = invalid ? paths.vocabulary : config.back(id)
 
-  // Bumped by "Học tiếp" to fetch a fresh session from the same source.
+  // 2. The data. "Học tiếp" bumps `round` to fetch a fresh session from the same source.
   const [round, setRound] = useState(0)
   const session = useStudySession(source, round, { enabled: !invalid })
 
+  // 3. One state at a time: not found, loading, error, nothing to study, then the cards.
   if (invalid || session.error?.status === 404) {
     return (
-      <Message title="Không tìm thấy" backTo={VOCABULARY_PATH} backLabel="Về từ vựng">
+      <Message title="Không tìm thấy" backTo={paths.vocabulary} backLabel="Về từ vựng">
         {mode === 'list' ? 'Danh sách này không tồn tại hoặc đã bị xóa.' : 'Chủ đề này không tồn tại hoặc đã bị xóa.'}
       </Message>
     )
@@ -80,9 +86,7 @@ export function StudySessionPage({ mode }) {
     return (
       <Page title={config.title} width="focus">
         <LoadError error={session.error} onRetry={() => session.refetch()} message="Không tải được phiên học. Vui lòng thử lại." />
-        <Link to={backTo} className="text-label font-medium">
-          ← {config.backLabel}
-        </Link>
+        <BackLink to={backTo}>{config.backLabel}</BackLink>
       </Page>
     )
   }
@@ -98,7 +102,7 @@ export function StudySessionPage({ mode }) {
         backLabel={config.backLabel}
         extra={
           mode === 'due' && (
-            <Link to={VOCABULARY_PATH} className="text-label font-semibold">
+            <Link to={paths.vocabulary} className="text-label font-semibold">
               Học theo chủ đề →
             </Link>
           )

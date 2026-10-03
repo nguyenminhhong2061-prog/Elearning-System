@@ -1,9 +1,8 @@
 import { Link } from 'react-router'
+import { paths } from '@/config/paths'
 import { cx } from '@/lib/cx'
+import { formatCount } from '@/lib/format'
 import { useLearningSummary } from '../api/learningQueries'
-import { formatCount } from '../topicProgress'
-
-export const REVIEW_PATH = '/vocabulary/review'
 
 /** Number of words due today, or 0 while unknown (loading, error): the reminder is simply not shown then. */
 function useDueToday() {
@@ -21,7 +20,7 @@ export function DueReviewCard({ className }) {
 
   return (
     <Link
-      to={REVIEW_PATH}
+      to={paths.review}
       aria-label={`Bạn có ${formatCount(due)} từ cần ôn hôm nay. Ôn tập ngay`}
       className={cx(
         'flex flex-col gap-0.5 rounded-xl border border-brand-tint-line bg-brand-tint p-5 transition-colors hover:border-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand',
@@ -44,7 +43,7 @@ export function DueReviewBanner() {
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-tint-line bg-brand-tint px-5 py-3.5">
       <p className="text-sm font-semibold text-brand-dark">Bạn có {formatCount(due)} từ cần ôn hôm nay</p>
       <Link
-        to={REVIEW_PATH}
+        to={paths.review}
         className="rounded-lg bg-brand px-4 py-2 text-label font-semibold text-white hover:bg-brand-dark hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
       >
         Ôn tập ngay →

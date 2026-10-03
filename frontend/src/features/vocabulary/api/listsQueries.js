@@ -1,4 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { nextPageParam } from '@/api/pagination'
+import { LIST_WORDS_PAGE_SIZE } from '../constants'
 import { learningKeys, listKeys, vocabularyKeys } from './keys'
 import {
   addNewWordToList,
@@ -12,7 +14,7 @@ import {
   renameCustomList,
 } from './listsApi'
 
-export const LIST_WORDS_PAGE_SIZE = 50
+// Hooks for the learner's personal lists (A3).
 
 export function useCustomLists() {
   return useQuery({ queryKey: listKeys.all, queryFn: getCustomLists })
@@ -34,7 +36,7 @@ export function useListWords(id) {
     queryKey: listKeys.words(id),
     queryFn: ({ pageParam }) => getListWords(id, { page: pageParam, size: LIST_WORDS_PAGE_SIZE }),
     initialPageParam: 0,
-    getNextPageParam: (last) => (last.page + 1 < last.totalPages ? last.page + 1 : undefined),
+    getNextPageParam: nextPageParam,
     enabled: id !== null,
   })
 }

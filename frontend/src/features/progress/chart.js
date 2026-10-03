@@ -1,6 +1,6 @@
 import { CEFR_LEVELS } from '@/api/constants'
 import { formatDate, formatDayMonth, formatWeekday } from '@/lib/dates'
-import { formatCount } from '@/features/vocabulary/topicProgress'
+import { formatCount } from '@/lib/format'
 import { PERIODS } from './constants'
 
 const SHORT_WEEKDAYS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']

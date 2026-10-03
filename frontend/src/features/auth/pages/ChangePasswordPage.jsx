@@ -7,12 +7,13 @@ import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { PasswordField } from '@/components/ui/PasswordField'
-import { changePassword } from '../authApi'
+import { useChangePassword } from '../api/authQueries'
 import { changePasswordSchema } from '../schemas'
 
 const EMPTY_FORM = { currentPassword: '', newPassword: '', confirmPassword: '' }
 
 export function ChangePasswordPage() {
+  const changePassword = useChangePassword()
   const [submitError, setSubmitError] = useState(null)
   const [succeeded, setSucceeded] = useState(false)
 
@@ -31,7 +32,7 @@ export function ChangePasswordPage() {
     setSubmitError(null)
     setSucceeded(false)
     try {
-      await changePassword({ currentPassword, newPassword })
+      await changePassword.mutateAsync({ currentPassword, newPassword })
       reset(EMPTY_FORM)
       setSucceeded(true)
     } catch (error) {
