@@ -22,7 +22,7 @@ function WrongAnswers({ round, answers }) {
               Câu
             </th>
             <th scope="col" className="py-1 pr-2 text-left font-medium">
-              {round.gameType === 'QUICK_QUIZ' ? 'Nghĩa' : 'Từ'}
+              Từ
             </th>
             <th scope="col" className="py-1 pr-2 text-left font-medium">
               Bạn chọn

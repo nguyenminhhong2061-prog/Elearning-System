@@ -28,13 +28,11 @@ export function reviewOption(result) {
   return REVIEW_OPTIONS.find((option) => option.value === result)
 }
 
-/** Largest number of cards in one session, matching the API default. */
-export const SESSION_SIZE = 20
-
 /**
- * Cards a topic or list session would contain: due words plus words never studied, capped at SESSION_SIZE.
+ * Cards a topic or list session contains: every due word plus every word never studied, with no limit (docs/api/
+ * learning.md version 2; "Học 30 từ →" in scenario 5).
  * @param {{ wordCount: number, learnedCount: number, dueCount: number }} counts
  */
 export function studyableCount({ wordCount, learnedCount, dueCount }) {
-  return Math.min(SESSION_SIZE, dueCount + Math.max(0, wordCount - learnedCount))
+  return dueCount + Math.max(0, wordCount - learnedCount)
 }

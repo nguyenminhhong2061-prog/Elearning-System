@@ -191,8 +191,9 @@ Người 0 điểm không có trong bảng.
 | `playToken` | Có chữ ký (HMAC), đọc được nội dung | Mã hóa (AES-GCM) |
 | Lưu ván | `game_sessions` + `game_session_answers` | Chỉ `game_sessions` (thêm nguồn, số câu, thời gian) |
 
-**Frontend và dữ liệu giả chưa sửa theo bản 2** (người dùng chọn làm backend và contract trước). Giao diện hiện tại vẫn
-chơi được với backend thật (gọi không có `topicId`/`listId`), nhưng: chưa có bước chọn chủ đề; hướng dẫn Trắc nghiệm
-nhanh vẫn ghi "hiện một nghĩa tiếng Việt, chọn từ tiếng Anh" (`features/games/constants.js`) và câu hỏi vẫn gắn
-`lang="vi"`; Đoán nghĩa chưa hiện câu ví dụ; màn kết quả chưa có thời gian và bảng câu sai (dòng "Thưởng thời gian"
-tự ẩn vì luôn 0). `frontend/mock/` vẫn theo bản 1.
+**Giao diện chỉ sửa tối thiểu theo bản 2** (03/10/2026, người dùng chọn tập trung backend, giữ giao diện): hướng dẫn và
+nhãn của Trắc nghiệm nhanh đổi theo chiều hỏi mới (hiện từ, chọn nghĩa). Giao diện vẫn chơi được với backend thật vì gọi
+không có `topicId`/`listId` (mọi từ hệ thống) và dùng id câu hỏi, lựa chọn như chuỗi mờ. Còn thiếu so với kịch bản 8: ô
+chọn "Chủ đề" và thông báo "chưa đủ từ"; Đoán nghĩa chưa hiện `example`; mô tả trên thẻ trò chơi chưa ghi số câu theo
+luật; thời gian và bảng câu sai ở màn kết quả do trình duyệt tự tính, chưa dùng `durationSeconds`, `wrongAnswers` của
+server. Dữ liệu giả `frontend/mock/` đã theo bản 2.

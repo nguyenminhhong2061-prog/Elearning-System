@@ -1,19 +1,29 @@
 import { addDays } from '../../src/lib/dates.js'
 import { HttpError, paginate } from '../http.js'
-import { applyReview, INTERVALS } from '../scheduler.js'
+import { applyReview } from '../scheduler.js'
 import { findWord, isDue, isReviewedToday, sessionCards, toCard, topics, visibleWords } from '../store.js'
 
 // docs/api/learning.md
 
 const RESULTS = ['FORGOT', 'VAGUE', 'REMEMBERED']
 const HISTORY_STATUSES = ['LEARNING', 'MASTERED']
+/** Words named in the "due tomorrow" line of the session summary; the count covers them all. */
+const DUE_TOMORROW_WORDS = 20
 
+/** Every card when no size is sent (scenarios 5 and 6 have no limit); otherwise 1 to 500 cards. */
 function parseSize(searchParams) {
   const raw = searchParams.get('size')
-  if (raw === null) return 20
+  if (raw === null) return undefined
   const size = Number(raw)
-  if (!Number.isInteger(size) || size < 1 || size > 50) throw new HttpError(400, 'size must be between 1 and 50')
+  if (!Number.isInteger(size) || size < 1 || size > 500) throw new HttpError(400, 'size must be between 1 and 500')
   return size
+}
+
+function parseSince(searchParams) {
+  const raw = searchParams.get('since')
+  const since = raw === null ? Number.NaN : Date.parse(raw)
+  if (Number.isNaN(since)) throw new HttpError(400, 'since must be an ISO date-time')
+  return since
 }
 
 /**
@@ -52,7 +62,7 @@ export function learningRoutes({ findList } = {}) {
       handle: ({ user, today, searchParams }) => {
         const size = parseSize(searchParams)
         const { source, pool, dueOnly = false } = sessionSource(user, searchParams, findList)
-        return { source, cards: sessionCards(user, pool, today, { size, dueOnly }) }
+        return { source, startedAt: new Date().toISOString(), cards: sessionCards(user, pool, today, { size, dueOnly }) }
       },
     },
     {
@@ -65,13 +75,45 @@ export function learningRoutes({ findList } = {}) {
 
         const next = applyReview(user.learning.get(word.id), body.result, today)
         user.learning.set(word.id, next)
+        user.reviews.push({ vocabularyId: word.id, result: body.result, reviewedAt: next.lastReviewedAt })
         return {
           vocabularyId: word.id,
           learningStatus: next.status,
           lastReviewResult: next.lastReviewResult,
           reviewCount: next.reviewCount,
-          intervalDays: INTERVALS[next.step],
+          intervalDays: next.intervalDays,
           nextReviewAt: next.nextReviewAt,
+        }
+      },
+    },
+    {
+      // Scenario 5 step 14 and scenario 6 step 5: the ratings since the session started and the words due by tomorrow.
+      method: 'GET',
+      pattern: /^\/api\/learning\/session-summary$/,
+      handle: ({ user, today, searchParams }) => {
+        const since = parseSince(searchParams)
+        const results = Object.fromEntries(RESULTS.map((result) => [result, 0]))
+        user.reviews
+          .filter((review) => Date.parse(review.reviewedAt) >= since)
+          .forEach((review) => {
+            results[review.result] += 1
+          })
+
+        const tomorrow = addDays(today, 1)
+        const due = [...user.learning.entries()]
+          .filter(([, state]) => state.nextReviewAt <= tomorrow)
+          .map(([id, state]) => ({ word: findWord(user, id)?.word, nextReviewAt: state.nextReviewAt }))
+          .filter((entry) => entry.word !== undefined)
+          .sort((a, b) => a.nextReviewAt.localeCompare(b.nextReviewAt) || a.word.localeCompare(b.word, 'en'))
+        return {
+          since: new Date(since).toISOString(),
+          reviewedCount: Object.values(results).reduce((sum, count) => sum + count, 0),
+          results,
+          dueTomorrow: {
+            date: tomorrow,
+            count: due.length,
+            words: due.slice(0, DUE_TOMORROW_WORDS).map((entry) => entry.word),
+          },
         }
       },
     },

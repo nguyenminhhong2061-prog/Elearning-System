@@ -94,7 +94,7 @@ describe('studying a topic', () => {
     })
     const user = userEvent.setup()
 
-    // Due words plus words never studied: min(20, 3 + 26 - 12) = 17.
+    // Every due word plus every word never studied: 3 + 26 - 12 = 17.
     await user.click(await screen.findByRole('link', { name: 'Học 17 từ →' }))
     await announced('Thẻ 1 trên 3: revenue')
     expect(callsTo('GET /api/learning/session')[0].params).toMatchObject({ topicId: 1 })
@@ -135,6 +135,15 @@ describe('studying a topic', () => {
     await user.click(screen.getByRole('button', { name: 'Học tiếp' }))
     await announced('Thẻ 1 trên 3: revenue')
     expect(callsTo('GET /api/learning/session')).toHaveLength(2)
+  })
+
+  it('offers every due and new word of the topic, with no 20-card limit (scenario 5, step 6)', async () => {
+    renderAt('/vocabulary/topics/1', {
+      'GET /api/topics/1': () => ({ data: { ...TOPIC, wordCount: 40, learnedCount: 12, dueCount: 2 } }),
+    })
+
+    // 2 due words and 28 never studied.
+    expect(await screen.findByRole('link', { name: 'Học 30 từ →' })).toHaveAttribute('href', '/vocabulary/topics/1/study')
   })
 
   it('keeps the card and says so when a rating could not be saved, then goes on once it is', async () => {

@@ -233,6 +233,7 @@ của module khác); cần số liệu thì dùng `WordReviewedEvent` ở trên 
 | Lượt ôn | Không lưu | Bảng `vocabulary_reviews` |
 | Tổng kết phiên | Frontend tự đếm | `GET /api/learning/session-summary` |
 
-**Frontend và dữ liệu giả chưa sửa theo bản 2** (người dùng chọn làm backend và contract trước): `frontend/mock/scheduler.js`
-vẫn tính theo bậc, nút "Học N từ" vẫn tối đa 20, màn tổng kết phiên chưa gọi `session-summary`. Với backend thật, phiên
-học có thể dài hơn 20 thẻ và lịch ôn hiện đúng luật mới.
+**Giao diện chỉ sửa tối thiểu theo bản 2** (03/10/2026, người dùng chọn tập trung backend, giữ giao diện): nút "Học N từ"
+không còn tối đa 20. Màn tổng kết phiên vẫn tự đếm các thẻ vừa đánh giá và lấy dòng "Cần ôn vào ngày mai" từ
+`summary.upcoming[0]` (từ đến hạn đúng ngày mai), chưa gọi `session-summary` (từ đến hạn đến hết ngày mai, kèm tên).
+Dữ liệu giả `frontend/mock/` đã theo bản 2 (luật ôn, thứ tự, không giới hạn thẻ, `startedAt`, `session-summary`).

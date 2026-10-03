@@ -5,8 +5,8 @@ export const GAME_TYPE_INFO = Object.freeze({
     instructions: 'Mỗi câu hiện một từ tiếng Anh. Chọn nghĩa tiếng Việt đúng trong 4 đáp án.',
   },
   QUICK_QUIZ: {
-    summary: 'Nhìn nghĩa, chọn thật nhanh từ tiếng Anh.',
-    instructions: 'Mỗi câu hiện một nghĩa tiếng Việt. Chọn từ tiếng Anh đúng trước khi hết giờ.',
+    summary: 'Nhìn từ, chọn thật nhanh nghĩa đúng.',
+    instructions: 'Mỗi câu hiện một từ tiếng Anh. Chọn nghĩa tiếng Việt đúng trong 4 đáp án trước khi hết giờ.',
   },
   WORD_MATCH: {
     summary: 'Ghép mỗi từ với nghĩa của nó.',
@@ -14,7 +14,7 @@ export const GAME_TYPE_INFO = Object.freeze({
   },
 })
 
-/** Points shown while playing: each right answer is worth points × 10 (the server adds the time bonus at the end). */
+/** Points shown while playing: each right answer is worth points × 10, the whole score (no time bonus any more). */
 export const POINTS_PER_UNIT = 10
 
 /** How long the right/wrong colours stay before the next question. */
