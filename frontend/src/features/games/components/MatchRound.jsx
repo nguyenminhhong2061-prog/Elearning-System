@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { describeApiError } from '@/api/errorMessages'
 import { cx } from '@/lib/cx'
-import { checkAnswer } from '../api/gamesApi'
-import { elapsedSince } from '../clock'
+import { useCheckAnswer } from '../api/gamesQueries'
+import { elapsedSince } from '../utils/clock'
 
 const WRONG_FLASH_MS = 600
 
@@ -45,15 +45,14 @@ export function MatchRound({ round, onAnswer, onComplete }) {
   const [picked, setPicked] = useState(null) // tile key
   const [matched, setMatched] = useState(() => new Set())
   const [wrong, setWrong] = useState(null) // [key, key] flashing red
-  const [checking, setChecking] = useState(false)
-  const [error, setError] = useState(null)
+  const check = useCheckAnswer(round.gameId)
   const startedAt = useRef(0)
   useEffect(() => {
     startedAt.current = Date.now() // when the tiles are first shown
   }, [])
 
   async function pick(tile) {
-    if (checking || wrong || matched.has(tile.key)) return
+    if (check.isPending || wrong || matched.has(tile.key)) return
     const first = tiles.find((candidate) => candidate.key === picked)
     if (!first || first.key === tile.key || first.side === tile.side) {
       // Nothing picked yet, the same tile again, or another tile of the same side: this becomes the pick.
@@ -63,10 +62,8 @@ export function MatchRound({ round, onAnswer, onComplete }) {
 
     const word = first.side === 'word' ? first : tile
     const meaning = first.side === 'word' ? tile : first
-    setChecking(true)
-    setError(null)
     try {
-      const result = await checkAnswer(round.gameId, { playToken: round.playToken, questionId: word.id, optionId: meaning.id })
+      const result = await check.mutateAsync({ playToken: round.playToken, questionId: word.id, optionId: meaning.id })
       if (result.correct) {
         const next = new Set(matched).add(word.key).add(meaning.key)
         setMatched(next)
@@ -80,11 +77,8 @@ export function MatchRound({ round, onAnswer, onComplete }) {
           setPicked(null)
         }, WRONG_FLASH_MS)
       }
-    } catch (failure) {
-      setError(describeApiError(failure, 'Không kiểm tra được cặp này. Hãy thử lại.'))
-      setPicked(null)
-    } finally {
-      setChecking(false)
+    } catch {
+      setPicked(null) // the error is shown below
     }
   }
 
@@ -120,7 +114,11 @@ export function MatchRound({ round, onAnswer, onComplete }) {
       <p aria-live="assertive" className="sr-only">
         {wrong ? 'Chưa đúng, hãy thử cặp khác.' : ''}
       </p>
-      {error && <p role="alert" className="rounded-lg bg-white px-3 py-2 text-label font-semibold text-danger">{error}</p>}
+      {check.isError && (
+        <p role="alert" className="rounded-lg bg-white px-3 py-2 text-label font-semibold text-danger">
+          {describeApiError(check.error, 'Không kiểm tra được cặp này. Hãy thử lại.')}
+        </p>
+      )}
     </div>
   )
 }

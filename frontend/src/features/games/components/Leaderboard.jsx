@@ -4,8 +4,8 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { useAuth } from '@/features/auth/context/useAuth'
 import { cx } from '@/lib/cx'
 import { formatMoment } from '@/lib/dates'
+import { formatCount } from '@/lib/format'
 import { getInitials } from '@/lib/personName'
-import { formatCount } from '@/features/vocabulary/topicProgress'
 import { useLeaderboard } from '../api/gamesQueries'
 
 const PERIODS = [

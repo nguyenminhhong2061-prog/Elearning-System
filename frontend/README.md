@@ -78,15 +78,19 @@ frontend/
     │   ├── App.jsx            # AuthProvider + QueryProvider + routes
     │   ├── QueryProvider.jsx  # cache TanStack Query, mỗi tài khoản một cache riêng
     │   └── router.jsx         # NƠI DUY NHẤT khai báo route; mỗi trang là một file JS riêng (lazyPage)
-    ├── api/                   # dùng chung: httpClient, ApiError, tokenStorage, hằng số enum, JSDoc typedef
+    ├── api/                   # dùng chung: httpClient, ApiError, tokenStorage, hằng số enum, JSDoc typedef,
+    │                          # pagination.js (danh sách nhiều trang)
+    ├── config/
+    │   └── paths.js           # mọi URL của các trang (link dùng paths.topic(id) thay vì gõ đường dẫn)
     ├── components/
     │   ├── ui/                # Button, TextField, PasswordField, SearchField, Alert, LoadError, Card, Tag,
-    │   │                      # Skeleton, Avatar, Spinner, Logo
+    │   │                      # Skeleton, Avatar, Spinner, Logo, EmptyState, BackLink
     │   └── layout/            # AppLayout (thanh bên), Page, AuthLayout, navItems.js, RouteBoundary (đang tải,
     │                          # lỗi của trang)
-    ├── features/
-    │   ├── auth/              # đăng nhập, đăng ký, đổi mật khẩu, AuthProvider, useAuth, route guard
-    │   ├── vocabulary/        # module A: chủ đề, học flashcard (study/), nhắc ôn, lịch sử, danh sách riêng (lists/)
+    ├── features/              # mỗi module một thư mục, cấu trúc bên trong theo CAU-TRUC-CODE.md
+    │   ├── auth/              # đăng nhập, đăng ký, đổi mật khẩu; context/ (AuthProvider, authReducer, useAuth),
+    │   │                      # components/ (ProtectedRoute, GuestRoute)
+    │   ├── vocabulary/        # module A: chủ đề, học thẻ, nhắc ôn, lịch sử, danh sách riêng
     │   ├── games/             # module A (A4): trò chơi từ vựng và bảng xếp hạng
     │   ├── exercises/         # module B (giao diện): đọc hiểu (reading/), viết (writing/), nghe (listening/),
     │                          # phát âm (pronunciation/), trợ lý AI (chat/); API theo docs/api/exercises.md, chatbot.md
@@ -95,19 +99,24 @@ frontend/
     │   │                      # ghi thời gian học (useStudyTime); API theo docs/api/progress.md
     │   └── plan/              # module D (giao diện): Kế hoạch học cá nhân (D2); API theo docs/api/plans.md
     ├── pages/                 # trang chung: HomePage, NotFoundPage, ForbiddenPage
-    ├── lib/                   # hàm tiện ích nhỏ; lazyPage.js (tải trang khi cần, tự tải lại sau khi deploy)
+    ├── lib/                   # hàm tiện ích nhỏ: format.js (formatCount), routeParams.js (parseId), dates.js,
+    │                          # lazyPage.js (tải trang khi cần, tự tải lại sau khi deploy)
     └── test/                  # setup.js, fakeBackend.js (giả lập backend cho test)
 ```
 
 Import dùng alias `@/` thay cho đường dẫn tương đối dài: `import { Button } from '@/components/ui/Button'`.
 File chứa JSX phải có đuôi `.jsx`, file logic thuần dùng `.js`. Mỗi module đặt code trong `src/features/<module>/`.
 
+**Bên trong một module** (`api/`, `components/`, `hooks/`, `pages/`, `utils/`…), file nào để đâu, gọi nhau thế nào và
+các bước thêm API, thêm trang: xem [CAU-TRUC-CODE.md](CAU-TRUC-CODE.md). Đã áp dụng cho `auth`, `vocabulary`,
+`games`; các module khác chuyển dần.
+
 ## Hướng dẫn cho các module khác
 
 ### Thêm trang cho module
 
-1. Tạo trang trong `src/features/<module>/pages/`, bọc nội dung bằng `Page` để có tiêu đề tab, tiêu đề trang và
-   độ rộng đúng thiết kế:
+1. Tạo trang trong `src/features/<module>/pages/` (khuôn trang: mục 3.3 của [CAU-TRUC-CODE.md](CAU-TRUC-CODE.md)),
+   bọc nội dung bằng `Page` để có tiêu đề tab, tiêu đề trang và độ rộng đúng thiết kế:
 
    ```jsx
    import { Page } from '@/components/layout/Page'
@@ -128,7 +137,8 @@ File chứa JSX phải có đuôi `.jsx`, file logic thuần dùng `.js`. Mỗi 
    theo số trang. `RouteBoundary` trong `AppLayout` lo phần đang tải (vòng quay trong vùng nội dung, thanh bên giữ
    nguyên) và phần lỗi (trang không tải được hoặc bị lỗi khi hiển thị). Layout mới (ví dụ khu Admin) cũng phải bọc
    `<Outlet />` bằng `<RouteBoundary>`.
-3. Nếu cần, sửa mục của mình trong `src/components/layout/navItems.js` (thanh bên).
+3. Thêm URL của trang vào `src/config/paths.js`, và nếu cần, sửa mục của mình trong
+   `src/components/layout/navItems.js` (thanh bên).
 
 Trang chỉ dành cho admin: bọc bằng `<Route element={<ProtectedRoute roles={[ROLES.ADMIN]} />}>`. Đây chỉ là để
 giao diện gọn, backend mới là nơi chặn quyền thật (`@PreAuthorize`).
@@ -164,8 +174,8 @@ const { data } = await httpClient.get('/api/topics')   // token được gắn t
 
 ### Hiển thị dữ liệu từ server (TanStack Query)
 
-Trong component, đừng tự gọi API trong `useEffect`. Viết hàm gọi API trong `features/<module>/api/` rồi bọc bằng
-`useQuery` (xem `src/features/vocabulary/api/queries.js`):
+Trong component, đừng tự gọi API trong `useEffect`. Viết hàm gọi API trong `features/<module>/api/<nhóm>Api.js` rồi
+bọc bằng `useQuery` trong `<nhóm>Queries.js` (xem `src/features/vocabulary/api/vocabularyQueries.js`):
 
 ```js
 export const grammarKeys = { all: ['grammar'], lessons: () => ['grammar', 'lessons'] }
@@ -187,8 +197,9 @@ Chốt contract trước (ví dụ `docs/api/vocabulary.md` ở thư mục gốc
 
 ### Test
 
-Test đặt cạnh file, đuôi `.test.js` hoặc `.test.jsx`. Muốn test cả luồng mà không cần backend, dùng
-`installFakeBackend` trong `src/test/fakeBackend.js` (xem `src/features/auth/authFlow.test.jsx`).
+Test của một hàm hay component đặt cạnh file, đuôi `.test.js` hoặc `.test.jsx`. Test cả luồng màn hình (render cả
+app) đặt trong `src/features/<module>/__tests__/`, dùng `installFakeBackend` trong `src/test/fakeBackend.js` để không
+cần backend (xem `src/features/auth/__tests__/authFlow.test.jsx`).
 
 ## Thiết kế (design system)
 
@@ -219,13 +230,16 @@ Khi chuyển một khối từ file thiết kế sang Tailwind, lưu ý:
 
 Component dùng chung nằm trong `src/components/ui/`. Hãy dùng lại thay vì tự viết ô nhập hay nút mới, để giao diện
 các module đồng nhất. `Button` có ba kiểu: `primary` (teal), `secondary` (xám, chỉ đặt trên nền trắng vì trên nền
-trang sẽ bị chìm) và `outline` (trắng có viền, dùng được trên mọi nền). `Page` có `width="wide"` (920px, mặc định)
-và `width="narrow"` (520px, cho màn một cột như chi tiết chủ đề, flashcard).
+trang sẽ bị chìm) và `outline` (trắng có viền, dùng được trên mọi nền). `Page` có `width="wide"` (mặc định, tối đa
+1600px, cho danh sách và lưới), `width="medium"` (1280px, một việc cạnh một khung phụ như trò chơi và bảng xếp hạng)
+và `width="focus"` (520px, một cột ở giữa như flashcard, đổi mật khẩu); mọi trang căn giữa cửa sổ.
 
 ## Bảo mật và giới hạn đã biết
 
 - Token lưu trong `localStorage` để F5 không mất phiên (backend không dùng cookie). Đổi lại, script chạy trên trang
   đọc được token, nên **không dùng `dangerouslySetInnerHTML`**. Nếu cần hiển thị markdown (ví dụ câu trả lời của
   chatbot), dùng thư viện có sanitize.
-- Đăng xuất chỉ xóa token ở trình duyệt. Token cũ vẫn hợp lệ ở backend đến khi hết hạn (8 giờ), kể cả sau khi đổi
-  mật khẩu hoặc bị khóa tài khoản. Chưa có refresh token: hết 8 giờ phải đăng nhập lại.
+- Đăng xuất chỉ xóa token ở trình duyệt. Token sống 30 phút: khi người dùng còn thao tác, giao diện tự đổi token mới
+  (`POST /api/auth/refresh`, xem `auth/hooks/useSessionKeepAlive.js`), tối đa 8 giờ kể từ lúc đăng nhập; quá 30 phút
+  không thao tác thì thao tác kế tiếp đưa về trang đăng nhập. Tài khoản bị khóa bị đăng xuất ngay ở request kế tiếp.
+  Token cũ vẫn hợp lệ ở backend đến khi hết hạn, kể cả sau khi đổi mật khẩu.

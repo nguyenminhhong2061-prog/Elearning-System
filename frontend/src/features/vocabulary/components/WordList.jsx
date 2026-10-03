@@ -2,7 +2,7 @@ import { Link } from 'react-router'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Tag } from '@/components/ui/Tag'
 import { cx } from '@/lib/cx'
-import { isLearned } from '../constants'
+import { isLearned } from '../utils/learning'
 
 function LearnedMark({ status }) {
   const learned = isLearned(status)

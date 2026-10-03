@@ -1,146 +1,74 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router'
-import { Card } from '@/components/ui/Card'
+import { useState } from 'react'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadError } from '@/components/ui/LoadError'
 import { SearchField } from '@/components/ui/SearchField'
-import { cx } from '@/lib/cx'
+import { paths } from '@/config/paths'
 import { matchesSearch } from '@/lib/searchText'
-import { useDebouncedValue } from '@/lib/useDebouncedValue'
-import { useTopics, useWordSearch, WORD_SEARCH_MIN_LENGTH } from '../api/queries'
-import { CreateListCard, TopicCard, TopicCardSkeleton, TopicGrid } from '../components/TopicCard'
-import { WordList, WordListSkeleton } from '../components/WordList'
+import { useTopics } from '../api/vocabularyQueries'
+import { CreateListDialog } from '../components/lists/CreateListDialog'
+import { NoResults } from '../components/topics/NoResults'
+import { CreateListCard, TopicCard, TopicCardSkeleton, TopicGrid } from '../components/topics/TopicCard'
+import { WordSearchResults } from '../components/topics/WordSearchResults'
 import { VocabularyShell } from '../components/VocabularyShell'
-import { CreateListDialog } from '../lists/CreateListDialog'
-import { formatCount } from '../topicProgress'
+import { useTopicSearch } from '../hooks/useTopicSearch'
 
-const SEARCH_DELAY_MS = 300
-
-function NoResults({ children }) {
-  return <p className="py-5 text-center text-label text-muted-light">{children}</p>
-}
-
-/** Words matching the search, fetched from the server (topics are filtered in the browser, words cannot be). */
-function WordSearchResults({ term, topics, backTo }) {
-  const search = useWordSearch(term)
-  const topicNames = useMemo(() => new Map(topics.map((topic) => [topic.id, topic.name])), [topics])
-
-  let content
-  if (term.length < WORD_SEARCH_MIN_LENGTH) {
-    content = <NoResults>Gõ ít nhất {WORD_SEARCH_MIN_LENGTH} ký tự để tìm từ.</NoResults>
-  } else if (search.isPending) {
-    content = <WordListSkeleton rows={3} />
-  } else if (search.isError) {
-    content = (
-      <LoadError error={search.error} onRetry={() => search.refetch()} message="Không tìm được từ. Vui lòng thử lại." />
-    )
-  } else if (search.data.items.length === 0) {
-    content = <NoResults>Không tìm thấy từ phù hợp.</NoResults>
-  } else {
-    const { items, totalItems } = search.data
-    content = (
-      <div className="flex flex-col gap-2">
-        <WordList
-          words={items}
-          describe={(word) => topicNames.get(word.topicId)}
-          linkTo={(word) => (word.topicId == null ? undefined : `/vocabulary/topics/${word.topicId}`)}
-          linkState={{ backTo }}
-        />
-        {totalItems > items.length && (
-          <p className="text-xs text-muted">
-            Hiển thị {items.length} / {formatCount(totalItems)} từ. Hãy gõ cụ thể hơn để thu hẹp kết quả.
-          </p>
-        )}
-      </div>
-    )
-  }
-
-  return (
-    <section aria-labelledby="word-results" aria-busy={search.isFetching} className="flex flex-col gap-3">
-      <h2 id="word-results" className="text-base font-semibold text-ink">
-        Từ vựng phù hợp
-      </h2>
-      {/* Previous results stay visible, dimmed, while the new search runs. */}
-      <div className={cx('transition-opacity', search.isPlaceholderData && 'opacity-60')}>{content}</div>
-    </section>
-  )
-}
-
-/** "Chủ đề có sẵn" tab: the topic grid, with topic and word search. */
-export function TopicsTab() {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const urlTerm = searchParams.get('q') ?? ''
-  const [query, setQuery] = useState(urlTerm)
-  const term = query.trim()
-  const debouncedTerm = useDebouncedValue(term, SEARCH_DELAY_MS)
-
-  // The search lives in the URL (?q=), so going back from a topic brings it back. `replace` keeps typing from
-  // filling the browser history.
-  useEffect(() => {
-    if (debouncedTerm === urlTerm) return
-    setSearchParams(
-      (previous) => {
-        const next = new URLSearchParams(previous)
-        if (debouncedTerm) next.set('q', debouncedTerm)
-        else next.delete('q')
-        return next
-      },
-      { replace: true },
-    )
-  }, [debouncedTerm, urlTerm, setSearchParams])
-
+/** The topic grid, or while searching the matching topics and words. */
+function TopicsContent({ term, debouncedTerm, onCreateList }) {
   const topicsQuery = useTopics()
-  const topics = topicsQuery.data
-  const [creatingList, setCreatingList] = useState(false)
-  const backTo = term ? `/vocabulary?q=${encodeURIComponent(term)}` : '/vocabulary'
 
-  let body
   if (topicsQuery.isPending) {
-    body = (
+    return (
       <TopicGrid>
         {Array.from({ length: 6 }, (_, index) => (
           <TopicCardSkeleton key={index} />
         ))}
       </TopicGrid>
     )
-  } else if (topicsQuery.isError) {
-    body = (
+  }
+  if (topicsQuery.isError) {
+    return (
       <LoadError
         error={topicsQuery.error}
         onRetry={() => topicsQuery.refetch()}
         message="Không tải được danh sách chủ đề. Vui lòng thử lại."
       />
     )
-  } else if (topics.length === 0) {
-    body = (
-      <Card>
-        <p className="text-sm text-muted">Chưa có chủ đề nào. Quản trị viên sẽ sớm bổ sung.</p>
-      </Card>
-    )
-  } else {
-    const visibleTopics = term ? topics.filter((topic) => matchesSearch(topic.name, term)) : topics
-    body = (
-      <>
-        <section aria-labelledby={term ? 'topic-results' : undefined} className="flex flex-col gap-3">
-          {term && (
-            <h2 id="topic-results" className="text-base font-semibold text-ink">
-              Chủ đề
-            </h2>
-          )}
-          {visibleTopics.length > 0 ? (
-            <TopicGrid>
-              {visibleTopics.map((topic) => (
-                <TopicCard key={topic.id} topic={topic} backTo={backTo} />
-              ))}
-              {!term && <CreateListCard onClick={() => setCreatingList(true)} />}
-            </TopicGrid>
-          ) : (
-            <NoResults>Không tìm thấy chủ đề phù hợp.</NoResults>
-          )}
-        </section>
-        {term && <WordSearchResults term={debouncedTerm} topics={topics} backTo={backTo} />}
-      </>
-    )
   }
+
+  const topics = topicsQuery.data
+  if (topics.length === 0) return <EmptyState>Chưa có chủ đề nào. Quản trị viên sẽ sớm bổ sung.</EmptyState>
+
+  const backTo = paths.vocabularySearch(term)
+  const visibleTopics = term ? topics.filter((topic) => matchesSearch(topic.name, term)) : topics
+
+  return (
+    <>
+      <section aria-labelledby={term ? 'topic-results' : undefined} className="flex flex-col gap-3">
+        {term && (
+          <h2 id="topic-results" className="text-base font-semibold text-ink">
+            Chủ đề
+          </h2>
+        )}
+        {visibleTopics.length > 0 ? (
+          <TopicGrid>
+            {visibleTopics.map((topic) => (
+              <TopicCard key={topic.id} topic={topic} backTo={backTo} />
+            ))}
+            {!term && <CreateListCard onClick={onCreateList} />}
+          </TopicGrid>
+        ) : (
+          <NoResults>Không tìm thấy chủ đề phù hợp.</NoResults>
+        )}
+      </section>
+      {term && <WordSearchResults term={debouncedTerm} topics={topics} backTo={backTo} />}
+    </>
+  )
+}
+
+/** "Chủ đề có sẵn" tab of /vocabulary: the topic grid, with topic and word search. */
+export function TopicsTab() {
+  const { query, setQuery, term, debouncedTerm } = useTopicSearch()
+  const [creatingList, setCreatingList] = useState(false)
 
   return (
     <VocabularyShell
@@ -158,7 +86,7 @@ export function TopicsTab() {
         />
       }
     >
-      {body}
+      <TopicsContent term={term} debouncedTerm={debouncedTerm} onCreateList={() => setCreatingList(true)} />
       <CreateListDialog open={creatingList} onClose={() => setCreatingList(false)} />
     </VocabularyShell>
   )

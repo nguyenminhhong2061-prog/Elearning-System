@@ -1,9 +1,9 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { describeApiError } from '@/api/errorMessages'
 import { cx } from '@/lib/cx'
-import { checkAnswer } from '../api/gamesApi'
-import { elapsedSince } from '../clock'
+import { useCheckAnswer } from '../api/gamesQueries'
 import { FEEDBACK_MS } from '../constants'
+import { elapsedSince } from '../utils/clock'
 
 const OPTION =
   'min-h-14 cursor-pointer rounded-[10px] px-3 py-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-default'
@@ -27,17 +27,14 @@ function optionStyle(optionId, feedback) {
 export function ChoiceRound({ round, onAnswer, onComplete }) {
   const [index, setIndex] = useState(0)
   const [feedback, setFeedback] = useState(null) // { chosenId, correctOptionId, correct }
-  const [checking, setChecking] = useState(false)
-  const [error, setError] = useState(null)
+  const check = useCheckAnswer(round.gameId)
   const shownAt = useRef(0)
   const question = round.questions[index]
 
   async function choose(option) {
-    if (feedback || checking) return
-    setChecking(true)
-    setError(null)
+    if (feedback || check.isPending) return
     try {
-      const result = await checkAnswer(round.gameId, { playToken: round.playToken, questionId: question.id, optionId: option.id })
+      const result = await check.mutateAsync({ playToken: round.playToken, questionId: question.id, optionId: option.id })
       const correctOptionId = result.correctOptionId ?? (result.correct ? option.id : null)
       setFeedback({ chosenId: option.id, correctOptionId, correct: result.correct })
       onAnswer({
@@ -48,10 +45,8 @@ export function ChoiceRound({ round, onAnswer, onComplete }) {
         points: question.points,
         responseTimeMs: elapsedSince(shownAt.current),
       })
-    } catch (failure) {
-      setError(describeApiError(failure, 'Không kiểm tra được đáp án. Hãy chọn lại.'))
-    } finally {
-      setChecking(false)
+    } catch {
+      // Shown below; the learner simply chooses again.
     }
   }
 
@@ -105,7 +100,7 @@ export function ChoiceRound({ round, onAnswer, onComplete }) {
             key={option.id}
             type="button"
             lang="vi"
-            disabled={Boolean(feedback) || checking}
+            disabled={Boolean(feedback) || check.isPending}
             aria-keyshortcuts={String(position + 1)}
             onClick={() => choose(option)}
             className={cx(OPTION, optionStyle(option.id, feedback))}
@@ -117,7 +112,11 @@ export function ChoiceRound({ round, onAnswer, onComplete }) {
       <p aria-live="assertive" className="min-h-5 text-label font-semibold text-white">
         {feedback ? (feedback.correct ? 'Chính xác!' : 'Chưa đúng, đáp án đúng được tô xanh.') : ''}
       </p>
-      {error && <p role="alert" className="rounded-lg bg-white px-3 py-2 text-label font-semibold text-danger">{error}</p>}
+      {check.isError && (
+        <p role="alert" className="rounded-lg bg-white px-3 py-2 text-label font-semibold text-danger">
+          {describeApiError(check.error, 'Không kiểm tra được đáp án. Hãy chọn lại.')}
+        </p>
+      )}
     </div>
   )
 }
