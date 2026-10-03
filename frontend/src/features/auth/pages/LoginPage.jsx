@@ -10,10 +10,12 @@ import { TextField } from '@/components/ui/TextField'
 import { useAuth } from '../context/useAuth'
 import { loginSchema } from '../schemas'
 
+const LOCKED_MESSAGE = 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.'
+
 function loginErrorMessage(error) {
   // The backend uses one 401 message for an unknown email and a wrong password, so do the same here.
   if (error?.status === 401) return 'Email hoặc mật khẩu không đúng.'
-  if (error?.status === 403) return 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.'
+  if (error?.status === 403) return LOCKED_MESSAGE
   return describeApiError(error, 'Không thể đăng nhập. Vui lòng thử lại.')
 }
 
@@ -48,6 +50,8 @@ export function LoginPage() {
       <h1 className="text-title font-bold text-ink">Đăng nhập</h1>
 
       {endReason === 'expired' && <Alert variant="info">Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.</Alert>}
+      {/* Signed out because an admin locked the account while it was in use (scenario 25). */}
+      {endReason === 'locked' && !submitError && <Alert variant="error">{LOCKED_MESSAGE}</Alert>}
       {location.state?.registered && (
         <Alert variant="success">Tạo tài khoản thành công. Hãy đăng nhập để bắt đầu học.</Alert>
       )}

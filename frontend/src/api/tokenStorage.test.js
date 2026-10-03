@@ -11,15 +11,17 @@ describe('tokenStorage', () => {
     expect(tokenStorage.get()).toBeNull()
   })
 
-  it('returns a saved session with its expiry computed from expiresIn (seconds)', () => {
+  it('returns a saved session with its issue time, its expiry computed from expiresIn (seconds) and its user', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-09-25T10:00:00Z'))
 
-    tokenStorage.save({ accessToken: 'abc', expiresIn: 28800 })
+    tokenStorage.save({ accessToken: 'abc', expiresIn: 1800, userId: 7 })
 
     expect(tokenStorage.get()).toEqual({
       accessToken: 'abc',
-      expiresAt: new Date('2026-09-25T18:00:00Z').getTime(),
+      issuedAt: new Date('2026-09-25T10:00:00Z').getTime(),
+      expiresAt: new Date('2026-09-25T10:30:00Z').getTime(),
+      userId: 7,
     })
   })
 

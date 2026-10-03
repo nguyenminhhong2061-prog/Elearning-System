@@ -36,14 +36,20 @@ public class GameController {
         this.leaderboardService = leaderboardService;
     }
 
+    /** The games for the words of a topic or a personal list ({@code topicId}, {@code listId}); neither: every system word. */
     @GetMapping
-    public List<GameResponse> findAll() {
-        return gameService.findAll();
+    public List<GameResponse> findAll(
+            @RequestParam(required = false) Long topicId,
+            @RequestParam(required = false) Long listId) {
+        return gameService.findAll(topicId, listId);
     }
 
     @GetMapping("/{id}/play")
-    public PlayResponse play(@PathVariable Long id) {
-        return gameService.play(id);
+    public PlayResponse play(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long topicId,
+            @RequestParam(required = false) Long listId) {
+        return gameService.play(id, topicId, listId);
     }
 
     @PostMapping("/{id}/check")

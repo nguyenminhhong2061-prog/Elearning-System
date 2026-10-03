@@ -3,11 +3,12 @@ package com.example.datn.modules.vocabulary.service;
 import com.example.datn.modules.vocabulary.exception.InvalidPlayTokenException;
 import org.springframework.stereotype.Component;
 
-import javax.crypto.Mac;
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
-import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
@@ -19,8 +20,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * Issues and checks the playToken of docs/api/games.md: the round's content signed with HMAC-SHA256, so the browser
- * can hold it without being able to change it.
+ * Issues and checks the playToken of docs/api/games.md: the whole round, the right answers included, encrypted with
+ * AES-GCM. The browser holds the round between requests but can neither read the answers nor change anything, since
+ * GCM also authenticates what it encrypts.
  *
  * The key is random and generated at startup, on purpose separate from the JWT secret (a play token must never be
  * usable as an access token). Restarting the server invalidates the rounds being played, which last a minute or two.
@@ -32,12 +34,14 @@ public class PlayTokenService {
     /** A round older than this cannot be checked or handed in any more. */
     static final Duration MAX_AGE = Duration.ofHours(1);
 
-    private static final String ALGORITHM = "HmacSHA256";
+    private static final String CIPHER = "AES/GCM/NoPadding";
+    private static final int IV_BYTES = 12;
+    private static final int TAG_BITS = 128;
     private static final Base64.Encoder ENCODER = Base64.getUrlEncoder().withoutPadding();
     private static final Base64.Decoder DECODER = Base64.getUrlDecoder();
 
     private final SecureRandom random = new SecureRandom();
-    private final SecretKeySpec key;
+    private final SecretKey key;
     private final StudyCalendar calendar;
     // nonce -> issuedAt of every round handed in and not yet expired
     private final Map<String, Instant> handedIn = new ConcurrentHashMap<>();
@@ -46,29 +50,52 @@ public class PlayTokenService {
         this.calendar = calendar;
         byte[] secret = new byte[32];
         random.nextBytes(secret);
-        this.key = new SecretKeySpec(secret, ALGORITHM);
+        this.key = new SecretKeySpec(secret, "AES");
     }
 
     /** A new round starting now. */
-    public PlayRound newRound(Long gameId, Long userId, List<Long> questionIds) {
+    public PlayRound newRound(
+            Long gameId,
+            Long userId,
+            Long topicId,
+            Long listId,
+            List<PlayRound.Question> questions,
+            List<Long> matchVocabularyIds) {
         byte[] nonce = new byte[12];
         random.nextBytes(nonce);
-        return new PlayRound(gameId, userId, calendar.now(), ENCODER.encodeToString(nonce), List.copyOf(questionIds));
+        return new PlayRound(
+                gameId,
+                userId,
+                calendar.now(),
+                ENCODER.encodeToString(nonce),
+                topicId,
+                listId,
+                List.copyOf(questions),
+                List.copyOf(matchVocabularyIds));
     }
 
-    public String sign(PlayRound round) {
-        String ids = round.questionIds().stream().map(String::valueOf).collect(Collectors.joining(","));
+    /** The round as an opaque token for the browser. */
+    public String seal(PlayRound round) {
         byte[] payload = String.join(":",
                         String.valueOf(round.gameId()),
                         String.valueOf(round.userId()),
                         String.valueOf(round.issuedAt().toEpochMilli()),
                         round.nonce(),
-                        ids)
+                        round.topicId() == null ? "" : String.valueOf(round.topicId()),
+                        round.listId() == null ? "" : String.valueOf(round.listId()),
+                        round.questions().stream().map(PlayTokenService::encode).collect(Collectors.joining(";")),
+                        joined(round.matchVocabularyIds()))
                 .getBytes(StandardCharsets.UTF_8);
-        return ENCODER.encodeToString(payload) + "." + ENCODER.encodeToString(hmac(payload));
+        byte[] iv = new byte[IV_BYTES];
+        random.nextBytes(iv);
+        try {
+            return ENCODER.encodeToString(iv) + "." + ENCODER.encodeToString(cipher(Cipher.ENCRYPT_MODE, iv, payload));
+        } catch (GeneralSecurityException exception) {
+            throw new IllegalStateException("AES-GCM is not available", exception);
+        }
     }
 
-    /** The round of a token signed by this server, not expired, and issued to this player for this game. */
+    /** The round of a token sealed by this server, not expired, and issued to this player for this game. */
     public PlayRound verify(String token, Long gameId, Long userId) {
         PlayRound round = decode(token);
         if (!round.gameId().equals(gameId) || !round.userId().equals(userId)) {
@@ -91,40 +118,60 @@ public class PlayTokenService {
         try {
             int dot = token.indexOf('.');
             if (dot < 0) {
-                throw new IllegalArgumentException("no signature");
+                throw new IllegalArgumentException("no ciphertext");
             }
-            byte[] payload = DECODER.decode(token.substring(0, dot));
-            byte[] signature = DECODER.decode(token.substring(dot + 1));
-            // Constant-time comparison: the time taken must not reveal how much of a forged signature is right.
-            if (!MessageDigest.isEqual(hmac(payload), signature)) {
-                throw new InvalidPlayTokenException("The playToken is not valid");
-            }
+            byte[] iv = DECODER.decode(token.substring(0, dot));
+            byte[] payload = cipher(Cipher.DECRYPT_MODE, iv, DECODER.decode(token.substring(dot + 1)));
             String[] parts = new String(payload, StandardCharsets.UTF_8).split(":", -1);
-            if (parts.length != 5) {
+            if (parts.length != 8) {
                 throw new IllegalArgumentException("unexpected payload");
             }
-            List<Long> questionIds = parts[4].isEmpty()
+            List<PlayRound.Question> questions = parts[6].isEmpty()
                     ? List.of()
-                    : Arrays.stream(parts[4].split(",")).map(Long::valueOf).toList();
+                    : Arrays.stream(parts[6].split(";")).map(PlayTokenService::decodeQuestion).toList();
             return new PlayRound(
                     Long.valueOf(parts[0]),
                     Long.valueOf(parts[1]),
                     Instant.ofEpochMilli(Long.parseLong(parts[2])),
                     parts[3],
-                    questionIds);
-        } catch (IllegalArgumentException exception) {
+                    parts[4].isEmpty() ? null : Long.valueOf(parts[4]),
+                    parts[5].isEmpty() ? null : Long.valueOf(parts[5]),
+                    questions,
+                    ids(parts[7]));
+        } catch (IllegalArgumentException | GeneralSecurityException exception) {
+            // Malformed, or changed: GCM refuses a ciphertext that was not produced with this key.
             throw new InvalidPlayTokenException("The playToken is not valid");
         }
     }
 
-    // A Mac instance is not thread-safe, so every call gets its own.
-    private byte[] hmac(byte[] payload) {
-        try {
-            Mac mac = Mac.getInstance(ALGORITHM);
-            mac.init(key);
-            return mac.doFinal(payload);
-        } catch (GeneralSecurityException exception) {
-            throw new IllegalStateException("HmacSHA256 is not available", exception);
+    /** "word,option1,option2,…" (the asked word first). */
+    private static String encode(PlayRound.Question question) {
+        return question.vocabularyId() + (question.optionVocabularyIds().isEmpty() ? "" : "," + joined(question.optionVocabularyIds()));
+    }
+
+    private static PlayRound.Question decodeQuestion(String text) {
+        List<Long> numbers = ids(text);
+        if (numbers.isEmpty()) {
+            throw new IllegalArgumentException("empty question");
         }
+        return new PlayRound.Question(numbers.getFirst(), numbers.subList(1, numbers.size()));
+    }
+
+    private static String joined(List<Long> ids) {
+        return ids.stream().map(String::valueOf).collect(Collectors.joining(","));
+    }
+
+    private static List<Long> ids(String text) {
+        return text.isEmpty() ? List.of() : Arrays.stream(text.split(",")).map(Long::valueOf).toList();
+    }
+
+    // A Cipher instance is not thread-safe, so every call gets its own.
+    private byte[] cipher(int mode, byte[] iv, byte[] input) throws GeneralSecurityException {
+        if (iv.length != IV_BYTES) {
+            throw new IllegalArgumentException("bad iv");
+        }
+        Cipher cipher = Cipher.getInstance(CIPHER);
+        cipher.init(mode, key, new GCMParameterSpec(TAG_BITS, iv));
+        return cipher.doFinal(input);
     }
 }

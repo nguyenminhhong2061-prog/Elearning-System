@@ -47,7 +47,7 @@ backend dùng `current_level` của người học, chưa có thì `A1` (cột `
 
 Quy tắc:
 
-- `name`: bắt buộc, cắt khoảng trắng, tối đa 150 ký tự (`400` nếu sai). Không trùng với danh sách khác của cùng người học, không phân biệt hoa thường: tạo hoặc đổi tên trùng trả `409` (kịch bản 7, nhánh 11a; thêm ngày 01/10/2026). Người học khác dùng cùng tên thì được.
+- `name`: bắt buộc, cắt khoảng trắng, tối đa 150 ký tự (`400` nếu sai). Không trùng với danh sách khác của cùng người học, không phân biệt hoa thường: tạo hoặc đổi tên trùng trả `409` (kịch bản 7, nhánh 11a; thêm ngày 01/10/2026). Người học khác dùng cùng tên thì được. Từ 03/10/2026 CSDL cũng chặn bằng chỉ mục duy nhất `uq_cvl_user_name` trên `(user_id, lower(name))` (migration `V202610031100`, như `UNIQUE (learner_id, name)` của thiết kế), nên hai yêu cầu đến cùng lúc (hai tab) cũng nhận `409`; các danh sách trùng tên có từ trước được thêm id vào sau tên.
 - Một lần tạo nhận tối đa 100 `vocabularyIds` và 100 `newWords` (`400` nếu hơn), để một yêu cầu không ghi được số dòng
   tùy ý.
 - Tạo danh sách là **một giao dịch**: danh sách, các từ có sẵn trong `vocabularyIds` (trùng thì bỏ qua) và các từ

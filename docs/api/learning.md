@@ -1,8 +1,10 @@
 # API học flashcard và ôn tập (Phase 3: A1, A2) — contract
 
-> Trạng thái: **frontend và backend đã làm theo tài liệu này** (backend: `LearningController` trong module
-> `vocabulary`; `listId` có từ Phase 4). `npm run dev:mock` trong `frontend/` vẫn dùng được khi cần dữ liệu giả. Quy ước chung (xác thực, lỗi, enum chữ hoa, `PageResponse`, `VocabularyItem`) giống
-> `docs/api/vocabulary.md`.
+> Trạng thái: **bản 2 (02/10/2026), backend đã làm theo, frontend và dữ liệu giả chưa.** Bản 2 theo tài liệu phân tích
+> thiết kế (`docs/English Learning System/`: Business model, kịch bản 5 và 6): đổi luật lên lịch ôn, thứ tự thẻ, bỏ giới
+> hạn 20 thẻ, thêm nhật ký lượt ôn và `GET /api/learning/session-summary`. Xem "Thay đổi so với bản 1" cuối file. Backend:
+> `LearningController` trong module `vocabulary`. Quy ước chung (xác thực, lỗi, enum chữ hoa, `PageResponse`,
+> `VocabularyItem`) giống `docs/api/vocabulary.md`.
 
 ## Đánh giá thẻ: 3 mức (đã chốt 25/09/2026)
 
@@ -16,18 +18,22 @@ Thiết kế LinguaStep vẽ 4 nút, nhưng nghiệp vụ A1 và schema chỉ c�
 
 ## Quy tắc lên lịch ôn (Spaced Repetition)
 
-Mỗi từ của một người học có một **bậc** (0 đến 4) tương ứng khoảng cách **1, 3, 7, 14, 30 ngày**. Cần thêm cột
-`interval_days` (hoặc lưu bậc) vào `user_vocabulary` vì không suy ra được bậc từ các cột hiện có.
+Theo Business model ("Đánh giá ghi nhớ"). Gọi **k** là khoảng cách ôn hiện tại của từ, tính bằng ngày (cột
+`user_vocabulary.interval_days`; từ chưa học có k = 0):
 
-| Kết quả | Bậc mới | Trạng thái mới |
+| Kết quả | Khoảng cách mới | Trạng thái mới |
 |---|---|---|
-| `FORGOT` | 0 | `LEARNING` |
-| `VAGUE` | giữ bậc hiện tại (từ mới: 0) | `LEARNING` |
-| `REMEMBERED` | bậc hiện tại + 1 (từ mới: 1), tối đa 4 | `MASTERED` nếu đạt bậc 4, còn lại `LEARNING` |
+| `FORGOT` | 1 ngày | `LEARNING` |
+| `VAGUE` | max(1, k) (giữ nguyên) | `MASTERED` nếu khoảng cách mới ≥ 16 ngày, còn lại `LEARNING` |
+| `REMEMBERED` | max(2, 2k) (gấp đôi) | như trên |
 
-`nextReviewAt = hôm nay + khoảng cách của bậc mới`, với "hôm nay" tính theo giờ `Asia/Ho_Chi_Minh` (cột `DATE`).
-Lần đánh giá đầu tiên đặt `first_learned_at`; mỗi lần đánh giá tăng `review_count` và đặt `last_reviewed_at`.
-Một từ **đến hạn** khi `nextReviewAt ≤ hôm nay`.
+Khoảng cách tối đa 36 500 ngày. `nextReviewAt = hôm nay + khoảng cách mới`, tính từ **ngày ôn thật**, kể cả khi ôn trễ
+(kịch bản 6, nhánh 3a: k = 4, ôn trễ 3 ngày, "Nhớ rõ" thì lịch mới là ngày ôn + 8). "Hôm nay" tính theo giờ
+`Asia/Ho_Chi_Minh` (cột `DATE`). Lần đánh giá đầu tiên đặt `first_learned_at`; mỗi lần đánh giá tăng `review_count`,
+đặt `last_reviewed_at` và ghi **một lượt ôn** (bảng `vocabulary_reviews`). Một từ **đến hạn** khi `nextReviewAt ≤ hôm nay`.
+
+Từ mới chấm "Nhớ rõ" 4 lần liên tiếp: 2, 4, 8, 16 ngày, tức là thuộc ở lần thứ tư. Từ đã thuộc chấm "Chưa nhớ" thì về
+`LEARNING`, khoảng cách 1 ngày.
 
 ## Đối tượng
 
@@ -61,17 +67,23 @@ Từ chưa học: `learningStatus = NEW`, `lastReviewResult`, `nextReviewAt`, `l
 | `topicId` | Học theo chủ đề (A1) |
 | `listId` | Học theo danh sách từ riêng (A3, xem `docs/api/custom-lists.md`) |
 | (không có cả hai) | Ôn các từ đến hạn trên mọi chủ đề và danh sách (A2) |
-| `size` | Số thẻ tối đa, mặc định `20`, tối đa `50` |
+| `size` | Không bắt buộc. Không gửi: **mọi** thẻ của phiên (kịch bản 5, 6 không giới hạn số thẻ). Gửi: số thẻ tối đa, `1` đến `500` |
 
-Thứ tự thẻ: **từ đến hạn trước** (từ có `lastReviewResult = VAGUE` trước, rồi theo `nextReviewAt` sớm nhất), **sau đó
-đến từ mới**, từ dễ đến khó như danh sách từ của chủ đề (theo `difficultyLevel` rồi `word`, xem `GET /api/vocabulary`). Từ đã học nhưng chưa đến hạn không vào phiên. Chế độ ôn (A2) chỉ có từ đến hạn.
+Thứ tự thẻ (kịch bản 6, bước 2): **từ đến hạn trước**, theo kết quả đánh giá gần nhất **"Chưa nhớ" → "Nhớ mơ hồ" → "Nhớ
+rõ"**, cùng kết quả thì `nextReviewAt` sớm nhất (quá hạn lâu nhất) trước; **sau đó đến từ mới**, từ dễ đến khó như danh
+sách từ của chủ đề (theo `difficultyLevel` rồi `word`, xem `GET /api/vocabulary`). Từ đã học nhưng chưa đến hạn không vào
+phiên. Chế độ ôn (A2) chỉ có từ đến hạn.
 
 ```json
 {
-  "source": { "type": "TOPIC", "id": 1, "name": "Kinh doanh" },
+  "source": { "type": "TOPIC", "id": 1, "name": "Du lịch" },
+  "startedAt": "2026-10-06T13:00:00.120Z",
   "cards": [ { "...": "LearningCard" } ]
 }
 ```
+
+`startedAt`: thời điểm server tạo phiên. Frontend giữ lại để hỏi `session-summary` khi người học bấm "Kết thúc" hoặc học
+hết thẻ.
 
 `source.type` là `TOPIC`, `LIST` hoặc `DUE` (với `DUE` thì `id`, `name` là `null`). `cards` rỗng khi không còn từ để học.
 `404` nếu chủ đề hoặc danh sách không tồn tại (danh sách của người khác cũng trả `404`); `400` nếu gửi cả `topicId` lẫn
@@ -91,8 +103,8 @@ Trả `200`:
   "learningStatus": "LEARNING",
   "lastReviewResult": "VAGUE",
   "reviewCount": 4,
-  "intervalDays": 3,
-  "nextReviewAt": "2026-09-28"
+  "intervalDays": 4,
+  "nextReviewAt": "2026-10-10"
 }
 ```
 
@@ -117,6 +129,26 @@ thứ hai, đánh giá lại thì thành công (frontend hiện "Vui lòng đán
 kế tiếp (bắt đầu từ ngày mai), số từ đến hạn đúng ngày đó. `reviewedToday`: số từ có `lastReviewedAt` trong hôm nay
 (theo giờ Việt Nam, như mọi chỗ khác nói "hôm nay"; lần ôn lúc 6 giờ sáng là 23 giờ hôm trước theo UTC).
 
+### `GET /api/learning/session-summary?since=…` — tổng kết phiên (kịch bản 5 bước 9, kịch bản 6 bước 6)
+
+`since` (bắt buộc): thời điểm ISO 8601, thường là `startedAt` của phiên. Trả `200`:
+
+```json
+{
+  "since": "2026-10-06T13:00:00.120Z",
+  "reviewedCount": 4,
+  "results": { "FORGOT": 1, "VAGUE": 1, "REMEMBERED": 2 },
+  "dueTomorrow": { "date": "2026-10-07", "count": 1, "words": ["departure"] }
+}
+```
+
+- `reviewedCount`, `results`: số **lượt ôn** của người dùng từ `since` đến nay, theo từng mức (đủ 3 khóa, mức không có
+  lượt nào là `0`). Đánh giá lại cùng một từ trong phiên tính hai lượt.
+- `dueTomorrow`: dòng "Cần ôn vào ngày mai": số từ có `nextReviewAt ≤ ngày mai` (gồm cả từ đến hạn hôm nay chưa ôn, vì
+  ngày mai chúng vẫn đến hạn), `words` là tối đa 20 từ đầu tiên theo `nextReviewAt` rồi `word`.
+
+`400` nếu thiếu `since` hoặc sai định dạng.
+
 ### `GET /api/learning/history` — lịch sử học
 
 | Tham số | Ý nghĩa |
@@ -135,8 +167,9 @@ sai giá trị.
 | Màn hình | Gọi |
 |---|---|
 | Nhắc ôn trên trang chủ và màn Từ vựng | `GET /api/learning/summary` (ẩn khi `dueToday = 0`) |
-| Nút "Học N từ" ở chi tiết chủ đề | Tính từ `Topic`: `min(20, dueCount + wordCount − learnedCount)` |
+| Nút "Học N từ" ở chi tiết chủ đề | Tính từ `Topic`: `dueCount + wordCount − learnedCount` (bản 1: tối đa 20, frontend chưa sửa) |
 | Phiên flashcard | `GET /api/learning/session`, rồi `POST /api/learning/reviews` cho từng thẻ |
+| Tổng kết phiên ("Kết thúc" hoặc hết thẻ) | `GET /api/learning/session-summary?since=<startedAt>` (frontend hiện tự đếm, chưa gọi) |
 | Tab "Lịch sử học" | `GET /api/learning/summary` và `GET /api/learning/history` |
 | Bấm thẻ "Đang học", "Đã thuộc", "Đã ôn hôm nay" | `GET /api/learning/history?status=LEARNING`, `?status=MASTERED`, `?reviewedToday=true` |
 
@@ -166,13 +199,41 @@ class WordReviewedListener {
 `studyDate` là ngày theo giờ Việt Nam, đúng khóa `(user_id, date)` của `user_progress`. `firstReview` là `true` ở lần
 đầu người học đánh giá từ đó, tức lúc từ bắt đầu được tính là "đã học".
 
+## Cho module khác: nhật ký lượt ôn
+
+Bảng `vocabulary_reviews` (`user_vocabulary_id`, `result` chữ thường, `reviewed_at TIMESTAMPTZ`; migration
+`V202610021000`) ghi mọi lần đánh giá thẻ. Module Tiến độ không đọc thẳng bảng này (quy ước: không truy cập repository
+của module khác); cần số liệu thì dùng `WordReviewedEvent` ở trên hoặc nhờ Hồng mở hàm service.
+
 ## Backend Phase 3 (đã làm)
 
 1. Migration `V202609252000__add_interval_days_to_user_vocabulary.sql`: cột `interval_days` (bậc ôn tính bằng ngày,
    `NULL` khi chưa ôn), đã ghi vào `docs/starter/Database.md`.
 2. Entity `UserVocabulary` đủ cột, converter chữ thường cho `status` và `last_review_result`.
-3. `ReviewScheduler`: logic thuần, `ReviewSchedulerTests` dùng cùng các trường hợp với `frontend/mock/scheduler.test.js`.
+3. `ReviewScheduler`: logic thuần. Bản 2: `ReviewSchedulerTests` kiểm tra đúng các từ và ngày của kịch bản 5, 6
+   (`frontend/mock/scheduler.js` vẫn theo bản 1).
 4. Bốn endpoint trên (`LearningController`, `LearningService`), người dùng lấy qua `CurrentUser`, "hôm nay" qua
    `StudyCalendar` (giờ Việt Nam). Thống kê của `summary` tính trong một truy vấn; `learningCount`, `masteredCount`,
    `reviewedToday` dùng đúng điều kiện của `history` nên các tổng luôn khớp.
 5. `WordReviewedEvent` ở `common.event` (xem mục trên).
+6. Bản 2 (02/10/2026): migration `V202610021000__add_vocabulary_reviews.sql` tạo `vocabulary_reviews` và chuyển các từ
+   đang có `interval_days ≥ 16` sang `mastered` (với luật mới `interval_days` chính là k, nên mọi khoảng cách đã lưu
+   vẫn dùng tiếp được). `LearningApiTests`, `LearningPostgresIntegrationTests` kiểm tra thứ tự thẻ, phiên không giới
+   hạn, luật ôn đến lúc thuộc, nhật ký lượt ôn và `session-summary`.
+
+## Thay đổi so với bản 1
+
+| Chỗ | Bản 1 | Bản 2 (02/10/2026) |
+|---|---|---|
+| Luật ôn | Bậc 1/3/7/14/30 ngày, thuộc ở bậc 30 | k giữ, gấp đôi hoặc về 1; thuộc khi k ≥ 16 |
+| `intervalDays` sau 2 lần "Nhớ rõ" | 3 | 4 |
+| Thứ tự từ đến hạn | "Nhớ mơ hồ" trước | "Chưa nhớ" → "Nhớ mơ hồ" → "Nhớ rõ" |
+| Số thẻ một phiên | Mặc định 20, tối đa 50 | Không gửi `size`: mọi thẻ; gửi thì tối đa 500 |
+| Phiên | `source`, `cards` | thêm `startedAt` |
+| Lượt ôn | Không lưu | Bảng `vocabulary_reviews` |
+| Tổng kết phiên | Frontend tự đếm | `GET /api/learning/session-summary` |
+
+**Giao diện chỉ sửa tối thiểu theo bản 2** (03/10/2026, người dùng chọn tập trung backend, giữ giao diện): nút "Học N từ"
+không còn tối đa 20. Màn tổng kết phiên vẫn tự đếm các thẻ vừa đánh giá và lấy dòng "Cần ôn vào ngày mai" từ
+`summary.upcoming[0]` (từ đến hạn đúng ngày mai), chưa gọi `session-summary` (từ đến hạn đến hết ngày mai, kèm tên).
+Dữ liệu giả `frontend/mock/` đã theo bản 2 (luật ôn, thứ tự, không giới hạn thẻ, `startedAt`, `session-summary`).

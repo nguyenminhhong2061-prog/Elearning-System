@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -23,7 +24,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Personal lists against the real schema: the composite key of custom_vocabulary_list_items, the learner's level read
- * from users.current_level, and the list queries with their optional (null) parameters on PostgreSQL.
+ * from users.current_level, the list queries with their optional (null) parameters on PostgreSQL, and the unique list
+ * name of each learner (V202610031100).
  */
 @Transactional
 class CustomListPostgresIntegrationTests extends AbstractPostgresIntegrationTest {
@@ -36,6 +38,23 @@ class CustomListPostgresIntegrationTests extends AbstractPostgresIntegrationTest
 
     @Autowired
     private EntityManager entityManager;
+
+    @Test
+    void theDatabaseRefusesTwoListsOfOneLearnerWithTheSameNameInAnyCase() throws Exception {
+        long learner = createLearner("A2");
+        long other = createLearner("A2");
+        mockMvc.perform(post("/api/custom-lists").with(TestAuth.learner(learner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"Từ khó tuần này\"}"))
+                .andExpect(status().isCreated());
+        entityManager.flush();
+
+        // Another learner may use the same name; the same learner may not, even in another case (scenario 7, 11a).
+        jdbcTemplate.update("insert into custom_vocabulary_lists (user_id, name) values (?, 'Từ khó tuần này')", other);
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "insert into custom_vocabulary_lists (user_id, name) values (?, 'TỪ KHÓ TUẦN NÀY')", learner))
+                .hasMessageContaining("uq_cvl_user_name");
+    }
 
     @Test
     void aListIsCreatedStudiedAndDeletedOnTheRealSchema() throws Exception {

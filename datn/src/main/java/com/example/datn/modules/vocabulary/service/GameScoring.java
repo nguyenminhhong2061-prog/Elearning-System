@@ -3,14 +3,12 @@ package com.example.datn.modules.vocabulary.service;
 import java.time.Duration;
 
 /**
- * The scoring rules of docs/api/games.md, as pure functions (the frontend mock, frontend/mock/routes/games.js,
- * implements the same ones):
+ * The scoring rules of scenario 8 and docs/api/games.md, as pure functions:
  *
  * <ul>
- *   <li>each right answer earns {@code points × 10};</li>
+ *   <li>each right answer earns {@code points × 10} (8 right answers out of 10 make 80 points), with no time bonus;</li>
  *   <li>answers handed in more than 3 seconds after the time limit count as wrong;</li>
- *   <li>when every question was answered in time, the remaining seconds are added, scaled by the share of right
- *       answers, so answering at random as fast as possible earns no bonus.</li>
+ *   <li>the time played is the time between dealing the round and handing it in, at most the time limit.</li>
  * </ul>
  */
 public final class GameScoring {
@@ -28,12 +26,14 @@ public final class GameScoring {
         return limitSeconds == null || elapsed.compareTo(Duration.ofSeconds(limitSeconds + GRACE_SECONDS)) <= 0;
     }
 
-    /** {@code floor(remaining seconds × right answers / questions)}, or 0 without a time limit. */
-    public static int timeBonus(Integer limitSeconds, Duration elapsed, int correctCount, int questionCount) {
-        if (limitSeconds == null || questionCount == 0) {
-            return 0;
-        }
-        double remainingSeconds = Math.max(0, limitSeconds - elapsed.toMillis() / 1000.0);
-        return (int) Math.floor(remainingSeconds * correctCount / questionCount);
+    /** {@code correctCount × points × 10}. */
+    public static int score(int correctCount, int pointsPerQuestion) {
+        return correctCount * pointsPerQuestion * POINTS_PER_UNIT;
+    }
+
+    /** Whole seconds played, rounded, and never more than the time limit (a round is over when the time is up). */
+    public static int playedSeconds(Integer limitSeconds, Duration elapsed) {
+        long seconds = Math.max(0, Math.round(elapsed.toMillis() / 1000.0));
+        return (int) (limitSeconds == null ? seconds : Math.min(seconds, limitSeconds));
     }
 }

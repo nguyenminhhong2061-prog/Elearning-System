@@ -29,7 +29,9 @@ public class VocabularyExceptionHandler {
             InvalidSessionRequestException.class,
             InvalidListWordsException.class,
             InvalidPlayTokenException.class,
-            InvalidGameAnswerException.class})
+            InvalidGameAnswerException.class,
+            InvalidGameSourceException.class,
+            NotEnoughWordsException.class})
     public ResponseEntity<ApiErrorResponse> handleInvalidRequest(RuntimeException exception) {
         return badRequest(exception.getMessage());
     }

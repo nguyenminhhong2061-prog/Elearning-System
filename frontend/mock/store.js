@@ -1,6 +1,6 @@
 import { CEFR_LEVELS } from '../src/api/constants.js'
 import { addDays, todayInVietnam } from '../src/lib/dates.js'
-import { INTERVALS } from './scheduler.js'
+import { MASTERED_FROM_DAYS } from './scheduler.js'
 import { MOCK_TOPICS, MOCK_WORDS } from './vocabularyFixtures.js'
 
 // In-memory data of the mock API, one entry per user id, lost when the dev server restarts. Each user starts with
@@ -17,19 +17,20 @@ function seedLearning(today) {
   MOCK_WORDS.forEach((word, index) => {
     if (word.learningStatus === 'NEW') return
     const mastered = word.learningStatus === 'MASTERED'
-    const step = mastered ? INTERVALS.length - 1 : index % 3
+    // k, the interval of the last review: 1, 2 or 4 days while learning, 16 or 32 once mastered.
+    const intervalDays = mastered ? MASTERED_FROM_DAYS * (1 + (index % 2)) : 2 ** (index % 3)
     // Half of the words being learned are due (today or overdue); mastered words come back in a few weeks.
     const nextReviewAt = mastered
       ? addDays(today, 10 + (index % 18))
       : Math.floor(index / 2) % 2 === 0 // learning words sit on even indexes, so look at every other one
         ? addDays(today, -(index % 3))
         : addDays(today, 1 + (index % 6))
-    const lastReviewed = addDays(nextReviewAt, -INTERVALS[step])
+    const lastReviewed = addDays(nextReviewAt, -intervalDays)
     learning.set(word.id, {
       status: mastered ? 'MASTERED' : 'LEARNING',
-      step,
-      lastReviewResult: mastered || index % 4 !== 0 ? 'REMEMBERED' : 'VAGUE',
-      reviewCount: step + 1,
+      intervalDays,
+      lastReviewResult: mastered || index % 4 !== 0 ? 'REMEMBERED' : index % 8 === 0 ? 'FORGOT' : 'VAGUE',
+      reviewCount: Math.log2(intervalDays) + 1,
       nextReviewAt,
       lastReviewedAt: `${lastReviewed}T0${index % 10}:${String(index % 60).padStart(2, '0')}:00Z`,
       firstLearnedAt: `${addDays(lastReviewed, -7)}T02:00:00Z`,
@@ -39,12 +40,14 @@ function seedLearning(today) {
 }
 
 /**
- * Everything the mock knows about one user.
- * @returns {{ learning: Map<number, object>, customWords: object[], lists: object[], gameSessions: object[] }}
+ * Everything the mock knows about one user. `reviews` logs every rating ({ vocabularyId, result, reviewedAt }), like
+ * the backend's vocabulary_reviews table; the seeded progress has no log.
+ * @returns {{ learning: Map<number, object>, reviews: object[], customWords: object[], lists: object[],
+ *   gameSessions: object[] }}
  */
 export function userState(userId, today) {
   if (!users.has(userId)) {
-    users.set(userId, { learning: seedLearning(today), customWords: [], lists: [], gameSessions: [] })
+    users.set(userId, { learning: seedLearning(today), reviews: [], customWords: [], lists: [], gameSessions: [] })
   }
   return users.get(userId)
 }
@@ -112,9 +115,12 @@ export const byLevel = (a, b) =>
   a.word.localeCompare(b.word, 'en', { sensitivity: 'base' }) ||
   a.id - b.id
 
+/** Order of due words by their last rating (scenario 6, step 3): "Chưa nhớ", then "Nhớ mơ hồ", then "Nhớ rõ". */
+const RESULT_ORDER = { FORGOT: 0, VAGUE: 1, REMEMBERED: 2 }
+
 /**
- * Cards of a study session (docs/api/learning.md): due words first (VAGUE ones first, then the most overdue), then
- * words never studied, easiest first, unless `dueOnly`.
+ * Cards of a study session (docs/api/learning.md): due words first (by last rating, then the most overdue), then
+ * words never studied, easiest first, unless `dueOnly`. Every card unless a `size` is given.
  */
 export function sessionCards(user, pool, today, { size, dueOnly }) {
   const due = pool
@@ -122,10 +128,14 @@ export function sessionCards(user, pool, today, { size, dueOnly }) {
     .sort((a, b) => {
       const stateA = user.learning.get(a.id)
       const stateB = user.learning.get(b.id)
-      const vague = (stateB.lastReviewResult === 'VAGUE') - (stateA.lastReviewResult === 'VAGUE')
-      return vague || stateA.nextReviewAt.localeCompare(stateB.nextReviewAt) || a.id - b.id
+      return (
+        RESULT_ORDER[stateA.lastReviewResult] - RESULT_ORDER[stateB.lastReviewResult] ||
+        stateA.nextReviewAt.localeCompare(stateB.nextReviewAt) ||
+        a.id - b.id
+      )
     })
   const fresh = dueOnly ? [] : pool.filter((word) => !user.learning.has(word.id)).sort(byLevel)
-  return [...due, ...fresh].slice(0, size).map((word) => toCard(user, word))
+  const cards = [...due, ...fresh]
+  return (size === undefined ? cards : cards.slice(0, size)).map((word) => toCard(user, word))
 }
 

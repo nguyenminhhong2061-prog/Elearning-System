@@ -31,7 +31,6 @@ export function ChoiceRound({ round, onAnswer, onComplete }) {
   const [error, setError] = useState(null)
   const shownAt = useRef(0)
   const question = round.questions[index]
-  const isMeaningPrompt = round.gameType === 'QUICK_QUIZ'
 
   async function choose(option) {
     if (feedback || checking) return
@@ -95,17 +94,17 @@ export function ChoiceRound({ round, onAnswer, onComplete }) {
         Câu {index + 1}/{round.questions.length}
       </p>
       <div className="flex min-h-28 flex-col items-center justify-center gap-1 rounded-[10px] bg-white/12 px-4 py-5 text-center">
-        <p lang={isMeaningPrompt ? 'vi' : 'en'} className="text-[28px] leading-9 font-bold break-words text-white">
+        <p lang="en" className="text-[28px] leading-9 font-bold break-words text-white">
           {question.prompt}
         </p>
         {question.phonetic && <p className="font-mono text-sm text-white/80">{question.phonetic}</p>}
       </div>
-      <div role="group" aria-label={isMeaningPrompt ? 'Chọn từ tiếng Anh' : 'Chọn nghĩa đúng'} className="grid gap-2.5 sm:grid-cols-2">
+      <div role="group" aria-label="Chọn nghĩa đúng" className="grid gap-2.5 sm:grid-cols-2">
         {question.options.map((option, position) => (
           <button
             key={option.id}
             type="button"
-            lang={isMeaningPrompt ? 'en' : 'vi'}
+            lang="vi"
             disabled={Boolean(feedback) || checking}
             aria-keyshortcuts={String(position + 1)}
             onClick={() => choose(option)}

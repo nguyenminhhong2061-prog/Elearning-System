@@ -5,9 +5,23 @@ import { onUnauthorized } from '@/api/httpClient'
 import { tokenStorage } from '@/api/tokenStorage'
 import * as authApi from '../authApi'
 import { AuthContext } from './authContext'
+import { useSessionKeepAlive } from './useSessionKeepAlive'
 
 const ANONYMOUS = { status: 'anonymous', user: null, endReason: null }
 const LOADING = { status: 'loading', user: null, endReason: null }
+
+/** Code of the 401 the backend sends for a token whose account an admin has locked (scenario 25). */
+const ACCOUNT_LOCKED = 'ACCOUNT_LOCKED'
+
+/** Whether a stored session (the raw localStorage value) had run out when it was removed. */
+function hasExpired(rawSession) {
+  try {
+    const expiresAt = JSON.parse(rawSession)?.expiresAt
+    return typeof expiresAt === 'number' && expiresAt <= Date.now()
+  } catch {
+    return false
+  }
+}
 
 export function AuthProvider({ children }) {
   // A stored token is not trusted until the server confirms it (see the effect below), so the app starts in
@@ -38,30 +52,46 @@ export function AuthProvider({ children }) {
     }
   }, [state.status])
 
-  // Any authenticated request answered with 401 (expired or invalid token) ends the session.
+  const endSession = useCallback((endReason) => {
+    tokenStorage.clear()
+    setState((current) => (current.status === 'anonymous' ? current : { status: 'anonymous', user: null, endReason }))
+  }, [])
+
+  // Any authenticated request answered with 401 ends the session: the token expired, or the account was locked.
   useEffect(
-    () =>
-      onUnauthorized(() => {
-        tokenStorage.clear()
-        setState((current) =>
-          current.status === 'anonymous' ? current : { status: 'anonymous', user: null, endReason: 'expired' },
-        )
-      }),
-    [],
+    () => onUnauthorized((error) => endSession(error.body?.code === ACCOUNT_LOCKED ? 'locked' : 'expired')),
+    [endSession],
   )
 
+  const expire = useCallback(() => endSession('expired'), [endSession])
+  const updateUser = useCallback((user) => {
+    setState((current) =>
+      current.status === 'authenticated' && current.user.id === user.id ? { ...current, user } : current,
+    )
+  }, [])
+  useSessionKeepAlive({
+    userId: state.status === 'authenticated' ? state.user.id : undefined,
+    onExpired: expire,
+    onRefreshed: updateUser,
+  })
+
   // The "storage" event only fires in the *other* tabs, so this keeps every open tab in step: logging out in one
-  // logs out all, and logging in as someone else in one makes the rest reload that user.
+  // logs out all, and logging in as someone else in one makes the rest reload that user. A token refreshed for the
+  // same user changes nothing here: every request reads the token from storage.
   useEffect(() => {
     function handleStorage(event) {
       if (event.key !== null && event.key !== tokenStorage.key) return
 
-      if (tokenStorage.get()) {
-        setState((current) => (current.status === 'loading' ? current : LOADING))
+      const session = tokenStorage.get()
+      if (session) {
+        setState((current) => {
+          if (current.status === 'authenticated' && session.userId === current.user.id) return current
+          return current.status === 'loading' ? current : LOADING
+        })
       } else {
-        setState((current) =>
-          current.status === 'anonymous' ? current : { status: 'anonymous', user: null, endReason: 'logout' },
-        )
+        // An expired token is also removed from storage (by whichever tab read it first): say so, as this tab would.
+        const endReason = hasExpired(event.oldValue) ? 'expired' : 'logout'
+        setState((current) => (current.status === 'anonymous' ? current : { status: 'anonymous', user: null, endReason }))
       }
     }
 
@@ -71,7 +101,7 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async ({ email, password }) => {
     const { accessToken, expiresIn, user } = await authApi.login({ email, password })
-    tokenStorage.save({ accessToken, expiresIn })
+    tokenStorage.save({ accessToken, expiresIn, userId: user.id })
     setState({ status: 'authenticated', user, endReason: null })
     return user
   }, [])
@@ -94,11 +124,9 @@ export function AuthProvider({ children }) {
   // storage listener above reloads that user.
   const refreshUser = useCallback(async () => {
     const user = await authApi.getCurrentUser()
-    setState((current) =>
-      current.status === 'authenticated' && current.user.id === user.id ? { ...current, user } : current,
-    )
+    updateUser(user)
     return user
-  }, [])
+  }, [updateUser])
 
   const value = useMemo(
     () => ({

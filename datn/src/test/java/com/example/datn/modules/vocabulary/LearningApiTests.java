@@ -70,9 +70,11 @@ class LearningApiTests {
         long goat = createWord(topic, "goat", "A1");
         long egg = createWord(topic, "egg", "C1");
         long fox = createWord(topic, "fox", "A2");
+        long hen = createWord(topic, "hen", "B1");
         progress(LEARNER, cat, "learning", "remembered", 3, today.minusDays(3), hoursAgo(80));
         progress(LEARNER, dog, "learning", "vague", 3, today, hoursAgo(72));
         progress(LEARNER, goat, "learning", "remembered", 1, today.minusDays(1), hoursAgo(48));
+        progress(LEARNER, hen, "learning", "forgot", 1, today, hoursAgo(24));
         progress(LEARNER, egg, "learning", "remembered", 7, today.plusDays(2), hoursAgo(120));   // learned, not due
         progress(LEARNER, fox, "mastered", "remembered", 30, today.plusDays(9), hoursAgo(500)); // learned, not due
 
@@ -81,26 +83,48 @@ class LearningApiTests {
                 .andExpect(jsonPath("$.source.type").value("TOPIC"))
                 .andExpect(jsonPath("$.source.id").value(topic))
                 .andExpect(jsonPath("$.source.name").value("Mixed"))
-                // Due: VAGUE first, then the longest overdue. New: easiest first, then alphabetically.
-                .andExpect(jsonPath("$.cards[*].word", contains("dog", "cat", "goat", "apple", "zebra", "banana")))
-                .andExpect(jsonPath("$.cards[0].learningStatus").value("LEARNING"))
-                .andExpect(jsonPath("$.cards[0].lastReviewResult").value("VAGUE"))
-                .andExpect(jsonPath("$.cards[0].reviewCount").value(1))
-                .andExpect(jsonPath("$.cards[0].nextReviewAt").value(today.toString()))
-                .andExpect(jsonPath("$.cards[0].lastReviewedAt").isNotEmpty())
-                .andExpect(jsonPath("$.cards[3].learningStatus").value("NEW"))
-                .andExpect(jsonPath("$.cards[3].lastReviewResult").value(nullValue()))
-                .andExpect(jsonPath("$.cards[3].reviewCount").value(0))
-                .andExpect(jsonPath("$.cards[3].nextReviewAt").value(nullValue()));
+                .andExpect(jsonPath("$.startedAt").isNotEmpty())
+                // Due, by the latest rating (scenario 6): FORGOT, VAGUE, then REMEMBERED, the longest overdue first.
+                // New: easiest first, then alphabetically.
+                .andExpect(jsonPath("$.cards[*].word", contains("hen", "dog", "cat", "goat", "apple", "zebra", "banana")))
+                .andExpect(jsonPath("$.cards[1].learningStatus").value("LEARNING"))
+                .andExpect(jsonPath("$.cards[1].lastReviewResult").value("VAGUE"))
+                .andExpect(jsonPath("$.cards[1].reviewCount").value(1))
+                .andExpect(jsonPath("$.cards[1].nextReviewAt").value(today.toString()))
+                .andExpect(jsonPath("$.cards[1].lastReviewedAt").isNotEmpty())
+                .andExpect(jsonPath("$.cards[4].learningStatus").value("NEW"))
+                .andExpect(jsonPath("$.cards[4].lastReviewResult").value(nullValue()))
+                .andExpect(jsonPath("$.cards[4].reviewCount").value(0))
+                .andExpect(jsonPath("$.cards[4].nextReviewAt").value(nullValue()));
 
-        asLearner(get("/api/learning/session").param("topicId", String.valueOf(topic)).param("size", "4"))
-                .andExpect(jsonPath("$.cards[*].word", contains("dog", "cat", "goat", "apple")));
+        asLearner(get("/api/learning/session").param("topicId", String.valueOf(topic)).param("size", "5"))
+                .andExpect(jsonPath("$.cards[*].word", contains("hen", "dog", "cat", "goat", "apple")));
 
         // Another learner has not studied anything yet: every word is new.
         mockMvc.perform(get("/api/learning/session").param("topicId", String.valueOf(topic))
                         .with(TestAuth.learner(OTHER_LEARNER)))
-                .andExpect(jsonPath("$.cards.length()").value(8))
+                .andExpect(jsonPath("$.cards.length()").value(9))
                 .andExpect(jsonPath("$.cards[0].word").value("apple"));
+    }
+
+    @Test
+    void aSessionHasEveryDueAndNewWordUnlessASizeIsAskedFor() throws Exception {
+        // Scenario 5, step 7: 2 due words and 28 new ones make a session of 30 cards.
+        LocalDate today = calendar.today();
+        long topic = createTopic("Du lịch");
+        for (int index = 0; index < 30; index++) {
+            long word = createWord(topic, "word" + (char) ('a' + index / 10) + index, "A1");
+            if (index < 2) {
+                progress(LEARNER, word, "learning", "remembered", 4, today, hoursAgo(96));
+            }
+        }
+        long notDue = createWord(topic, "zzz", "A1");
+        progress(LEARNER, notDue, "learning", "remembered", 8, today.plusDays(3), hoursAgo(120));
+
+        asLearner(get("/api/learning/session").param("topicId", String.valueOf(topic)))
+                .andExpect(jsonPath("$.cards.length()").value(30));
+        asLearner(get("/api/learning/session").param("topicId", String.valueOf(topic)).param("size", "20"))
+                .andExpect(jsonPath("$.cards.length()").value(20));
     }
 
     @Test
@@ -136,8 +160,8 @@ class LearningApiTests {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400));
         asLearner(get("/api/learning/session").param("size", "0")).andExpect(status().isBadRequest());
-        asLearner(get("/api/learning/session").param("size", "51")).andExpect(status().isBadRequest());
-        asLearner(get("/api/learning/session").param("size", "50")).andExpect(status().isOk());
+        asLearner(get("/api/learning/session").param("size", "501")).andExpect(status().isBadRequest());
+        asLearner(get("/api/learning/session").param("size", "500")).andExpect(status().isOk());
         asLearner(get("/api/learning/session").param("topicId", "999999"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));
@@ -145,39 +169,92 @@ class LearningApiTests {
     }
 
     @Test
-    void reviewsMoveAWordThroughTheStepsUntilItIsMastered() throws Exception {
+    void reviewsFollowTheBusinessModelRuleUntilTheWordIsMastered() throws Exception {
         LocalDate today = calendar.today();
         long topic = createTopic("Travel");
         long word = createWord(topic, "airport", "B1");
 
+        // A new word rated "Nhớ rõ": max(2, 2 × 0) = 2 days.
         review(word, "REMEMBERED")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.vocabularyId").value(word))
                 .andExpect(jsonPath("$.learningStatus").value("LEARNING"))
                 .andExpect(jsonPath("$.lastReviewResult").value("REMEMBERED"))
                 .andExpect(jsonPath("$.reviewCount").value(1))
-                .andExpect(jsonPath("$.intervalDays").value(3))
-                .andExpect(jsonPath("$.nextReviewAt").value(today.plusDays(3).toString()));
+                .andExpect(jsonPath("$.intervalDays").value(2))
+                .andExpect(jsonPath("$.nextReviewAt").value(today.plusDays(2).toString()));
         Map<String, Object> first = row(LEARNER, word);
         assertThat(first.get("status")).isEqualTo("learning");
         assertThat(first.get("last_review_result")).isEqualTo("remembered");
         assertThat(first.get("first_learned_at")).isNotNull().isEqualTo(first.get("last_reviewed_at"));
 
-        review(word, "VAGUE").andExpect(jsonPath("$.intervalDays").value(3)).andExpect(jsonPath("$.reviewCount").value(2));
+        review(word, "VAGUE").andExpect(jsonPath("$.intervalDays").value(2)).andExpect(jsonPath("$.reviewCount").value(2));
         review(word, "FORGOT").andExpect(jsonPath("$.intervalDays").value(1))
                 .andExpect(jsonPath("$.nextReviewAt").value(today.plusDays(1).toString()));
-        review(word, "REMEMBERED").andExpect(jsonPath("$.intervalDays").value(3));
-        review(word, "REMEMBERED").andExpect(jsonPath("$.intervalDays").value(7));
-        review(word, "REMEMBERED").andExpect(jsonPath("$.intervalDays").value(14));
+        review(word, "REMEMBERED").andExpect(jsonPath("$.intervalDays").value(2));
+        review(word, "REMEMBERED").andExpect(jsonPath("$.intervalDays").value(4));
+        review(word, "REMEMBERED").andExpect(jsonPath("$.intervalDays").value(8));
         review(word, "REMEMBERED")
-                .andExpect(jsonPath("$.intervalDays").value(30))
+                .andExpect(jsonPath("$.intervalDays").value(16))
                 .andExpect(jsonPath("$.learningStatus").value("MASTERED"))
                 .andExpect(jsonPath("$.reviewCount").value(7));
+
+        // Every rating is kept as a review ("Lượt ôn từ"), with the lower-case values of the real schema.
+        assertThat(jdbcTemplate.queryForList(
+                "select result from vocabulary_reviews where user_vocabulary_id = ? order by id", String.class, first.get("id")))
+                .containsExactly("remembered", "vague", "forgot", "remembered", "remembered", "remembered", "remembered");
 
         // The first review date is kept; the topic now counts the word as learned.
         assertThat(row(LEARNER, word).get("first_learned_at")).isEqualTo(first.get("first_learned_at"));
         asLearner(get("/api/topics/{id}", topic)).andExpect(jsonPath("$.learnedCount").value(1));
         asLearner(get("/api/vocabulary/{id}", word)).andExpect(jsonPath("$.learningStatus").value("MASTERED"));
+    }
+
+    @Test
+    void theSessionSummaryCountsTheRatingsSinceTheSessionStartedAndTheWordsDueTomorrow() throws Exception {
+        LocalDate today = calendar.today();
+        LocalDate tomorrow = today.plusDays(1);
+        long topic = createTopic("Du lịch");
+        long itinerary = createWord(topic, "itinerary", "B1");
+        long passport = createWord(topic, "passport", "A2");
+        long departure = createWord(topic, "departure", "B1");
+        long colleague = createWord(topic, "colleague", "B1");
+        long recipe = createWord(topic, "recipe", "A2");
+        long souvenir = createWord(topic, "souvenir", "A2");
+        progress(LEARNER, itinerary, "learning", "vague", 4, today, hoursAgo(96));
+        progress(LEARNER, passport, "learning", "remembered", 8, today, hoursAgo(192));
+        progress(LEARNER, colleague, "learning", "vague", 2, tomorrow, hoursAgo(24));
+        progress(LEARNER, recipe, "learning", "remembered", 8, today.plusDays(2), hoursAgo(144));
+        // A rating given before the session does not count.
+        jdbcTemplate.update("insert into vocabulary_reviews (user_vocabulary_id, result, reviewed_at) values (?, 'forgot', ?)",
+                row(LEARNER, colleague).get("id"), Timestamp.from(hoursAgo(24)));
+
+        String session = asLearner(get("/api/learning/session").param("topicId", String.valueOf(topic)))
+                .andReturn().getResponse().getContentAsString();
+        String since = JsonPath.read(session, "$.startedAt");
+        review(itinerary, "VAGUE");
+        review(passport, "REMEMBERED");
+        review(departure, "FORGOT");
+        review(souvenir, "REMEMBERED");
+
+        asLearner(get("/api/learning/session-summary").param("since", since))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.since").value(since))
+                .andExpect(jsonPath("$.reviewedCount").value(4))
+                .andExpect(jsonPath("$.results.FORGOT").value(1))
+                .andExpect(jsonPath("$.results.VAGUE").value(1))
+                .andExpect(jsonPath("$.results.REMEMBERED").value(2))
+                .andExpect(jsonPath("$.dueTomorrow.date").value(tomorrow.toString()))
+                // departure (forgot today) and colleague (already due tomorrow); souvenir is due in 2 days.
+                .andExpect(jsonPath("$.dueTomorrow.count").value(2))
+                .andExpect(jsonPath("$.dueTomorrow.words", contains("colleague", "departure")));
+
+        mockMvc.perform(get("/api/learning/session-summary").param("since", since).with(TestAuth.learner(OTHER_LEARNER)))
+                .andExpect(jsonPath("$.reviewedCount").value(0))
+                .andExpect(jsonPath("$.results.FORGOT").value(0))
+                .andExpect(jsonPath("$.dueTomorrow.count").value(0));
+        asLearner(get("/api/learning/session-summary")).andExpect(status().isBadRequest());
+        asLearner(get("/api/learning/session-summary").param("since", "yesterday")).andExpect(status().isBadRequest());
     }
 
     @Test

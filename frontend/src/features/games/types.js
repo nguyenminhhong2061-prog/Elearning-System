@@ -13,7 +13,7 @@
  *
  * @typedef {object} GameQuestion
  * @property {number} id
- * @property {string} prompt the word (GUESS_MEANING, WORD_MATCH) or the meaning (QUICK_QUIZ)
+ * @property {string} prompt the English word
  * @property {string | null} phonetic
  * @property {number} points
  * @property {Array<{ id: number, content: string }>} options empty for WORD_MATCH
