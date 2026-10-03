@@ -8,8 +8,9 @@ import { createContext } from 'react'
  *   loading: a stored token is being checked with the server; error: that check failed for a reason other
  *   than the token being rejected (server unreachable), so retry() can be offered.
  * @property {import('@/api/types').User | null} user set only while status is 'authenticated'
- * @property {'expired' | 'logout' | null} endReason why the last session ended, so the login page can explain
- *   ("expired") and the router does not send the user back to the page they just logged out from ("logout")
+ * @property {'expired' | 'locked' | 'logout' | null} endReason why the last session ended, so the login page can
+ *   explain ("expired": inactive too long or token rejected; "locked": an admin locked the account) and the router
+ *   does not send the user back to the page they just logged out from ("logout")
  * @property {boolean} isAuthenticated
  * @property {boolean} isAdmin
  * @property {(credentials: { email: string, password: string }) => Promise<import('@/api/types').User>} login

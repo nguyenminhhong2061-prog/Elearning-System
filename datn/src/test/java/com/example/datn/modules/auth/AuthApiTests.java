@@ -12,6 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
@@ -25,8 +26,12 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 
-import static org.hamcrest.Matchers.not;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.hasKey;
+import static org.hamcrest.Matchers.lessThanOrEqualTo;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -45,6 +50,9 @@ class AuthApiTests {
 
     @Autowired
     private JwtEncoder jwtEncoder;
+
+    @Autowired
+    private JwtDecoder jwtDecoder;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -97,7 +105,8 @@ class AuthApiTests {
         String body = login("user@example.com", PASSWORD)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
-                .andExpect(jsonPath("$.expiresIn").value(Duration.ofHours(8).toSeconds()))
+                // A token lives for the idle timeout; the client refreshes it while the user is active.
+                .andExpect(jsonPath("$.expiresIn").value(Duration.ofMinutes(30).toSeconds()))
                 .andExpect(jsonPath("$.user.email").value("user@example.com"))
                 .andReturn().getResponse().getContentAsString();
         String token = JsonPath.read(body, "$.accessToken");
@@ -134,6 +143,82 @@ class AuthApiTests {
         login("locked@example.com", PASSWORD).andExpect(status().isForbidden());
         // A wrong password must not reveal that the account is locked.
         login("locked@example.com", "wrong-password").andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void lockingAnAccountSignsItOutAtItsNextRequest() throws Exception {
+        register("A", "user@example.com", PASSWORD).andExpect(status().isCreated());
+        String token = tokenFor("user@example.com", PASSWORD);
+        mockMvc.perform(get("/api/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk());
+
+        // Scenario 25, step 9: the still-valid token stops working at once, with a code the client can explain.
+        jdbcTemplate.update("update users set status = 'locked' where email = ?", "user@example.com");
+        entityManager.clear();
+        mockMvc.perform(get("/api/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_LOCKED"));
+        mockMvc.perform(post("/api/auth/refresh").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+
+        jdbcTemplate.update("update users set status = 'active' where email = ?", "user@example.com");
+        entityManager.clear();
+        mockMvc.perform(get("/api/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void aTokenOfADeletedAccountIsRejected() throws Exception {
+        Instant now = Instant.now();
+        String orphan = tokenWith(jwtEncoder, "987654321", now, now.plus(Duration.ofMinutes(10)));
+
+        mockMvc.perform(get("/api/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + orphan))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$", not(hasKey("code"))));
+    }
+
+    @Test
+    void refreshIssuesAFreshTokenForTheSameSession() throws Exception {
+        register("A", "user@example.com", PASSWORD).andExpect(status().isCreated());
+        String token = tokenFor("user@example.com", PASSWORD);
+
+        String body = mockMvc.perform(post("/api/auth/refresh").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.expiresIn").value(Duration.ofMinutes(30).toSeconds()))
+                .andExpect(jsonPath("$.user.email").value("user@example.com"))
+                .andReturn().getResponse().getContentAsString();
+        String refreshed = JsonPath.read(body, "$.accessToken");
+
+        mockMvc.perform(get("/api/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + refreshed))
+                .andExpect(status().isOk());
+        // The session keeps its start, so refreshing cannot push it past its maximum length.
+        assertThat(jwtDecoder.decode(refreshed).getClaimAsInstant("auth_time"))
+                .isEqualTo(jwtDecoder.decode(token).getClaimAsInstant("auth_time"));
+        mockMvc.perform(post("/api/auth/refresh")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void refreshStopsAtTheMaximumSessionLength() throws Exception {
+        String body = register("A", "user@example.com", PASSWORD).andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String userId = String.valueOf(((Number) JsonPath.read(body, "$.id")).longValue());
+        Instant now = Instant.now();
+
+        // Logged in 7 h 50 min ago: the new token ends with the 8-hour session, not 30 minutes later.
+        String nearTheEnd = sessionToken(userId, now.minus(Duration.ofHours(8)).plus(Duration.ofMinutes(10)));
+        mockMvc.perform(post("/api/auth/refresh").header(HttpHeaders.AUTHORIZATION, "Bearer " + nearTheEnd))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.expiresIn", allOf(greaterThan(500), lessThanOrEqualTo(600))));
+
+        String overTheEnd = sessionToken(userId, now.minus(Duration.ofHours(8)).minus(Duration.ofMinutes(1)));
+        mockMvc.perform(post("/api/auth/refresh").header(HttpHeaders.AUTHORIZATION, "Bearer " + overTheEnd))
+                .andExpect(status().isUnauthorized());
+
+        // Tokens issued before auth_time existed count their session from their issue time.
+        String legacy = tokenWith(jwtEncoder, userId, now, now.plus(Duration.ofHours(8)));
+        mockMvc.perform(post("/api/auth/refresh").header(HttpHeaders.AUTHORIZATION, "Bearer " + legacy))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -223,6 +308,20 @@ class AuthApiTests {
                 .expiresAt(expiresAt)
                 .build();
         return encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
+                .getTokenValue();
+    }
+
+    /** A still-valid token of a session that started at {@code authTime}. */
+    private String sessionToken(String subject, Instant authTime) {
+        Instant now = Instant.now();
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .subject(subject)
+                .claim("role", "LEARNER")
+                .claim("auth_time", authTime.getEpochSecond())
+                .issuedAt(now)
+                .expiresAt(now.plus(Duration.ofMinutes(10)))
+                .build();
+        return jwtEncoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
                 .getTokenValue();
     }
 

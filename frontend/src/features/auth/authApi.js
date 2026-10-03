@@ -25,6 +25,16 @@ export async function login(payload) {
 }
 
 /**
+ * POST /api/auth/refresh. A new token for the current session, asked for while the user is active; 401 when the
+ * session has ended (too long since login, or the account was locked), which signs the user out like any other 401.
+ * @returns {Promise<import('@/api/types').AuthToken>}
+ */
+export async function refresh() {
+  const { data } = await httpClient.post('/api/auth/refresh')
+  return data
+}
+
+/**
  * POST /api/auth/change-password (204, no body). Rejects with status 400 when the current password is wrong.
  * @param {{ currentPassword: string, newPassword: string }} payload
  */

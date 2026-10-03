@@ -1,7 +1,9 @@
 package com.example.datn.modules.auth.config;
 
+import com.example.datn.modules.auth.security.ActiveAccountJwtAuthenticationConverter;
 import com.example.datn.modules.auth.security.JsonSecurityErrorHandler;
 import com.example.datn.modules.auth.service.JwtService;
+import com.example.datn.modules.user.service.UserService;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,13 +42,17 @@ public class SecurityConfig {
 
     /**
      * Everything requires a valid bearer token except registration and login. Sessions and CSRF are off because
-     * the API is stateless: the token is sent in the Authorization header, not in a cookie.
+     * the API is stateless: the token is sent in the Authorization header, not in a cookie. Each request also checks
+     * that the token's account is still active (see {@link ActiveAccountJwtAuthenticationConverter}).
      */
     @Bean
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             JwtAuthenticationConverter jwtAuthenticationConverter,
+            UserService userService,
             JsonSecurityErrorHandler errorHandler) throws Exception {
+        ActiveAccountJwtAuthenticationConverter activeAccountConverter =
+                new ActiveAccountJwtAuthenticationConverter(jwtAuthenticationConverter, userService);
         http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -62,7 +68,7 @@ public class SecurityConfig {
                 .oauth2ResourceServer(resourceServer -> resourceServer
                         .authenticationEntryPoint(errorHandler)
                         .accessDeniedHandler(errorHandler)
-                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)));
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(activeAccountConverter)));
         return http.build();
     }
 

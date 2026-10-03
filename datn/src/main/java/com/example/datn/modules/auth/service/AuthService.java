@@ -18,6 +18,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+
 @Service
 @Transactional
 public class AuthService {
@@ -67,12 +69,26 @@ public class AuthService {
             throw new AccountLockedException();
         }
 
-        JwtService.IssuedToken token = jwtService.issue(credentials.id(), credentials.role());
-        return new AuthTokenResponse(
-                token.value(),
-                TOKEN_TYPE,
-                token.expiresInSeconds(),
-                userService.getProfile(credentials.id()));
+        return tokenResponse(credentials.id(), jwtService.issue(credentials.id(), credentials.role()));
+    }
+
+    /**
+     * A fresh token for the session the current token belongs to, so an active user is not signed out when a token
+     * expires (scenario 3, branch 1a: only inactivity ends a session). The account was checked to be active when the
+     * request was authenticated; the role is read again in case it changed. 401 once the session has reached its
+     * maximum length.
+     */
+    @Transactional(readOnly = true)
+    public AuthTokenResponse refresh(Long userId, Instant authTime) {
+        UserCredentials credentials = userService.findCredentialsById(userId)
+                .orElseThrow(() -> new InvalidCredentialsException("Account no longer exists"));
+        JwtService.IssuedToken token = jwtService.renew(credentials.id(), credentials.role(), authTime)
+                .orElseThrow(() -> new InvalidCredentialsException("The session has reached its maximum length"));
+        return tokenResponse(credentials.id(), token);
+    }
+
+    private AuthTokenResponse tokenResponse(Long userId, JwtService.IssuedToken token) {
+        return new AuthTokenResponse(token.value(), TOKEN_TYPE, token.expiresInSeconds(), userService.getProfile(userId));
     }
 
     public void changePassword(Long userId, ChangePasswordRequest request) {

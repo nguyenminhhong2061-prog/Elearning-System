@@ -278,6 +278,112 @@ describe('session on start-up', () => {
   })
 })
 
+describe('session lifetime (scenario 3, branch 1a; scenario 25)', () => {
+  const MINUTE = 60_000
+
+  /** Replaces the stored session, as if `ageMinutes` had passed since a 30-minute token was issued. */
+  function storeSessionAged(ageMinutes, accessToken = 'stored-token') {
+    const issuedAt = Date.now() - ageMinutes * MINUTE
+    localStorage.setItem(
+      tokenStorage.key,
+      JSON.stringify({ accessToken, issuedAt, expiresAt: issuedAt + 30 * MINUTE, userId: learner.id }),
+    )
+  }
+
+  async function openSignedIn(extraRoutes = {}) {
+    signInBeforeStart()
+    backend = installFakeBackend({ 'GET /api/users/me': () => ({ data: learner }), ...extraRoutes })
+    renderApp('/account/change-password')
+    await heading('Đổi mật khẩu')
+  }
+
+  const refreshCalls = () => backend.calls.filter((call) => call.key === 'POST /api/auth/refresh')
+
+  it('keeps an active user signed in by refreshing a token past half its life', async () => {
+    await openSignedIn({ 'POST /api/auth/refresh': () => ({ data: loginResponse(learner, 'fresh-token') }) })
+    const user = userEvent.setup()
+
+    // Under half its life: typing does not ask for a new token.
+    storeSessionAged(10)
+    await user.keyboard('a')
+    expect(refreshCalls()).toHaveLength(0)
+
+    storeSessionAged(20)
+    await user.keyboard('a')
+
+    await waitFor(() => expect(tokenStorage.get()?.accessToken).toBe('fresh-token'))
+    expect(refreshCalls()).toEqual([expect.objectContaining({ authorization: 'Bearer stored-token' })])
+    expect(tokenStorage.get()).toMatchObject({ userId: learner.id })
+    expect(screen.getByRole('heading', { name: 'Đổi mật khẩu' })).toBeInTheDocument()
+  })
+
+  it('ends the session at the next action once the token ran out while the user was away', async () => {
+    await openSignedIn()
+    const user = userEvent.setup()
+
+    storeSessionAged(31)
+    await user.click(document.body)
+
+    await heading('Đăng nhập')
+    expect(screen.getByRole('status')).toHaveTextContent('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.')
+    expect(backend.calls.filter((call) => call.key !== 'GET /api/users/me')).toHaveLength(0)
+  })
+
+  it('ends the session when the server refuses to refresh it', async () => {
+    await openSignedIn({
+      'POST /api/auth/refresh': () => ({ status: 401, data: { status: 401, message: 'Session ended' } }),
+    })
+    const user = userEvent.setup()
+
+    storeSessionAged(25)
+    await user.keyboard('a')
+
+    await heading('Đăng nhập')
+    expect(screen.getByRole('status')).toHaveTextContent('Phiên đăng nhập đã hết hạn')
+  })
+
+  it('tells a learner signed out because their account was locked', async () => {
+    signInBeforeStart()
+    backend = installFakeBackend({
+      'GET /api/users/me': () => ({
+        status: 401,
+        data: { status: 401, message: 'Account is locked', code: 'ACCOUNT_LOCKED' },
+      }),
+    })
+
+    renderApp('/plan')
+
+    await heading('Đăng nhập')
+    expect(screen.getByRole('alert')).toHaveTextContent('Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.')
+    expect(screen.queryByText(/hết hạn/)).not.toBeInTheDocument()
+  })
+
+  it('explains an expiry noticed by another tab', async () => {
+    await openSignedIn()
+
+    act(() => {
+      const oldValue = JSON.stringify({ accessToken: 'stored-token', expiresAt: Date.now() - 1000 })
+      tokenStorage.clear()
+      window.dispatchEvent(new StorageEvent('storage', { key: tokenStorage.key, oldValue, newValue: null }))
+    })
+
+    await heading('Đăng nhập')
+    expect(screen.getByRole('status')).toHaveTextContent('Phiên đăng nhập đã hết hạn')
+  })
+
+  it('stays signed in when another tab refreshes the token of the same user', async () => {
+    await openSignedIn()
+
+    act(() => {
+      tokenStorage.save({ accessToken: 'refreshed-elsewhere', expiresIn: 1800, userId: learner.id })
+      window.dispatchEvent(new StorageEvent('storage', { key: tokenStorage.key }))
+    })
+
+    expect(screen.getByRole('heading', { name: 'Đổi mật khẩu' })).toBeInTheDocument()
+    expect(backend.calls.filter((call) => call.key === 'GET /api/users/me')).toHaveLength(1)
+  })
+})
+
 describe('logout', () => {
   it('returns to the login page and, on the next login, starts from the home page', async () => {
     signInBeforeStart()

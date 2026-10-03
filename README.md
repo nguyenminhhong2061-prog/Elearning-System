@@ -306,7 +306,7 @@ tái hiện trên máy khi viết mục này; các dòng còn lại là lỗi ha
 | `password authentication failed for user "datn"` | App nối nhầm vào PostgreSQL cài trên máy (cổng 5432) | Đừng đặt `DB_URL` trỏ 5432; mặc định là `localhost:5433` |
 | `'vite' is not recognized ...` | Chưa cài thư viện frontend | `cd frontend`, `npm install` |
 | Giao diện báo "Không kết nối được máy chủ"; terminal frontend in `[vite] http proxy error: /api/...` và `AggregateError [ECONNREFUSED]` | Backend chưa chạy hoặc chưa khởi động xong | Chờ dòng `Started DatnApplication` ở terminal 1 |
-| Bị đưa về trang đăng nhập với "Phiên đăng nhập đã hết hạn" | Backend vừa khởi động lại mà không đặt `JWT_SECRET` | Đăng nhập lại; lần sau đặt `JWT_SECRET` |
+| Bị đưa về trang đăng nhập với "Phiên đăng nhập đã hết hạn" | Backend vừa khởi động lại mà không đặt `JWT_SECRET`, hoặc không thao tác quá 30 phút | Đăng nhập lại; lần sau đặt `JWT_SECRET` |
 | Backend không khởi động: `Validate failed: Migrations have failed validation` … `Detected resolved migration not applied to database: 2026...` | DB trên máy đã chạy một migration có số phiên bản **lớn hơn** migration vừa pull về (ví dụ đã chạy code của nhánh khác trước) | Chạy **một lần** (Git Bash): `./mvnw spring-boot:run -Dspring-boot.run.arguments=--spring.flyway.out-of-order=true`; ở PowerShell đặt cả tham số `-D...` trong dấu ngoặc kép. Lần sau chạy bình thường. Không cần giữ dữ liệu cũ thì `docker compose down -v` rồi chạy lại cũng được |
 | Trang chủ báo "Không tải được" ở biểu đồ, điểm kỹ năng, thành tích | Đang dùng `npm run dev`; backend module D chưa có | Bình thường. Dùng `npm run dev:mock` để xem trang chủ đầy đủ |
 | Trợ lý AI báo "không thể trả lời lúc này"; tab Network của DevTools thấy lời gọi `.../messages` trả 503 `Groq API key is not configured` | Chưa đặt `GROQ_API_KEY` trước khi chạy backend | Đặt khóa (xem terminal 1) rồi khởi động lại backend |
@@ -409,11 +409,19 @@ Test frontend dùng `installFakeBackend` (`frontend/src/test/fakeBackend.js`) đ
 | Endpoint | Mô tả |
 |---|---|
 | `POST /api/auth/register` | Đăng ký tài khoản learner (`fullName`, `email`, `password` 8–72 ký tự). 201; 409 nếu trùng email |
-| `POST /api/auth/login` | Đăng nhập, trả `accessToken`. 401 nếu sai email/mật khẩu; 403 nếu tài khoản bị khóa |
+| `POST /api/auth/login` | Đăng nhập, trả `accessToken` và `expiresIn` (giây). 401 nếu sai email/mật khẩu; 403 nếu tài khoản bị khóa |
+| `POST /api/auth/refresh` | Đổi token đang dùng lấy token mới của cùng phiên (cùng dạng với login). 401 khi phiên đã quá 8 giờ hoặc tài khoản bị khóa |
 | `POST /api/auth/change-password` | Đổi mật khẩu (`currentPassword`, `newPassword`). 204; 400 nếu sai mật khẩu hiện tại |
 | `GET /api/users/me` | Thông tin người dùng hiện tại |
 
-Đăng xuất: client xóa token. Token không lưu ở server và tự hết hạn sau 8 giờ.
+Phiên đăng nhập (kịch bản 3 nhánh 1a, kịch bản 25):
+
+- Mỗi token sống **30 phút** (`app.jwt.idle-timeout`). Giao diện tự gọi `refresh` khi người dùng còn thao tác,
+  nên chỉ không thao tác quá 30 phút mới bị đưa về trang đăng nhập ("Phiên đăng nhập đã hết hạn"). Một phiên dài
+  tối đa **8 giờ** kể từ lúc đăng nhập (`app.jwt.expiration`, claim `auth_time` trong token).
+- **Mỗi request đều đọc trạng thái tài khoản**: tài khoản bị khóa (hoặc đã bị xóa) bị từ chối ngay ở request kế tiếp
+  bằng 401; tài khoản bị khóa có thêm `"code": "ACCOUNT_LOCKED"` để giao diện báo đúng lý do.
+- Đăng xuất: client xóa token; token không lưu ở server.
 
 Biến môi trường (xem `.env.example`):
 
@@ -436,6 +444,8 @@ Optional<CefrLevel> level = currentUser.currentLevel();   // users.current_level
 Giới hạn theo vai trò bằng `@PreAuthorize("hasRole('ADMIN')")` trên phương thức controller hoặc service.
 
 Test MockMvc: dùng `TestAuth` (`com.example.datn.support`). `@WithMockUser` không dùng được vì API là stateless.
+`TestAuth` đặt sẵn người dùng vào security context nên không qua bước đọc trạng thái tài khoản; test gửi token thật
+(`Authorization: Bearer …`) thì người dùng phải có trong bảng `users` và đang hoạt động.
 
 ```java
 mockMvc.perform(get("/api/xxx").with(TestAuth.learner(42)));   // CurrentUser.id() == 42

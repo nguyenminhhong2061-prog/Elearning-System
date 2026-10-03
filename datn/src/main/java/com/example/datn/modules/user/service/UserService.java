@@ -4,6 +4,7 @@ import com.example.datn.common.enums.CefrLevel;
 import com.example.datn.modules.user.dto.response.UserResponse;
 import com.example.datn.modules.user.entity.User;
 import com.example.datn.modules.user.enums.UserRole;
+import com.example.datn.modules.user.enums.UserStatus;
 import com.example.datn.modules.user.exception.UserNotFoundException;
 import com.example.datn.modules.user.mapper.UserMapper;
 import com.example.datn.modules.user.repository.UserRepository;
@@ -49,6 +50,12 @@ public class UserService {
 
     public void updatePasswordHash(Long id, String passwordHash) {
         findEntity(id).changePasswordHash(passwordHash);
+    }
+
+    /** The account status, empty when the user does not exist (any more). */
+    @Transactional(readOnly = true)
+    public Optional<UserStatus> findStatus(Long id) {
+        return repository.findStatusById(id);
     }
 
     /** The user's CEFR level, empty when it has not been set yet or the user does not exist. */

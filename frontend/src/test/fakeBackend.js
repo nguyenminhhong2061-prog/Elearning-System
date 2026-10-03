@@ -66,7 +66,7 @@ export const learner = {
 
 export const admin = { ...learner, id: 1, fullName: 'Administrator', email: 'admin@example.com', role: 'ADMIN' }
 
-/** Body of a successful POST /api/auth/login (see AuthTokenResponse). */
+/** Body of a successful POST /api/auth/login or /api/auth/refresh (see AuthTokenResponse). */
 export function loginResponse(user = learner, accessToken = 'token-abc') {
-  return { accessToken, tokenType: 'Bearer', expiresIn: 28800, user }
+  return { accessToken, tokenType: 'Bearer', expiresIn: 1800, user }
 }
