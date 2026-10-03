@@ -76,6 +76,7 @@ Quan hệ: users 1-n user_level_history. Module dùng: Tiến độ, Kiểm tra 
 ## custom_vocabulary_lists
 
 - id BIGINT UNSIGNED PK, user_id FK→users.id, name, created_at
+- UNIQUE (user_id, lower(name)): tên danh sách không trùng với danh sách khác của cùng người học, không phân biệt hoa thường (migration `V202610031100`, 03/10/2026)
 
 ## custom_vocabulary_list_items
 

@@ -21,6 +21,7 @@ import com.example.datn.modules.vocabulary.repository.CustomVocabularyListItemRe
 import com.example.datn.modules.vocabulary.repository.CustomVocabularyListRepository;
 import com.example.datn.modules.vocabulary.repository.ListWordCounts;
 import com.example.datn.modules.vocabulary.repository.VocabularyRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -82,7 +83,7 @@ public class CustomListService {
         Set<Long> existingIds = new LinkedHashSet<>(request.vocabularyIds());
         requireVisibleWords(existingIds, userId);
 
-        CustomVocabularyList list = listRepository.save(new CustomVocabularyList(userId, request.name(), calendar.now()));
+        CustomVocabularyList list = saveUniquelyNamed(new CustomVocabularyList(userId, request.name(), calendar.now()));
         List<Long> wordIds = new ArrayList<>(existingIds);
         CefrLevel defaultLevel = request.newWords().stream().anyMatch(input -> input.difficultyLevel() == null)
                 ? defaultLevel()
@@ -101,6 +102,7 @@ public class CustomListService {
         CustomVocabularyList list = requireOwnList(id);
         requireUniqueName(list.getUserId(), name, list.getId());
         list.rename(name);
+        saveUniquelyNamed(list);
         return toResponse(list);
     }
 
@@ -109,6 +111,18 @@ public class CustomListService {
         // -1 matches no list: a new list has nothing to exclude.
         if (listRepository.existsByUserIdAndNameIgnoreCaseAndIdNot(userId, name, excludedId == null ? -1L : excludedId)) {
             throw new DuplicateListNameException(name);
+        }
+    }
+
+    /**
+     * Writes the list at once, so that a name taken by another request between {@link #requireUniqueName} and now (two
+     * tabs) is refused by the database's unique index here, with the same 409, instead of failing at commit.
+     */
+    private CustomVocabularyList saveUniquelyNamed(CustomVocabularyList list) {
+        try {
+            return listRepository.saveAndFlush(list);
+        } catch (DataIntegrityViolationException e) {
+            throw new DuplicateListNameException(list.getName());
         }
     }
 
