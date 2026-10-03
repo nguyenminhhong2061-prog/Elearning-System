@@ -6,7 +6,10 @@ import com.example.datn.modules.test.enums.TestType;
 import java.time.Instant;
 import java.util.List;
 
-/** The full content of a test, questions included (no answers). */
+/**
+ * The full content of a test: its passages and questions (no answers). {@code lastAttemptId} is the current learner's
+ * latest submitted attempt, null when there is none.
+ */
 public record TestDetailResponse(
         Long id,
         String title,
@@ -14,6 +17,9 @@ public record TestDetailResponse(
         TestSkill skill,
         Instant startDate,
         Instant endDate,
+        boolean retakeAllowed,
+        List<PassageResponse> passages,
         List<QuestionResponse> questions,
-        boolean hasInProgress) {
+        boolean hasInProgress,
+        Long lastAttemptId) {
 }

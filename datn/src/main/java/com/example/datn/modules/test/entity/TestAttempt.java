@@ -49,6 +49,11 @@ public class TestAttempt {
     @Column(name = "skill_scores")
     private Map<String, Integer> skillScores;
 
+    // Skill levels under the same keys as skillScores ({"nghe":"B1",..}); null on attempts graded before the column.
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "skill_levels")
+    private Map<String, CefrLevel> skillLevels;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "suggested_level", length = 2)
     private CefrLevel suggestedLevel;
@@ -97,6 +102,10 @@ public class TestAttempt {
         return skillScores;
     }
 
+    public Map<String, CefrLevel> getSkillLevels() {
+        return skillLevels;
+    }
+
     public CefrLevel getSuggestedLevel() {
         return suggestedLevel;
     }
@@ -114,12 +123,14 @@ public class TestAttempt {
             BigDecimal totalScore,
             TestAttemptStatus status,
             Map<String, Integer> skillScores,
+            Map<String, CefrLevel> skillLevels,
             CefrLevel suggestedLevel,
             String suggestedRoadmap,
             Instant submittedAt) {
         this.totalScore = totalScore;
         this.status = status;
         this.skillScores = skillScores;
+        this.skillLevels = skillLevels;
         this.suggestedLevel = suggestedLevel;
         this.suggestedRoadmap = suggestedRoadmap;
         this.submittedAt = submittedAt;

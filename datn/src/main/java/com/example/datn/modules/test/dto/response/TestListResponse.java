@@ -13,6 +13,7 @@ public record TestListResponse(
         TestSkill skill,
         Instant startDate,
         Instant endDate,
+        boolean retakeAllowed,
         int questionCount,
         TestProgressResponse progress) {
 }

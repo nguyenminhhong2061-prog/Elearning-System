@@ -1,5 +1,6 @@
 package com.example.datn.modules.test.entity;
 
+import com.example.datn.common.enums.CefrLevel;
 import com.example.datn.modules.test.enums.TestQuestionType;
 import com.example.datn.modules.test.enums.TestSkill;
 import jakarta.persistence.Column;
@@ -44,6 +45,15 @@ public class TestQuestion {
     @Column(name = "audio_url", length = 500)
     private String audioUrl;
 
+    // The CEFR level the question tests; null for a question that has not been given one.
+    @Enumerated(EnumType.STRING)
+    @Column(length = 2)
+    private CefrLevel level;
+
+    // The passage (recording or text) the question is asked about; null for a question that stands alone.
+    @Column(name = "passage_id")
+    private Long passageId;
+
     protected TestQuestion() {
     }
 
@@ -55,6 +65,18 @@ public class TestQuestion {
         this.content = content;
         this.points = points;
         this.audioUrl = audioUrl;
+    }
+
+    public TestQuestion(Long testId, TestQuestionType questionType, TestSkill skill, String content, int points,
+            String audioUrl, CefrLevel level) {
+        this(testId, questionType, skill, content, points, audioUrl);
+        this.level = level;
+    }
+
+    public TestQuestion(Long testId, TestQuestionType questionType, TestSkill skill, String content, int points,
+            String audioUrl, CefrLevel level, Long passageId) {
+        this(testId, questionType, skill, content, points, audioUrl, level);
+        this.passageId = passageId;
     }
 
     public Long getId() {
@@ -87,5 +109,13 @@ public class TestQuestion {
 
     public String getAudioUrl() {
         return audioUrl;
+    }
+
+    public CefrLevel getLevel() {
+        return level;
+    }
+
+    public Long getPassageId() {
+        return passageId;
     }
 }
