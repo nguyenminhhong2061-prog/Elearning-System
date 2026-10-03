@@ -50,14 +50,17 @@ Cả hai tham số bắt buộc; giao diện tính sẵn cho "7 ngày", "30 ngà
   "to": "2026-09-29",
   "generatedAt": "2026-09-29T03:30:00Z",
   "learners": { "total": 128, "newInPeriod": 12 },
-  "activeToday": 37,
+  "activeLearners": 115,
   "reviews": 4812,
-  "exercisesCompleted": 356,
+  "exerciseAttempts": 469,
   "testsSubmitted": 96,
   "dailyActive": [{ "date": "2026-08-31", "count": 18 }],
   "levels": { "A1": 22, "A2": 31, "B1": 38, "B2": 19, "C1": 6, "C2": 2, "NONE": 10 },
-  "topTopics": [{ "topicId": 2, "name": "Du lịch", "reviews": 1126 }],
-  "topLessons": [{ "lessonId": 1, "title": "Thì hiện tại đơn", "skill": "GRAMMAR", "cefrLevel": "A1", "attempts": 168, "averageScore": 84 }],
+  "topContent": [
+    { "type": "TOPIC", "id": 2, "name": "Du lịch", "skill": null, "attemptCount": 1606, "learnerCount": 61 },
+    { "type": "EXERCISE", "id": 23, "name": "Thì hiện tại hoàn thành", "skill": "READING", "attemptCount": 118, "learnerCount": 52 },
+    { "type": "TEST", "id": 200, "name": "Kiểm tra tổng hợp tháng 9", "skill": null, "attemptCount": 15, "learnerCount": 14 }
+  ],
   "attention": {
     "wordsMissingAudio": 180,
     "wordsMissingExample": 48,
@@ -71,12 +74,13 @@ Cả hai tham số bắt buộc; giao diện tính sẵn cho "7 ngày", "30 ngà
 | Trường | Ý nghĩa, nguồn |
 |---|---|
 | `learners.total` | Số tài khoản người học đến ngày `to`; `newInPeriod` là số đăng ký trong kỳ (`users.created_at`) |
-| `activeToday` | Số người học có ít nhất một ngày học hôm nay (`user_progress`, module D) |
+| `activeLearners` | Số người học có **ít nhất một ngày học trong kỳ** (`user_progress`, module D), thẻ "Hoạt động trong kỳ" (KB 26 bước 4; `SystemStat.activeUsers` của thiết kế) |
 | `reviews` | Số lượt đánh giá thẻ trong kỳ (`vocabulary_reviews`, module A) |
-| `exercisesCompleted`, `testsSubmitted` | Lượt bài tập hoàn thành, bài kiểm tra đã nộp trong kỳ (module B, C) |
+| `exerciseAttempts` | Số lượt làm bài tập bắt đầu trong kỳ, mọi trạng thái, cả bốn kỹ năng (module B), thẻ "Lượt làm bài tập" (`SystemStat.exerciseAttemptCount`) |
+| `testsSubmitted` | Số bài kiểm tra đã nộp trong kỳ (module C) |
 | `dailyActive` | Mỗi ngày trong kỳ một phần tử, kể cả ngày 0 người |
 | `levels` | Đếm theo `users.current_level` của người học hiện có; `NONE` là chưa có trình độ |
-| `topTopics`, `topLessons` | Tối đa 5 dòng, giảm dần theo lượt ôn / lượt làm trong kỳ; `averageScore` 0–100 |
+| `topContent` | Bảng "Nội dung được học nhiều nhất" (`ContentStat` của thiết kế): tối đa 5 dòng gộp chủ đề, bài tập, đề kiểm tra, giảm dần theo `learnerCount` rồi `attemptCount`. `type`: `TOPIC` (lượt = lượt ôn từ của chủ đề, người = người ôn ít nhất một từ của chủ đề), `EXERCISE` (lượt làm bắt đầu trong kỳ; `skill` để giao diện ghi "Bài đọc hiểu", "Bài nghe hiểu"…), `TEST` (bài nộp trong kỳ). `skill` là `null` trừ `EXERCISE`. Kỳ không có hoạt động → `[]` |
 | `attention` | Việc cần xử lý, không phụ thuộc kỳ. `periodicTestGap` là **tuần tới**: 7 ngày ngay sau ngày đóng của đề định kỳ đã mở gần nhất (đề đang mở hôm nay, không có thì đề vừa đóng), khi chưa có đề định kỳ nào (không tính bản nháp) mở trong tuần đó; `null` nếu đã có |
 
 ## Chủ đề và từ vựng (module A, Hồng)
@@ -94,7 +98,7 @@ Mọi chủ đề kèm số liệu cho admin (khác `GET /api/topics` của ngư
 }]
 ```
 
-`wordCount` và các số "thiếu" chỉ tính từ hệ thống chưa lưu trữ. `learnerCount` là số người học có ít nhất một từ của chủ
+`wordCount` và các số "thiếu" chỉ tính từ hệ thống chưa ẩn. `learnerCount` là số người học có ít nhất một từ của chủ
 đề trong `user_vocabulary`. `minLevel`, `maxLevel` là `null` khi chủ đề chưa có từ. `updatedAt` cần cột mới
 `topics.updated_at` (có thể `null`).
 
@@ -105,13 +109,13 @@ một chủ đề khác (không phân biệt hoa thường, sau khi cắt khoả
 
 ### `DELETE /api/topics/{id}` (đã có) — luật mới
 
-**Mới:** chủ đề còn từ (kể cả từ đã lưu trữ) → `409` với `message` "Topic still has N words"; giao diện đọc `wordCount`
+**Mới:** chủ đề còn từ (kể cả từ đã ẩn) → `409` với `message` "Topic still has N words"; giao diện đọc `wordCount`
 để hiện hộp thoại chặn trước khi gọi. Hiện backend vẫn xóa và đặt `topic_id = NULL` cho các từ: phải sửa.
 
 ### `GET /api/admin/vocabulary?topicId=2&q=&level=&missing=&page=0&size=10`
 
 Như `GET /api/vocabulary` (tìm chuỗi con trong từ hoặc nghĩa, sắp A1 → C2 rồi theo chữ cái) nhưng chỉ từ hệ thống
-(`created_by IS NULL`) chưa lưu trữ, và thêm bộ lọc `missing` = `AUDIO`, `EXAMPLE` hoặc `IMAGE`. `size` mặc định 10,
+(`created_by IS NULL`) chưa ẩn, và thêm bộ lọc `missing` = `AUDIO`, `EXAMPLE` hoặc `IMAGE`. `size` mặc định 10,
 tối đa 50.
 
 ```json
@@ -134,10 +138,11 @@ Thân như hiện tại: `topicId`, `word`, `phonetic`, `meaning`, `exampleSente
 
 ### `DELETE /api/vocabulary/{id}` (đã có) — đổi cách trả lời
 
-Từ đã có người học hoặc nằm trong danh sách riêng thì **lưu trữ** (cột mới `vocabulary.archived_at`): không còn xuất hiện
-trong phiên học, trò chơi, tìm kiếm và danh sách admin, tiến độ cũ giữ nguyên. Từ chưa ai dùng thì xóa hẳn.
+Từ đã có người học hoặc nằm trong danh sách riêng thì **ẩn** (`status` = `HIDDEN`, như `tbl_vocabulary.status` của thiết
+kế; giao diện admin gọi là "Lưu trữ"): không còn xuất hiện trong phiên học, trò chơi, tìm kiếm và danh sách admin, tiến
+độ cũ giữ nguyên. Từ chưa ai dùng thì xóa hẳn.
 
-`200` `{ "result": "ARCHIVED" }` hoặc `{ "result": "DELETED" }`. Hiện backend luôn xóa hẳn và xóa dây chuyền tiến độ học
+`200` `{ "result": "HIDDEN" }` hoặc `{ "result": "DELETED" }`. Hiện backend luôn xóa hẳn và xóa dây chuyền tiến độ học
 (`ON DELETE CASCADE`): phải sửa trước khi mở chức năng này.
 
 ### `POST /api/admin/media?kind=AUDIO|IMAGE`
@@ -160,7 +165,8 @@ Mọi bài (không phân trang, số bài nhỏ), giao diện tự lọc theo k�
 }]
 ```
 
-`status`: `DRAFT`, `PUBLISHED`, `ARCHIVED` (`exercise_lessons.publication_status`). `issues`: `MISSING_AUDIO` (bài nghe
+`status`: `DRAFT`, `PUBLISHED`, `HIDDEN` (`exercise_lessons.publication_status`, như `tbl_exercise_lesson.status`; giao
+diện ghi `HIDDEN` là "Lưu trữ"). `issues`: `MISSING_AUDIO` (bài nghe
 không có file âm thanh), `NO_QUESTIONS` (không có câu hỏi hoặc mục phát âm).
 
 ### `GET /api/admin/lessons/{id}`
@@ -198,7 +204,7 @@ lựa chọn, đoạn, mục mới không có `id`. `POST` trả `201`. Kiểm t
 
 ### `DELETE /api/admin/lessons/{id}`
 
-Bài đã có lượt làm → chuyển `ARCHIVED`; chưa có → xóa hẳn. Trả `{ "result": "ARCHIVED" | "DELETED" }`.
+Bài đã có lượt làm → chuyển `HIDDEN`; chưa có → xóa hẳn. Trả `{ "result": "HIDDEN" | "DELETED" }`.
 
 ## Đề kiểm tra (module C, Nhân)
 
@@ -278,7 +284,8 @@ chưa có.
   "createdAt": "2026-09-15T02:00:00Z", "lastActiveAt": "2026-09-28T16:40:00Z",
   "stats": {
     "wordsLearned": 12, "wordsMastered": 0, "streakDays": 0, "lastStudyDate": "2026-09-20",
-    "exercisesCompleted": 1, "exerciseAverageScore": 50, "testsSubmitted": 1, "lastTestDate": "2026-09-16"
+    "exercisesCompleted": 1, "exerciseAverageScore": 50, "testsSubmitted": 1, "lastTestDate": "2026-09-16",
+    "chatSessions": 37, "lastChatDate": "2026-09-28"
   },
   "recentActivity": [{ "at": "2026-09-28T16:40:00Z", "type": "CHAT", "title": "Trò chuyện với trợ lý AI", "detail": "14 tin nhắn" }],
   "levelHistory": [
@@ -289,7 +296,8 @@ chưa có.
 }
 ```
 
-`recentActivity`: tối đa 5 hoạt động gần nhất, `type` là `REVIEW`, `EXERCISE`, `TEST`, `GAME`, `CHAT`. Trò chuyện chỉ có số
+`stats.chatSessions`: số phiên chat với trợ lý AI (thẻ "Phiên chat", KB 25 bước 6), `lastChatDate` là ngày của phiên gần
+nhất hoặc `null`. `recentActivity`: tối đa 5 hoạt động gần nhất, `type` là `REVIEW`, `EXERCISE`, `TEST`, `GAME`, `CHAT`. Trò chuyện chỉ có số
 tin nhắn, **không** có nội dung. `plan`: `{ "title": "Đạt B2 trong 3 tháng", "currentWeek": 3, "weekCount": 13,
 "status": "ACTIVE" }` hoặc `null`. Không id nào tồn tại, hoặc id là admin → `404`.
 
@@ -303,7 +311,8 @@ hoặc lưu thời điểm khóa và từ chối token cấp trước đó); đ�
 
 | Bảng | Thay đổi | Dùng cho |
 |---|---|---|
-| `vocabulary` | `archived_at TIMESTAMPTZ NULL` | Lưu trữ thay cho xóa (kịch bản 21) |
+| `vocabulary` | `status VARCHAR(20) NOT NULL DEFAULT 'visible'` (`visible`/`hidden`, chữ thường như các enum khác của DB hiện tại) | Ẩn thay cho xóa (kịch bản 21); `tbl_vocabulary.status` của thiết kế |
+| `exercise_lessons` | giá trị `archived` của `publication_status` đổi thành `hidden` | Cùng tên với thiết kế (`tbl_exercise_lesson.status`) |
 | `topics` | `updated_at TIMESTAMPTZ NULL` | Cột "Cập nhật" |
 | `tests` | `draft BOOLEAN NOT NULL DEFAULT FALSE` | Đề nháp (kịch bản 24) |
 | `users` | `last_active_at TIMESTAMPTZ NULL` | "Hoạt động gần nhất" |
@@ -315,3 +324,14 @@ hoặc lưu thời điểm khóa và từ chối token cấp trước đó); đ�
 2. Nhóm có muốn giữ `DELETE` trả `200` kèm `result`, hay tách thành `POST .../archive` và `DELETE`?
 3. File tải lên lưu ở đâu khi deploy (ổ đĩa của container sẽ mất khi khởi động lại)? Đề xuất: bảng `media_files` lưu
    nội dung trong Postgres cho demo, hoặc dịch vụ lưu trữ ngoài.
+
+## Thay đổi theo tài liệu thiết kế (04/10/2026)
+
+Đối chiếu với `Analysis/Scenarios.md` (KB 19–26) và `Design/schema.sql`:
+
+- **Ẩn thay cho lưu trữ:** từ vựng và bài tập dùng giá trị `HIDDEN` như thiết kế (trước là `ARCHIVED` và cột
+  `vocabulary.archived_at`); `DELETE` trả `{ "result": "HIDDEN" | "DELETED" }`. Giao diện vẫn ghi "Lưu trữ".
+- **Tổng quan (KB 26):** `activeToday` → `activeLearners` (người học có ít nhất một ngày học trong kỳ),
+  `exercisesCompleted` → `exerciseAttempts` (lượt làm bài tập), `topTopics` + `topLessons` → `topContent` (gộp cả đề
+  kiểm tra, sắp theo số người học).
+- **Người dùng (KB 25):** `stats` thêm `chatSessions`, `lastChatDate` cho thẻ "Phiên chat".

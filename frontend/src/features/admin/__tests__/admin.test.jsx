@@ -44,14 +44,17 @@ const STATS = {
   to: today,
   generatedAt: '2026-09-29T03:30:00Z',
   learners: { total: 128, newInPeriod: 12 },
-  activeToday: 37,
+  activeLearners: 64,
   reviews: 4812,
-  exercisesCompleted: 356,
+  exerciseAttempts: 356,
   testsSubmitted: 96,
   dailyActive: Array.from({ length: 30 }, (_, index) => ({ date: addDays(today, index - 29), count: 10 + index })),
   levels: { A1: 22, A2: 31, B1: 38, B2: 19, C1: 6, C2: 2, NONE: 10 },
-  topTopics: [{ topicId: 2, name: 'Du lịch', reviews: 1126 }],
-  topLessons: [{ lessonId: 1, title: 'Thì hiện tại đơn', skill: 'GRAMMAR', cefrLevel: 'A1', attempts: 168, averageScore: 84 }],
+  topContent: [
+    { type: 'TOPIC', id: 2, name: 'Du lịch', skill: null, attemptCount: 1126, learnerCount: 61 },
+    { type: 'TEST', id: 200, name: 'Kiểm tra tổng hợp tháng 9', skill: null, attemptCount: 15, learnerCount: 14 },
+    { type: 'EXERCISE', id: 23, name: 'Thì hiện tại hoàn thành', skill: 'READING', attemptCount: 18, learnerCount: 12 },
+  ],
   attention: {
     wordsMissingAudio: 180,
     wordsMissingExample: 48,
@@ -72,7 +75,7 @@ const NAM = {
 }
 const NAM_DETAIL = {
   ...NAM,
-  stats: { wordsLearned: 12, wordsMastered: 0, streakDays: 0, lastStudyDate: '2026-09-20', exercisesCompleted: 1, exerciseAverageScore: 50, testsSubmitted: 1, lastTestDate: '2026-09-16' },
+  stats: { wordsLearned: 12, wordsMastered: 0, streakDays: 0, lastStudyDate: '2026-09-20', exercisesCompleted: 1, exerciseAverageScore: 50, testsSubmitted: 1, lastTestDate: '2026-09-16', chatSessions: 37, lastChatDate: '2026-09-28' },
   recentActivity: [{ at: '2026-09-20T12:30:00Z', type: 'EXERCISE', title: 'Thì hiện tại đơn', detail: '50%' }],
   levelHistory: [
     { level: 'A2', changedAt: '2026-09-16T13:05:00Z', source: 'Kiểm tra tổng hợp tháng 9 · 38 điểm' },
@@ -120,6 +123,16 @@ describe('admin area', () => {
     expect(within(nav).getByRole('link', { name: 'Người dùng' })).toHaveAttribute('href', '/admin/users')
     expect(await screen.findByText('+12 người mới trong kỳ')).toBeInTheDocument()
     expect(screen.getByText('4.812')).toBeInTheDocument()
+    expect(screen.getByText('Hoạt động trong kỳ').parentElement).toHaveTextContent(/^Hoạt động trong kỳ6450% người học$/)
+    expect(screen.getByText('Lượt làm bài tập').parentElement).toHaveTextContent(/^Lượt làm bài tập356/)
+    const content = screen.getByRole('region', { name: 'Nội dung được học nhiều nhất' })
+    const rows = within(content).getAllByRole('row').slice(1)
+    expect(rows.map((row) => row.textContent)).toEqual([
+      '1Du lịchChủ đề từ vựng1.12661',
+      '2Kiểm tra tổng hợp tháng 9Đề kiểm tra1514',
+      '3Thì hiện tại hoàn thànhBài đọc hiểu1812',
+    ])
+    expect(within(content).getByRole('link', { name: 'Thì hiện tại hoàn thành' })).toHaveAttribute('href', '/admin/lessons/23')
     expect(screen.getByRole('link', { name: /Bài nghe “Hội thoại tại sân bay” thiếu file audio/ })).toHaveAttribute('href', '/admin/lessons/2')
     expect(screen.getByRole('link', { name: /Chưa có đề định kỳ tuần 41 \(đề hiện tại đóng 03\/10\)/ })).toHaveAttribute('href', '/admin/tests')
     expect(screen.getByRole('link', { name: /180 từ chưa có audio/ })).toHaveAttribute('href', '/admin/vocabulary?missing=AUDIO')
@@ -139,16 +152,17 @@ describe('admin area', () => {
     await user.type(screen.getByLabelText('Từ ngày'), '20/09/2026')
     await user.clear(screen.getByLabelText('Đến ngày'))
     await user.type(screen.getByLabelText('Đến ngày'), '10/09/2026')
-    await user.click(screen.getByRole('button', { name: 'Xem số liệu' }))
+    await user.click(screen.getByRole('button', { name: 'Xem' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent('Ngày bắt đầu phải trước hoặc trùng ngày kết thúc.')
   })
 
   it('shows "no activity" for a period without any', async () => {
-    const quiet = { ...STATS, dailyActive: STATS.dailyActive.map((day) => ({ ...day, count: 0 })), activeToday: 0 }
+    const quiet = { ...STATS, dailyActive: STATS.dailyActive.map((day) => ({ ...day, count: 0 })), activeLearners: 0, topContent: [] }
     renderAdmin('/admin', { 'GET /api/admin/stats': () => ({ data: quiet }) })
 
     expect(await screen.findByText('Chưa có hoạt động trong kỳ này')).toBeInTheDocument()
+    expect(screen.getByText('Chưa có lượt học nào trong kỳ này.')).toBeInTheDocument()
   })
 })
 
@@ -163,7 +177,7 @@ describe('vocabulary administration', () => {
     expect(within(drawer).getByText('Đang thiếu: mặt sau thẻ flashcard của từ này chưa có câu ví dụ.')).toBeInTheDocument()
 
     await user.clear(within(drawer).getByLabelText('Nghĩa *'))
-    await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }))
+    await user.click(screen.getByRole('button', { name: 'Lưu' }))
     expect(await within(drawer).findByText('Vui lòng nhập nghĩa.')).toBeInTheDocument()
     expect(within(drawer).getByText(/còn 1 ô bắt buộc chưa điền/)).toBeInTheDocument()
 
@@ -174,7 +188,7 @@ describe('vocabulary administration', () => {
 
     await user.type(within(drawer).getByLabelText('Nghĩa *'), 'hành lý (va li)')
     await user.type(within(drawer).getByLabelText('Câu ví dụ'), 'How many pieces of luggage are you checking in?')
-    await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }))
+    await user.click(screen.getByRole('button', { name: 'Lưu' }))
 
     expect(await screen.findByText('Nghĩa và câu ví dụ của “luggage” đã được cập nhật.')).toBeInTheDocument()
     expect(callsTo('PUT /api/vocabulary/105')[0].body).toMatchObject({
@@ -216,18 +230,18 @@ describe('vocabulary administration', () => {
     expect(await screen.findByRole('dialog', { name: 'Sửa từ “passport”' })).toBeInTheDocument()
   })
 
-  it('archives a word people study and deletes an unused one for good (scenario 21)', async () => {
+  it('hides a word people study and deletes an unused one for good (scenario 21)', async () => {
     renderAdmin('/admin/vocabulary/topics/2', {
       'GET /api/admin/vocabulary': () => ({ data: page([PASSPORT, VISA]) }),
-      'DELETE /api/vocabulary/104': () => ({ data: { result: 'ARCHIVED' } }),
+      'DELETE /api/vocabulary/104': () => ({ data: { result: 'HIDDEN' } }),
       'DELETE /api/vocabulary/130': () => ({ data: { result: 'DELETED' } }),
     })
     const user = userEvent.setup()
 
     await user.click(await screen.findByRole('button', { name: 'Xóa “passport”' }))
     let dialog = screen.getByRole('dialog', { name: 'Xóa từ “passport”?' })
-    expect(dialog).toHaveTextContent('12 người học đang học từ này, và từ này nằm trong 3 danh sách riêng của người học.')
-    expect(dialog).toHaveTextContent('Lưu trữ')
+    expect(dialog).toHaveTextContent('Từ “passport” đã được 12 người học học và nằm trong 3 danh sách riêng.')
+    expect(dialog).toHaveTextContent('Từ sẽ bị ẩn đối với các lượt học mới; lịch sử học cũ được giữ nguyên.')
     await user.click(within(dialog).getByRole('button', { name: 'Xóa từ' }))
     expect(await screen.findByText('Người học không gặp lại “passport” trong phiên học mới.')).toBeInTheDocument()
 
@@ -289,6 +303,7 @@ describe('user administration', () => {
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Phạm Văn Nam' })).toBeInTheDocument()
     expect(screen.getByText('điểm TB 50%')).toBeInTheDocument()
+    expect(screen.getByText('Phiên chat').parentElement).toHaveTextContent(/^Phiên chat37gần nhất 28\/09$/)
     expect(screen.getByText('16/09/2026 · Kiểm tra tổng hợp tháng 9 · 38 điểm')).toBeInTheDocument()
     expect(screen.getByText('Chưa có kế hoạch học.')).toBeInTheDocument()
 

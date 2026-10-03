@@ -190,7 +190,7 @@ export function WordDrawer({ target, topics, onClose, onOpenWord }) {
         Hủy
       </Button>
       <Button type="submit" form={FORM_ID} variant="strong" size="xs" loading={busy}>
-        Lưu thay đổi
+        Lưu
       </Button>
     </>
   ) : (
@@ -255,11 +255,11 @@ export function WordDrawer({ target, topics, onClose, onOpenWord }) {
             render={({ field }) => (
               <MediaPicker
                 kind="AUDIO"
-                label="Audio phát âm"
+                label="Âm thanh"
                 value={field.value}
                 onChange={(url) => field.onChange(url)}
                 maxBytes={MAX_AUDIO_BYTES}
-                emptyTitle={editing ? 'Chưa có audio' : 'Không bắt buộc'}
+                emptyTitle={editing ? 'Chưa có âm thanh' : 'Không bắt buộc'}
                 emptyNote={editing ? 'Người học đang nghe giọng đọc của trình duyệt.' : 'Không có audio thì người học nghe giọng đọc của trình duyệt.'}
                 allowUrl
                 urlError={errors.audioUrl?.message}

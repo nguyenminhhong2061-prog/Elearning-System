@@ -46,7 +46,7 @@ export async function updateWord(id, word) {
   return data
 }
 
-/** @returns {Promise<{ result: 'ARCHIVED' | 'DELETED' }>} */
+/** @returns {Promise<{ result: 'HIDDEN' | 'DELETED' }>} */
 export async function deleteWord(id) {
   const { data } = await httpClient.delete(`/api/vocabulary/${id}`)
   return data

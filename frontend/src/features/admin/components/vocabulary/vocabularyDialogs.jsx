@@ -23,9 +23,17 @@ function WarningBox({ children }) {
   )
 }
 
+/** "đã được 3 người học học và nằm trong 2 danh sách riêng": what keeps a word from being deleted for good. */
+function usageOf(word) {
+  const parts = []
+  if (word.learnerCount > 0) parts.push(`đã được ${word.learnerCount} người học học`)
+  if (word.listCount > 0) parts.push(`nằm trong ${word.listCount} danh sách riêng`)
+  return parts.join(' và ')
+}
+
 /**
- * Scenario 21: a word someone studies (or keeps in a list) is archived, an unused one is deleted for good. The
- * server makes the final call; the wording follows the counts the table already shows.
+ * Scenario 21: a word someone studies (or keeps in a list) is hidden ("Lưu trữ" on screen), an unused one is deleted
+ * for good. The server makes the final call; the wording follows the counts the table already shows.
  *
  * @param {{ word: import('../../types').AdminWord | null, onClose: () => void }} props
  */
@@ -42,7 +50,7 @@ export function DeleteWordDialog({ word, onClose }) {
   function confirm() {
     remove.mutate(word.id, {
       onSuccess: ({ result }) => {
-        toast(result === 'ARCHIVED' ? 'Đã chuyển vào Lưu trữ' : 'Đã xóa', result === 'ARCHIVED' ? `Người học không gặp lại “${word.word}” trong phiên học mới.` : `Đã xóa vĩnh viễn “${word.word}”.`)
+        toast(result === 'HIDDEN' ? 'Đã chuyển vào Lưu trữ' : 'Đã xóa', result === 'HIDDEN' ? `Người học không gặp lại “${word.word}” trong phiên học mới.` : `Đã xóa vĩnh viễn “${word.word}”.`)
         close()
       },
     })
@@ -54,12 +62,10 @@ export function DeleteWordDialog({ word, onClose }) {
         (used ? (
           <>
             <WarningBox>
-              <strong>{word.learnerCount} người học đang học từ này</strong>
-              {word.listCount > 0 ? `, và từ này nằm trong ${word.listCount} danh sách riêng của người học.` : '.'}
+              Từ “{word.word}” <strong>{usageOf(word)}</strong>.
             </WarningBox>
             <p className="text-sm leading-5.5 text-ink-soft">
-              Từ sẽ được chuyển vào <strong className="text-ink">Lưu trữ</strong>: người học không gặp lại từ này trong phiên học và trò chơi mới, còn tiến độ và lịch
-              sử học của họ được giữ nguyên. Từ vẫn còn trong cơ sở dữ liệu nên khôi phục được.
+              Từ sẽ bị ẩn đối với các lượt học mới; lịch sử học cũ được giữ nguyên. Từ được chuyển vào <strong className="text-ink">Lưu trữ</strong> nên vẫn khôi phục được.
             </p>
           </>
         ) : (
@@ -183,7 +189,7 @@ export function TopicDialog({ target, topics, onClose }) {
 export function DeleteTopicDialog({ topic, onClose }) {
   const remove = useDeleteTopic()
   const toast = useToast()
-  // The server also refuses (409) when archived words remain; show the same explanation then.
+  // The server also refuses (409) when hidden words remain; show the same explanation then.
   const blocked = topic ? topic.wordCount > 0 || remove.error?.status === 409 : false
 
   function close() {

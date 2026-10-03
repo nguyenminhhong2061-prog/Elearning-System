@@ -24,7 +24,7 @@ export async function updateLesson(id, lesson) {
   return data
 }
 
-/** @returns {Promise<{ result: 'ARCHIVED' | 'DELETED' }>} */
+/** @returns {Promise<{ result: 'HIDDEN' | 'DELETED' }>} */
 export async function deleteLesson(id) {
   const { data } = await httpClient.delete(`/api/admin/lessons/${id}`)
   return data

@@ -145,7 +145,7 @@ const megabytes = (bytes) => `${Math.round(bytes / (1024 * 1024))} MB`
  * @param {string} props.value current address ('' when none)
  * @param {(url: string) => void} props.onChange
  * @param {number} props.maxBytes checked before uploading
- * @param {string} props.emptyTitle ("Chưa có audio", "Không bắt buộc")
+ * @param {string} props.emptyTitle ("Chưa có âm thanh", "Không bắt buộc")
  * @param {string} props.emptyNote explanation next to the type and size limit
  * @param {boolean} [props.allowUrl] show "Hoặc dán đường dẫn"
  * @param {string} [props.urlError]

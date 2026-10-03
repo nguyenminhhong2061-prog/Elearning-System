@@ -11,9 +11,9 @@ const users = new Map()
 
 /**
  * Fixture words without the fixture's learningStatus (which only seeds the per-user state). The admin pages
- * (routes/admin.js) add, change, archive (`archivedAt`) and delete entries of this array, so learners see their edits.
+ * (routes/admin.js) add, change, hide (`status: 'HIDDEN'`) and delete entries of this array, so learners see their edits.
  */
-export const SYSTEM_WORDS = MOCK_WORDS.map(({ learningStatus: _seed, ...word }) => ({ ...word, archivedAt: null }))
+export const SYSTEM_WORDS = MOCK_WORDS.map(({ learningStatus: _seed, ...word }) => ({ ...word, status: 'VISIBLE' }))
 
 function seedLearning(today) {
   const learning = new Map()
@@ -63,12 +63,12 @@ export function allUsers() {
 /** Topic rows; the admin pages add, change and delete entries. */
 export const topics = MOCK_TOPICS.map((topic) => ({ ...topic }))
 
-/** Words a user may see: the shared ones and their own (created in personal lists). Archived words are left out. */
+/** Words a user may see: the shared ones and their own (created in personal lists). Hidden words are left out. */
 export function visibleWords(user) {
-  return [...SYSTEM_WORDS.filter((word) => !word.archivedAt), ...user.customWords]
+  return [...SYSTEM_WORDS.filter((word) => word.status !== 'HIDDEN'), ...user.customWords]
 }
 
-/** A word by id, archived ones included (history and personal lists keep them). */
+/** A word by id, hidden ones included (history and personal lists keep them). */
 export function findWord(user, id) {
   return [...SYSTEM_WORDS, ...user.customWords].find((word) => word.id === id)
 }

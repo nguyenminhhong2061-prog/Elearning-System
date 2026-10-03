@@ -21,7 +21,7 @@ import { LessonInfo, LessonQuestions, ListeningPassage, PronunciationItems } fro
 const STATUS_TAGS = {
   PUBLISHED: ['success', 'Đã xuất bản'],
   DRAFT: ['neutral', 'Nháp'],
-  ARCHIVED: ['warning', 'Lưu trữ'],
+  HIDDEN: ['warning', 'Lưu trữ'],
 }
 
 /** Scenario 23, steps 3–13 and branch 2a: create or edit a lesson of any skill. */
@@ -194,7 +194,7 @@ function DeleteLessonDialog({ lesson, onClose }) {
   function confirm() {
     remove.mutate(lesson.id, {
       onSuccess: ({ result }) => {
-        toast(result === 'ARCHIVED' ? 'Đã chuyển vào Lưu trữ' : 'Đã xóa', `Bài “${lesson.title}”.`)
+        toast(result === 'HIDDEN' ? 'Đã chuyển vào Lưu trữ' : 'Đã xóa', `Bài “${lesson.title}”.`)
         navigate(paths.adminLessons)
       },
     })

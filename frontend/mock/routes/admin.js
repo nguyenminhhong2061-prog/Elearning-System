@@ -68,10 +68,10 @@ function usageOf(word) {
   return { learnerCount: learners, listCount: lists }
 }
 
-const liveWords = () => SYSTEM_WORDS.filter((word) => !word.archivedAt)
+const liveWords = () => SYSTEM_WORDS.filter((word) => word.status !== 'HIDDEN')
 
 function toAdminWord(word) {
-  const { archivedAt: _archived, createdBy: _createdBy, ...fields } = word
+  const { status: _status, createdBy: _createdBy, ...fields } = word
   return { ...fields, updatedAt: word.updatedAt ?? '2026-09-25T03:00:00Z', ...usageOf(word) }
 }
 
@@ -131,7 +131,7 @@ function readWord(body, exceptId) {
 }
 
 function requireWord(id) {
-  const word = SYSTEM_WORDS.find((candidate) => candidate.id === id && !candidate.archivedAt)
+  const word = SYSTEM_WORDS.find((candidate) => candidate.id === id && candidate.status !== 'HIDDEN')
   if (!word) throw new HttpError(404, 'Vocabulary not found')
   return word
 }
@@ -235,7 +235,7 @@ function readLesson(body, s, existing) {
   if (!title || title.length > 150) throw new HttpError(400, 'title must be 1-150 characters')
   if (!CEFR_LEVELS.includes(body.cefrLevel)) throw new HttpError(400, 'cefrLevel must be one of A1..C2')
   const skill = existing?.skill ?? body.skill
-  if (!['GRAMMAR', 'LISTENING', 'PRONUNCIATION'].includes(skill)) throw new HttpError(400, 'skill is not valid')
+  if (!['GRAMMAR', 'READING', 'WRITING', 'LISTENING', 'PRONUNCIATION'].includes(skill)) throw new HttpError(400, 'skill is not valid')
   const questions = (body.questions ?? []).map((question, index) => {
     checkChoiceQuestion(question, index)
     if (question.type === 'MULTIPLE_CHOICE' && (question.options ?? []).length === 0) throw new HttpError(400, `question ${index + 1}: options are required`)
@@ -270,7 +270,7 @@ function readLesson(body, s, existing) {
     return { id: item.id ?? (s.nextId += 1), text: item.text.trim(), ipa: clean(item.ipa), audioUrl: clean(item.audioUrl), notes: clean(item.notes) }
   })
   const status = existing ? body.status : 'DRAFT'
-  if (!['DRAFT', 'PUBLISHED', 'ARCHIVED'].includes(status)) throw new HttpError(400, 'status is not valid')
+  if (!['DRAFT', 'PUBLISHED', 'HIDDEN'].includes(status)) throw new HttpError(400, 'status is not valid')
   const lesson = {
     id: existing?.id ?? (s.nextId += 1),
     title,
@@ -429,6 +429,54 @@ function activeOn(learners, day, today) {
   return Math.round(registered * share)
 }
 
+/**
+ * Learners with at least one study day in the period. Up to today that is exact (their last activity falls in it); for
+ * a period that ended earlier the mock can only estimate it from the daily numbers.
+ */
+function activeLearners(learners, dailyActive, from, to, today) {
+  const registered = learners.filter((learner) => learner.createdAt.slice(0, 10) <= to)
+  if (to >= today) return registered.filter((learner) => learner.lastActiveAt && learner.lastActiveAt.slice(0, 10) >= from).length
+  const studyDays = dailyActive.reduce((sum, day) => sum + day.count, 0)
+  return Math.min(registered.length, Math.round(studyDays / (1 + dailyActive.length * 0.2)))
+}
+
+/** Topics, lessons and tests learned the most in the period, by number of learners (ContentStat of the design). */
+function topContent(s, today, from, to, reviews, active, periodShare) {
+  const coverage = active / Math.max(1, s.learners.length)
+  const topicRows = topics
+    .map((topic) => ({ topic, weight: liveWords().filter((word) => word.topicId === topic.id).reduce((sum, word) => sum + usageOf(word).learnerCount, 0) }))
+    .filter(({ weight }) => weight > 0)
+  const totalWeight = topicRows.reduce((sum, { weight }) => sum + weight, 0)
+  const rows = [
+    ...topicRows.map(({ topic, weight }) => ({
+      type: 'TOPIC',
+      id: topic.id,
+      name: topic.name,
+      skill: null,
+      attemptCount: Math.round((reviews * weight) / totalWeight),
+      learnerCount: Math.min(active, Math.round(toAdminTopic(topic).learnerCount * coverage)),
+    })),
+    ...s.lessons
+      .filter((lesson) => lesson.status !== 'DRAFT')
+      // About 45% of a lesson's attempts are by different learners (the rest are retries).
+      .map((lesson) => ({
+        type: 'EXERCISE',
+        id: lesson.id,
+        name: lesson.title,
+        skill: lesson.skill,
+        attemptCount: Math.round(lesson.attempts * periodShare),
+        learnerCount: Math.min(active, Math.round(lesson.attempts * 0.45 * coverage)),
+      })),
+    ...s.tests
+      .filter((test) => !test.draft && (!test.startDate || (test.startDate <= to && test.startDate <= today && test.endDate >= from)))
+      .map((test) => ({ type: 'TEST', id: test.id, name: test.title, skill: null, attemptCount: test.submissions, learnerCount: Math.min(active, Math.round(test.submissions * 0.94)) })),
+  ]
+  return rows
+    .filter((row) => row.attemptCount > 0 && row.learnerCount > 0)
+    .sort((a, b) => b.learnerCount - a.learnerCount || b.attemptCount - a.attemptCount)
+    .slice(0, 5)
+}
+
 function stats(s, today, from, to) {
   if (!ISO_DATE.test(from ?? '') || !ISO_DATE.test(to ?? '')) throw new HttpError(400, 'from and to must be YYYY-MM-DD')
   if (from > to) throw new HttpError(400, 'from must not be after to')
@@ -440,34 +488,10 @@ function stats(s, today, from, to) {
   const dailyActive = days.map((date) => ({ date, count: activeOn(s.learners, date, today) }))
   const activeDays = dailyActive.reduce((sum, day) => sum + day.count, 0)
   const reviews = dailyActive.reduce((sum, day) => sum + Math.round(day.count * (9 + noise(day.date, 1) * 6)), 0)
+  const active = activeLearners(s.learners, dailyActive, from, to, today)
 
   const levels = Object.fromEntries([...CEFR_LEVELS, 'NONE'].map((level) => [level, 0]))
   s.learners.forEach((learner) => (levels[learner.currentLevel ?? 'NONE'] += 1))
-
-  const topicWeights = topics
-    .map((topic) => ({ topic, weight: liveWords().filter((word) => word.topicId === topic.id).reduce((sum, word) => sum + usageOf(word).learnerCount, 0) }))
-    .filter(({ weight }) => weight > 0)
-  const totalWeight = topicWeights.reduce((sum, { weight }) => sum + weight, 0)
-  const topTopics = topicWeights
-    .map(({ topic, weight }) => ({ topicId: topic.id, name: topic.name, reviews: Math.round((reviews * weight) / totalWeight) }))
-    .filter((topic) => topic.reviews > 0)
-    .sort((a, b) => b.reviews - a.reviews)
-    .slice(0, 5)
-
-  const periodShare = activeDays / Math.max(1, s.learners.length * 30 * 0.2)
-  const topLessons = s.lessons
-    .filter((lesson) => lesson.status !== 'DRAFT')
-    .map((lesson) => ({
-      lessonId: lesson.id,
-      title: lesson.title,
-      skill: lesson.skill,
-      cefrLevel: lesson.cefrLevel,
-      attempts: Math.round(lesson.attempts * periodShare),
-      averageScore: 60 + ((lesson.id * 17) % 30),
-    }))
-    .filter((lesson) => lesson.attempts > 0)
-    .sort((a, b) => b.attempts - a.attempts)
-    .slice(0, 5)
 
   return {
     from,
@@ -477,14 +501,13 @@ function stats(s, today, from, to) {
       total: s.learners.filter((learner) => learner.createdAt.slice(0, 10) <= to).length,
       newInPeriod: s.learners.filter((learner) => learner.createdAt.slice(0, 10) >= from && learner.createdAt.slice(0, 10) <= to).length,
     },
-    activeToday: activeOn(s.learners, today, today),
+    activeLearners: active,
     reviews,
-    exercisesCompleted: Math.round(activeDays * 0.45),
+    exerciseAttempts: Math.round(activeDays * 0.55),
     testsSubmitted: Math.round(activeDays * 0.12),
     dailyActive,
     levels,
-    topTopics,
-    topLessons,
+    topContent: topContent(s, today, from, to, reviews, active, activeDays / Math.max(1, s.learners.length * 30 * 0.2)),
     attention: {
       wordsMissingAudio: liveWords().filter(MISSING.AUDIO).length,
       wordsMissingExample: liveWords().filter(MISSING.EXAMPLE).length,
@@ -600,7 +623,7 @@ export const adminRoutes = [
     pattern: /^\/api\/vocabulary$/,
     status: 201,
     handle: adminOnly(({ body, s }) => {
-      const word = { id: (s.nextId += 1), createdBy: null, ...readWord(body), archivedAt: null, updatedAt: nowIso() }
+      const word = { id: (s.nextId += 1), createdBy: null, ...readWord(body), status: 'VISIBLE', updatedAt: nowIso() }
       SYSTEM_WORDS.push(word)
       return toAdminWord(word)
     }),
@@ -622,8 +645,8 @@ export const adminRoutes = [
       const word = requireWord(id(match))
       const { learnerCount, listCount } = usageOf(word)
       if (learnerCount > 0 || listCount > 0) {
-        word.archivedAt = nowIso()
-        return { result: 'ARCHIVED' }
+        Object.assign(word, { status: 'HIDDEN', updatedAt: nowIso() })
+        return { result: 'HIDDEN' }
       }
       SYSTEM_WORDS.splice(SYSTEM_WORDS.indexOf(word), 1)
       return { result: 'DELETED' }
@@ -683,8 +706,8 @@ export const adminRoutes = [
     handle: adminOnly(({ s, match }) => {
       const lesson = requireLesson(s, id(match))
       if (lesson.attempts > 0) {
-        Object.assign(lesson, { status: 'ARCHIVED', updatedAt: nowIso() })
-        return { result: 'ARCHIVED' }
+        Object.assign(lesson, { status: 'HIDDEN', updatedAt: nowIso() })
+        return { result: 'HIDDEN' }
       }
       s.lessons.splice(s.lessons.indexOf(lesson), 1)
       return { result: 'DELETED' }

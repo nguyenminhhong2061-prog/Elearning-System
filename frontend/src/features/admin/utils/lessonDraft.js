@@ -61,7 +61,7 @@ export function validateLesson(draft) {
 
   const publishing = draft.status === 'PUBLISHED'
   if (publishing && itemCount(draft) === 0) {
-    fields.items = draft.skill === 'PRONUNCIATION' ? 'Bài xuất bản cần ít nhất 1 câu mẫu.' : 'Bài xuất bản cần ít nhất 1 câu hỏi.'
+    fields.items = draft.skill === 'PRONUNCIATION' ? 'Bài xuất bản phải có ít nhất một câu mẫu.' : 'Bài xuất bản phải có ít nhất một câu hỏi.'
   }
 
   draft.questions.forEach((question) => {

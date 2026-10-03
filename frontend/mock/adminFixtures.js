@@ -97,6 +97,8 @@ export function learnerDetail(learner, today) {
         exerciseAverageScore: 50,
         testsSubmitted: 1,
         lastTestDate: addDays(today, -13),
+        chatSessions: 37,
+        lastChatDate: addDays(today, -1),
       },
       recentActivity: [
         { at: instant(today, 1, '23:40'), type: 'CHAT', title: 'Trò chuyện với trợ lý AI', detail: '14 tin nhắn' },
@@ -117,6 +119,7 @@ export function learnerDetail(learner, today) {
   const learned = learner.lastActiveAt ? 8 + ((seed * 37) % 160) : 0
   const exercises = learner.lastActiveAt ? (seed * 7) % 24 : 0
   const tests = learner.currentLevel ? 1 + (seed % 5) : 0
+  const chats = learner.lastActiveAt ? (seed * 5) % 13 : 0
   const levelHistory = [{ level: null, changedAt: learner.createdAt, source: 'Đăng ký tài khoản' }]
   if (learner.currentLevel) {
     levelHistory.unshift({
@@ -141,6 +144,8 @@ export function learnerDetail(learner, today) {
       exerciseAverageScore: exercises > 0 ? 55 + (seed % 40) : null,
       testsSubmitted: tests,
       lastTestDate: tests > 0 ? addDays(today, -(seed % 20)) : null,
+      chatSessions: chats,
+      lastChatDate: chats > 0 ? learner.lastActiveAt.slice(0, 10) : null,
     },
     recentActivity,
     levelHistory,

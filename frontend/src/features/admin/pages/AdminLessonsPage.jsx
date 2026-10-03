@@ -21,13 +21,13 @@ const SKILLS = ['GRAMMAR', 'LISTENING', 'PRONUNCIATION']
 const STATUS = {
   PUBLISHED: { label: 'Đã xuất bản', variant: 'success' },
   DRAFT: { label: 'Nháp', variant: 'neutral' },
-  ARCHIVED: { label: 'Lưu trữ', variant: 'warning' },
+  HIDDEN: { label: 'Lưu trữ', variant: 'warning' },
 }
 const STATUS_OPTIONS = [
   { value: '', label: 'Mọi trạng thái' },
   { value: 'PUBLISHED', label: 'Đã xuất bản' },
   { value: 'DRAFT', label: 'Nháp' },
-  { value: 'ARCHIVED', label: 'Lưu trữ' },
+  { value: 'HIDDEN', label: 'Lưu trữ' },
 ]
 const ISSUES = { MISSING_AUDIO: 'Thiếu file audio', NO_QUESTIONS: 'Chưa có câu hỏi' }
 

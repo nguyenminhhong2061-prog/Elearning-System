@@ -35,18 +35,18 @@ describe('admin mock API', () => {
     expect(call('GET', '/api/admin/users/summary')).toEqual({ total: 128, active: 125, locked: 3 })
     const [nam] = call('GET', '/api/admin/users?q=nam.pv').items
     expect(nam).toMatchObject({ fullName: 'Phạm Văn Nam', currentLevel: 'A2', status: 'ACTIVE' })
-    expect(call('GET', `/api/admin/users/${nam.id}`).stats).toMatchObject({ wordsLearned: 12, exercisesCompleted: 1, testsSubmitted: 1 })
+    expect(call('GET', `/api/admin/users/${nam.id}`).stats).toMatchObject({ wordsLearned: 12, exercisesCompleted: 1, testsSubmitted: 1, chatSessions: 37 })
     expect(call('PATCH', `/api/admin/users/${nam.id}`, { body: { status: 'LOCKED' } }).status).toBe('LOCKED')
   })
 
-  it('refuses a duplicate word, archives a used word and deletes an unused one', () => {
+  it('refuses a duplicate word, hides a used word and deletes an unused one', () => {
     const body = { topicId: 2, word: 'Passport', meaning: 'hộ chiếu', difficultyLevel: 'A2' }
     expect(statusOf(() => call('POST', '/api/vocabulary', { body }))).toBe(409)
 
     const visa = call('POST', '/api/vocabulary', { body: { ...body, word: 'visa', meaning: 'thị thực' } })
     expect(call('DELETE', `/api/vocabulary/${visa.id}`)).toEqual({ result: 'DELETED' })
     const passport = call('GET', '/api/admin/vocabulary?q=passport').items[0]
-    expect(call('DELETE', `/api/vocabulary/${passport.id}`)).toEqual({ result: 'ARCHIVED' })
+    expect(call('DELETE', `/api/vocabulary/${passport.id}`)).toEqual({ result: 'HIDDEN' })
     expect(call('GET', '/api/admin/vocabulary?q=passport').totalItems).toBe(0)
   })
 
@@ -76,6 +76,19 @@ describe('admin mock API', () => {
     expect(lesson.issues).toEqual(['MISSING_AUDIO'])
     expect(statusOf(() => call('PUT', '/api/admin/lessons/11', { body: lesson }))).toBe(400)
     expect(statusOf(() => call('PUT', '/api/admin/lessons/11', { body: { ...lesson, status: 'DRAFT' } }))).toBe(200)
+  })
+
+  it('counts learners active in the period and ranks content by learners (scenario 26)', () => {
+    const stats = call('GET', `/api/admin/stats?from=2026-08-31&to=${TODAY}`)
+    expect(stats.activeLearners).toBeGreaterThan(0)
+    expect(stats.activeLearners).toBeLessThanOrEqual(stats.learners.total)
+    const week = call('GET', '/api/admin/stats?from=2026-09-23&to=2026-09-29')
+    expect(week.activeLearners).toBeLessThan(stats.activeLearners)
+    expect(stats.topContent).toHaveLength(5)
+    expect(stats.topContent.every((row) => ['TOPIC', 'EXERCISE', 'TEST'].includes(row.type) && row.learnerCount <= stats.activeLearners)).toBe(true)
+    const learners = stats.topContent.map((row) => row.learnerCount)
+    expect(learners).toEqual(learners.toSorted((a, b) => b - a))
+    expect(week.topContent.map((row) => row.type)).toContain('TEST')
   })
 
   it('rejects a period that starts after it ends', () => {

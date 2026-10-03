@@ -2,9 +2,21 @@
 
 /**
  * @typedef {'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2'} CefrLevel
- * @typedef {'GRAMMAR' | 'LISTENING' | 'PRONUNCIATION'} LessonSkill
- * @typedef {'DRAFT' | 'PUBLISHED' | 'ARCHIVED'} LessonStatus
+ * @typedef {'GRAMMAR' | 'READING' | 'WRITING' | 'LISTENING' | 'PRONUNCIATION'} LessonSkill
+ * @typedef {'DRAFT' | 'PUBLISHED' | 'HIDDEN'} LessonStatus
  * @typedef {'LISTENING' | 'READING' | 'WRITING' | 'SPEAKING'} TestSkill
+ */
+
+/**
+ * One row of "Nội dung được học nhiều nhất" (ContentStat of the design). `skill` is only set for lessons.
+ *
+ * @typedef {object} ContentStat
+ * @property {'TOPIC' | 'EXERCISE' | 'TEST'} type
+ * @property {number} id
+ * @property {string} name
+ * @property {LessonSkill | null} skill
+ * @property {number} attemptCount
+ * @property {number} learnerCount
  */
 
 /**
@@ -13,14 +25,13 @@
  * @property {string} to
  * @property {string} generatedAt
  * @property {{ total: number, newInPeriod: number }} learners
- * @property {number} activeToday
+ * @property {number} activeLearners learners with at least one study day in the period
  * @property {number} reviews
- * @property {number} exercisesCompleted
+ * @property {number} exerciseAttempts
  * @property {number} testsSubmitted
  * @property {{ date: string, count: number }[]} dailyActive
  * @property {Record<CefrLevel | 'NONE', number>} levels
- * @property {{ topicId: number, name: string, reviews: number }[]} topTopics
- * @property {{ lessonId: number, title: string, skill: LessonSkill, cefrLevel: CefrLevel, attempts: number, averageScore: number }[]} topLessons
+ * @property {ContentStat[]} topContent
  * @property {{ wordsMissingAudio: number, wordsMissingExample: number, lessonsWithIssues: { lessonId: number, title: string, issue: string }[], periodicTestGap: { weekStart: string, weekEnd: string } | null, lockedUsers: number }} attention
  */
 
@@ -145,7 +156,7 @@
 
 /**
  * @typedef {AdminUserRow & {
- *   stats: { wordsLearned: number, wordsMastered: number, streakDays: number, lastStudyDate: string | null, exercisesCompleted: number, exerciseAverageScore: number | null, testsSubmitted: number, lastTestDate: string | null },
+ *   stats: { wordsLearned: number, wordsMastered: number, streakDays: number, lastStudyDate: string | null, exercisesCompleted: number, exerciseAverageScore: number | null, testsSubmitted: number, lastTestDate: string | null, chatSessions: number, lastChatDate: string | null },
  *   recentActivity: { at: string, type: 'REVIEW' | 'EXERCISE' | 'TEST' | 'GAME' | 'CHAT', title: string, detail: string | null }[],
  *   levelHistory: { level: CefrLevel | null, changedAt: string, source: string }[],
  *   plan: { title: string, currentWeek: number, weekCount: number, status: string } | null,

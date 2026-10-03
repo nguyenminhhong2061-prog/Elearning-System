@@ -17,7 +17,7 @@ const DIFFICULTIES = [
 const STATUSES = [
   { value: 'DRAFT', label: 'Nháp', note: 'Người học chưa thấy bài.' },
   { value: 'PUBLISHED', label: 'Đã xuất bản', note: 'Hiện trong danh sách bài tập.' },
-  { value: 'ARCHIVED', label: 'Lưu trữ', note: 'Ẩn với người học, giữ lịch sử làm bài.' },
+  { value: 'HIDDEN', label: 'Lưu trữ', note: 'Ẩn với người học, giữ lịch sử làm bài.' },
 ]
 
 /** Left column: title, level, difficulty, time and status. */

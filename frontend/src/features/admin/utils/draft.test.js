@@ -38,7 +38,7 @@ describe('editor drafts', () => {
     const lesson = { ...newLesson('LISTENING'), title: 'Bài nghe', cefrLevel: 'A2', status: 'PUBLISHED', questions: [] }
     const { fields } = validateLesson(lesson)
     expect(fields.audioUrl).toBe('Bài nghe xuất bản cần file âm thanh.')
-    expect(fields.items).toBe('Bài xuất bản cần ít nhất 1 câu hỏi.')
+    expect(fields.items).toBe('Bài xuất bản phải có ít nhất một câu hỏi.')
     expect(validateLesson({ ...lesson, status: 'DRAFT' }).fields).toEqual({})
   })
 })
