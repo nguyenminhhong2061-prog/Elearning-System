@@ -77,7 +77,7 @@ function questionsOf(s, wordId, today) {
   for (const test of s.tests) {
     const count = test.questions.filter((question) => question.vocabularyId === wordId).length
     questionCount += count
-    if (count > 0 && testStatus(test, today) === 'OPEN') openTests.push({ id: test.id, title: test.title })
+    if (count > 0 && isOpenTest(test, today)) openTests.push({ id: test.id, title: test.title })
   }
   return { questionCount, openTests }
 }
@@ -361,28 +361,36 @@ function requireLesson(s, id) {
 
 // --- Tests -----------------------------------------------------------------------------------------------------------
 
-function testStatus(test, today) {
-  if (test.draft) return 'DRAFT'
-  if (!test.startDate) return 'OPEN'
+/** Where a test is in its schedule, whatever its status: before, during or after its dates. */
+function testPhase(test, today) {
   if (today < test.startDate) return 'UPCOMING'
   if (today > test.endDate) return 'CLOSED'
   return 'OPEN'
 }
 
+/** Open to learners today: shown (VISIBLE) and within its dates. */
+const isOpenTest = (test, today) => test.status === 'VISIBLE' && testPhase(test, today) === 'OPEN'
+
 function testSummary(test, today) {
   const skills = SKILL_ORDER.filter((skill) => test.questions.some((question) => question.skill === skill))
-  const { questions: _q, duplicatedFrom: _d, draft: _draft, ...fields } = test
-  return { ...fields, status: testStatus(test, today), questionCount: test.questions.length, skills }
+  const { questions: _q, materials: _m, duplicatedFrom: _d, instruction: _i, ...fields } = test
+  return { ...fields, phase: testPhase(test, today), questionCount: test.questions.length, skills }
 }
 
-const testDetail = (test, today) => ({ ...testSummary(test, today), duplicatedFrom: test.duplicatedFrom, questions: test.questions })
+const testDetail = (test, today) => ({
+  ...testSummary(test, today),
+  instruction: test.instruction,
+  duplicatedFrom: test.duplicatedFrom,
+  materials: test.materials,
+  questions: test.questions,
+})
 
 /**
  * Next week, when no weekly test opens in it (docs/api/admin.md, attention). "Next week" follows the weekly test that
  * has already opened most recently (the one open today, or else the last one to close).
  */
 export function periodicTestGap(tests, today) {
-  const scheduled = tests.filter((test) => test.type === 'PERIODIC' && !test.draft && test.endDate)
+  const scheduled = tests.filter((test) => test.type === 'PERIODIC' && test.status === 'VISIBLE')
   const current = scheduled.filter((test) => test.startDate <= today).sort((a, b) => a.startDate.localeCompare(b.startDate)).at(-1)
   if (!current) return null
   const weekStart = addDays(current.endDate, 1)
@@ -392,63 +400,153 @@ export function periodicTestGap(tests, today) {
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
-function readTestQuestions(body, s) {
+/** Question types a skill allows (the design's tbl_question: SPEAKING and ESSAY are graded by the AI). */
+const TEST_TYPES = {
+  LISTENING: ['MULTIPLE_CHOICE', 'FILL_BLANK'],
+  READING: ['MULTIPLE_CHOICE', 'FILL_BLANK'],
+  WRITING: ['MULTIPLE_CHOICE', 'FILL_BLANK', 'ESSAY'],
+  SPEAKING: ['SPEAKING'],
+}
+
+/** Shared listening or reading material of a test part (tbl_test_material). */
+function readMaterials(body, s) {
+  return (body.materials ?? []).map((material, index) => {
+    const label = `material ${index + 1}`
+    if (!['LISTENING', 'READING'].includes(material.type)) throw new HttpError(400, `${label}: type must be LISTENING or READING`)
+    const audioUrl = clean(material.audioUrl)
+    const text = clean(material.text)
+    if (material.type === 'LISTENING' && !audioUrl) throw new HttpError(400, `${label}: a listening material needs its audio`)
+    if (material.type === 'READING' && !text) throw new HttpError(400, `${label}: a reading material needs its text`)
+    return { id: material.id ?? (s.nextId += 1), type: material.type, title: clean(material.title), audioUrl: material.type === 'LISTENING' ? audioUrl : null, text: material.type === 'READING' ? text : null }
+  })
+}
+
+function readTestQuestions(body, s, materials) {
   return (body.questions ?? []).map((question, index) => {
+    const label = `question ${index + 1}`
     checkChoiceQuestion({ ...question, prompt: question.content }, index)
-    if (!SKILL_ORDER.includes(question.skill)) throw new HttpError(400, `question ${index + 1}: skill is not valid`)
+    if (!SKILL_ORDER.includes(question.skill)) throw new HttpError(400, `${label}: skill is not valid`)
+    if (!TEST_TYPES[question.skill].includes(question.type)) throw new HttpError(400, `${label}: ${question.skill} allows ${TEST_TYPES[question.skill].join(', ')}`)
+    if (question.type === 'MULTIPLE_CHOICE' && (question.options ?? []).length === 0) throw new HttpError(400, `${label}: options are required`)
+    if (question.type === 'FILL_BLANK' && !(question.acceptedAnswers ?? []).some(clean)) throw new HttpError(400, `${label}: an accepted answer is required`)
+    // New materials have no id yet, so a question points at one by its place in this request's materials.
+    const materialIndex = question.materialIndex ?? null
+    const material = materialIndex === null ? null : materials[materialIndex]
+    if (materialIndex !== null && material?.type !== question.skill) throw new HttpError(400, `${label}: materialIndex must point at a ${question.skill} material of this test`)
     return {
       id: question.id ?? (s.nextId += 1),
       skill: question.skill,
       type: question.type,
       points: question.points,
-      audioUrl: clean(question.audioUrl),
-      content: question.content.trim(),
-      options: (question.options ?? []).map((option) => ({ id: option.id ?? (s.nextId += 1), text: option.text.trim(), correct: Boolean(option.correct) })),
-      acceptedAnswers: (question.acceptedAnswers ?? []).map((answer) => answer.trim()).filter(Boolean),
+      audioUrl: question.skill === 'LISTENING' ? clean(question.audioUrl) : null,
       vocabularyId: question.vocabularyId ?? null,
+      materialId: material?.id ?? null,
+      content: question.content.trim(),
+      options: question.type === 'MULTIPLE_CHOICE' ? question.options.map((option) => ({ id: option.id ?? (s.nextId += 1), text: option.text.trim(), correct: Boolean(option.correct) })) : [],
+      acceptedAnswers: question.type === 'FILL_BLANK' ? question.acceptedAnswers.map((answer) => answer.trim()).filter(Boolean) : [],
     }
   })
 }
 
-function readTest(body, s, type) {
+function readTest(body, s, type, existing) {
   const title = clean(body.title)
   if (!title || title.length > 200) throw new HttpError(400, 'title must be 1-200 characters')
-  let startDate = null
-  let endDate = null
-  if (type === 'PERIODIC') {
-    if (!ISO_DATE.test(body.startDate ?? '') || !ISO_DATE.test(body.endDate ?? '')) throw new HttpError(400, 'startDate and endDate are required')
-    if (body.endDate <= body.startDate) throw new HttpError(400, 'endDate must be after startDate')
-    ;({ startDate, endDate } = body)
-  }
-  const questions = readTestQuestions(body, s)
+  // Weekly and comprehensive tests both have their dates (scenario 24, branch 5a).
+  if (!ISO_DATE.test(body.startDate ?? '') || !ISO_DATE.test(body.endDate ?? '')) throw new HttpError(400, 'startDate and endDate are required')
+  if (body.endDate <= body.startDate) throw new HttpError(400, 'endDate must be after startDate')
+  const status = body.status ?? 'DRAFT'
+  if (!(existing ? ['DRAFT', 'VISIBLE', 'HIDDEN'] : ['DRAFT', 'VISIBLE']).includes(status)) throw new HttpError(400, 'status is not valid')
+  const materials = readMaterials(body, s)
+  const questions = readTestQuestions(body, s, materials)
   if (questions.length === 0) throw new HttpError(400, 'A test needs at least one question')
   if (type === 'COMPREHENSIVE' && SKILL_ORDER.some((skill) => !questions.some((question) => question.skill === skill))) {
     throw new HttpError(400, 'A comprehensive test needs all four skills')
   }
-  return { title, startDate, endDate, draft: Boolean(body.draft), questions }
+  return {
+    title,
+    skillText: clean(body.skillText),
+    instruction: clean(body.instruction),
+    startDate: body.startDate,
+    endDate: body.endDate,
+    status,
+    materials,
+    questions,
+  }
 }
 
-/** Only wording may change once learners have submitted: same questions, answers and points (scenario 24). */
-function sameStructure(before, after) {
-  if (after.startDate !== before.startDate || after.questions.length !== before.questions.length) return false
-  return before.questions.every((question, index) => {
-    const next = after.questions[index]
-    return (
-      next.id === question.id &&
-      next.skill === question.skill &&
-      next.type === question.type &&
-      next.points === question.points &&
-      next.options.length === question.options.length &&
-      next.options.every((option, optionIndex) => option.id === question.options[optionIndex].id && option.correct === question.options[optionIndex].correct) &&
-      next.acceptedAnswers.join('\n') === question.acceptedAnswers.join('\n')
-    )
-  })
+/**
+ * Once learners have submitted, only the title, the closing date and showing or hiding the test may change (scenario
+ * 24, branch 2a): questions, their wording, answers, points and the materials stay as graded.
+ */
+function sameGradedContent(before, after) {
+  const content = (test) =>
+    JSON.stringify({
+      skillText: test.skillText,
+      instruction: test.instruction,
+      startDate: test.startDate,
+      materials: test.materials.map(({ id, type, title, audioUrl, text }) => [id, type, title, audioUrl, text]),
+      questions: test.questions.map((question) => [
+        question.id,
+        question.skill,
+        question.type,
+        question.points,
+        question.content,
+        question.audioUrl,
+        question.materialId,
+        question.options.map((option) => [option.id, option.text, option.correct]),
+        question.acceptedAnswers,
+      ]),
+    })
+  return content(before) === content(after) && after.status !== 'DRAFT'
 }
 
 function requireTest(s, id) {
   const test = s.tests.find((candidate) => candidate.id === id)
   if (!test) throw new HttpError(404, 'Test not found')
   return test
+}
+
+/** A question body that copies a test's questions and materials (duplicating): ids dropped, materials by index. */
+function copyBody(test) {
+  return {
+    materials: test.materials.map(({ id: _id, ...material }) => material),
+    questions: test.questions.map(({ id: _id, materialId, options, ...question }) => ({
+      ...question,
+      materialIndex: materialId === null ? null : test.materials.findIndex((material) => material.id === materialId),
+      options: options.map(({ id: _o, ...option }) => option),
+    })),
+  }
+}
+
+/**
+ * Scenario 24, step 6: a multiple-choice question made from a word of the bank. The blank replaces the word in its
+ * example sentence (or the question asks for the word with that meaning); three other words of its topic are the wrong
+ * choices.
+ */
+function wordQuestion(word) {
+  const others = liveWords().filter(
+    (other) => other.topicId === word.topicId && other.id !== word.id && !same(other.word, word.word) && !same(other.meaning, word.meaning),
+  )
+  if (word.topicId === null || others.length < 3) throw new HttpError(422, 'The word needs three other words in its topic')
+  const distractors = others.toSorted((a, b) => Math.abs(a.id - word.id) - Math.abs(b.id - word.id) || a.id - b.id).slice(0, 3)
+  const example = word.exampleSentence ?? ''
+  const at = example.toLocaleLowerCase('en').indexOf(word.word.toLocaleLowerCase('en'))
+  const content = at >= 0 ? `${example.slice(0, at)}___${example.slice(at + word.word.length)}` : `Which word means “${word.meaning}”?`
+  // A blank that starts the sentence takes capitalised choices ("___ officers checked our bags" → "Customs").
+  const shown = (text) => (at === 0 ? text.charAt(0).toUpperCase() + text.slice(1) : text)
+  const choices = [word, ...distractors]
+  const order = choices.map((_, index) => index).sort((a, b) => ((a * 7 + word.id) % 5) - ((b * 7 + word.id) % 5) || a - b)
+  return {
+    skill: 'READING',
+    type: 'MULTIPLE_CHOICE',
+    points: 1,
+    audioUrl: null,
+    vocabularyId: word.id,
+    materialIndex: null,
+    content,
+    options: order.map((index) => ({ text: shown(choices[index].word), correct: index === 0 })),
+    acceptedAnswers: [],
+  }
 }
 
 // --- Users -----------------------------------------------------------------------------------------------------------
@@ -525,7 +623,7 @@ function topContent(s, today, from, to, reviews, active, periodShare) {
         learnerCount: Math.min(active, Math.round(lesson.attempts * 0.45 * coverage)),
       })),
     ...s.tests
-      .filter((test) => !test.draft && (!test.startDate || (test.startDate <= to && test.startDate <= today && test.endDate >= from)))
+      .filter((test) => test.status !== 'DRAFT' && test.startDate <= to && test.startDate <= today && test.endDate >= from)
       .map((test) => ({ type: 'TEST', id: test.id, name: test.title, skill: null, attemptCount: test.submissions, learnerCount: Math.min(active, Math.round(test.submissions * 0.94)) })),
   ]
   return rows
@@ -789,7 +887,7 @@ export const adminRoutes = [
     status: 201,
     handle: adminOnly(({ s, today, body }) => {
       if (!['PERIODIC', 'COMPREHENSIVE'].includes(body.type)) throw new HttpError(400, 'type must be PERIODIC or COMPREHENSIVE')
-      const test = { id: (s.nextId += 1), type: body.type, ...readTest(body, s, body.type), submissions: 0, averageScore: null, duplicatedFrom: null }
+      const test = { id: (s.nextId += 1), type: body.type, ...readTest(body, s, body.type, null), submissions: 0, averageScore: null, duplicatedFrom: null }
       s.tests.unshift(test)
       return testDetail(test, today)
     }),
@@ -799,12 +897,27 @@ export const adminRoutes = [
     pattern: /^\/api\/admin\/tests\/(\d+)$/,
     handle: adminOnly(({ s, today, body, match }) => {
       const test = requireTest(s, id(match))
-      const next = readTest(body, s, test.type)
-      if (test.submissions > 0 && (!sameStructure(test, next) || next.draft)) {
-        throw new HttpError(409, 'The test has submissions: only the wording and the closing date may change')
+      const next = readTest(body, s, test.type, test)
+      if (test.submissions > 0 && !sameGradedContent(test, next)) {
+        throw new HttpError(409, 'The test has submissions: only the title, the closing date and hiding it may change')
       }
       Object.assign(test, next)
       return testDetail(test, today)
+    }),
+  },
+  {
+    method: 'DELETE',
+    pattern: /^\/api\/admin\/tests\/(\d+)$/,
+    status: 200,
+    handle: adminOnly(({ s, match }) => {
+      const test = requireTest(s, id(match))
+      // Scenario 24, branch 2b: a test learners have done is only hidden, their results stay.
+      if (test.submissions > 0) {
+        test.status = 'HIDDEN'
+        return { result: 'HIDDEN' }
+      }
+      s.tests.splice(s.tests.indexOf(test), 1)
+      return { result: 'DELETED' }
     }),
   },
   {
@@ -813,18 +926,11 @@ export const adminRoutes = [
     status: 201,
     handle: adminOnly(({ s, today, body, match }) => {
       const source = requireTest(s, id(match))
+      const fields = { skillText: source.skillText, instruction: source.instruction, ...body, status: 'DRAFT', ...copyBody(source) }
       const copy = {
         id: (s.nextId += 1),
         type: source.type,
-        ...readTest(
-          {
-            ...body,
-            draft: true,
-            questions: source.questions.map(({ id: _id, options, ...question }) => ({ ...question, options: options.map(({ id: _o, ...option }) => option) })),
-          },
-          s,
-          source.type,
-        ),
+        ...readTest(fields, s, source.type, null),
         submissions: 0,
         averageScore: null,
         duplicatedFrom: { id: source.id, title: source.title },
@@ -832,6 +938,11 @@ export const adminRoutes = [
       s.tests.unshift(copy)
       return testDetail(copy, today)
     }),
+  },
+  {
+    method: 'GET',
+    pattern: /^\/api\/admin\/vocabulary\/(\d+)\/test-question$/,
+    handle: adminOnly(({ match }) => wordQuestion(requireWord(id(match)))),
   },
 
   // Users

@@ -7,6 +7,7 @@ import { tokenStorage } from '@/api/tokenStorage'
 import { addDays, todayInVietnam } from '@/lib/dates'
 import { admin, installFakeBackend } from '@/test/fakeBackend'
 import '@/test/preloadPages'
+import { nextMonth } from '../utils/testDraft'
 
 // Data shaped as docs/api/admin.md describes it, following scenarios 19–26 of Analysis/Scenarios.md (docs/English Learning System).
 
@@ -371,9 +372,11 @@ describe('test administration', () => {
     id: 100,
     title: 'Kiểm tra định kỳ — tuần 40',
     type: 'PERIODIC',
+    skillText: 'Từ vựng và ngữ pháp',
     startDate: '2026-09-26',
     endDate: '2026-10-03',
-    status: 'OPEN',
+    status: 'VISIBLE',
+    phase: 'OPEN',
     questionCount: 1,
     skills: ['READING'],
     submissions: 28,
@@ -391,15 +394,18 @@ describe('test administration', () => {
       { id: 2, text: 'has lived', correct: true },
     ],
     acceptedAnswers: [],
+    vocabularyId: null,
+    materialId: null,
   }
+  const detail = (test) => ({ instruction: null, duplicatedFrom: null, materials: [], questions: [question], ...test })
 
-  it('warns about next week and duplicates the open test into a draft for it (scenario 24)', async () => {
-    const copy = { ...week40, id: 101, title: 'Kiểm tra định kỳ — tuần 41', startDate: '2026-10-04', endDate: '2026-10-10', status: 'DRAFT', submissions: 0, averageScore: null, duplicatedFrom: { id: 100, title: week40.title }, questions: [question] }
+  it('warns about next week and duplicates the open test into a draft for it (scenario 24, branch 2c)', async () => {
+    const copy = detail({ ...week40, id: 101, title: 'Kiểm tra định kỳ — tuần 41', startDate: '2026-10-04', endDate: '2026-10-10', status: 'DRAFT', phase: 'UPCOMING', submissions: 0, averageScore: null, duplicatedFrom: { id: 100, title: week40.title } })
     renderAdmin('/admin/tests', {
       'GET /api/admin/tests': () => ({ data: [week40] }),
       'POST /api/admin/tests/100/duplicate': () => ({ status: 201, data: copy }),
       'GET /api/admin/tests/101': () => ({ data: copy }),
-      'PUT /api/admin/tests/101': ({ body }) => ({ data: { ...copy, ...body, status: body.draft ? 'DRAFT' : 'UPCOMING' } }),
+      'PUT /api/admin/tests/101': ({ body }) => ({ data: { ...copy, ...body } }),
     })
     const user = userEvent.setup()
 
@@ -426,20 +432,124 @@ describe('test administration', () => {
     expect(await screen.findByText('“Kiểm tra định kỳ — tuần 41” sẽ mở theo lịch.')).toBeInTheDocument()
     expect(callsTo('PUT /api/admin/tests/101')[0].body).toMatchObject({
       title: 'Kiểm tra định kỳ — tuần 41',
+      skillText: 'Từ vựng và ngữ pháp',
       startDate: '2026-10-04',
       endDate: '2026-10-10',
-      draft: false,
-      questions: [{ id: 1001, skill: 'READING', type: 'MULTIPLE_CHOICE', options: [{ id: 1, text: 'lives', correct: false }, { id: 2, text: 'has lived', correct: true }] }],
+      status: 'VISIBLE',
+      materials: [],
+      questions: [{ id: 1001, skill: 'READING', type: 'MULTIPLE_CHOICE', options: [{ id: 1, text: 'lives', correct: false }, { id: 2, text: 'has lived', correct: true }], materialIndex: null }],
     })
   })
 
-  it('keeps answers of a test with submissions locked', async () => {
-    renderAdmin('/admin/tests/100', { 'GET /api/admin/tests/100': () => ({ data: { ...week40, duplicatedFrom: null, questions: [question] } }) })
+  it('locks every question of a test with submissions, wording included (scenario 24, branch 2a)', async () => {
+    renderAdmin('/admin/tests/100', { 'GET /api/admin/tests/100': () => ({ data: detail(week40) }) })
 
     expect(await screen.findByText(/Đề đã có 28 bài nộp:/)).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: 'B là đáp án đúng' })).toBeDisabled()
+    expect(screen.getByLabelText('Nội dung lựa chọn A')).toBeDisabled()
+    expect(screen.getByLabelText('Đề bài *')).toBeDisabled()
     expect(screen.queryByRole('button', { name: 'Xóa câu' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Thêm câu hỏi từ kho từ vựng' })).not.toBeInTheDocument()
     expect(screen.getByLabelText('Ngày mở *')).toBeDisabled()
+    expect(screen.getByLabelText('Ngày đóng *')).toBeEnabled()
+    expect(screen.getByRole('radio', { name: /Nháp/ })).toBeDisabled()
+    expect(screen.getByRole('radio', { name: /Ẩn/ })).toBeEnabled()
+  })
+
+  it('hides a test with submissions from its row (scenario 24, branch 2b)', async () => {
+    renderAdmin('/admin/tests', {
+      'GET /api/admin/tests': () => ({ data: [week40] }),
+      'DELETE /api/admin/tests/100': () => ({ data: { result: 'HIDDEN' } }),
+    })
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: `Xóa ${week40.title}` }))
+    const dialog = screen.getByRole('dialog', { name: `Xóa đề “${week40.title}”?` })
+    expect(dialog).toHaveTextContent('Đề đã có 28 bài nộp nên chỉ bị ẩn')
+    await user.click(within(dialog).getByRole('button', { name: 'Ẩn đề' }))
+    expect(await screen.findByText(`Đề “${week40.title}”.`)).toBeInTheDocument()
+    expect(callsTo('DELETE /api/admin/tests/100')).toHaveLength(1)
+  })
+
+  it('builds a weekly test with a shared reading and a question made from a word (scenario 24, steps 4–10)', async () => {
+    const fromWord = {
+      skill: 'READING',
+      type: 'MULTIPLE_CHOICE',
+      points: 1,
+      audioUrl: null,
+      vocabularyId: 105,
+      materialIndex: null,
+      content: 'Which word means “hành lý”?',
+      options: [
+        { text: 'passport', correct: false },
+        { text: 'luggage', correct: true },
+        { text: 'visa', correct: false },
+        { text: 'souvenir', correct: false },
+      ],
+      acceptedAnswers: [],
+    }
+    renderAdmin('/admin/tests/new', {
+      'GET /api/admin/tests': () => ({ data: [week40] }),
+      'GET /api/admin/vocabulary/105/test-question': () => ({ data: fromWord }),
+      'POST /api/admin/tests': ({ body }) => ({ status: 201, data: detail({ ...week40, ...body, id: 44, phase: 'UPCOMING', submissions: 0, averageScore: null }) }),
+      'GET /api/admin/tests/44': () => ({ data: detail({ ...week40, id: 44, submissions: 0 }) }),
+    })
+    const user = userEvent.setup()
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Đề kiểm tra mới' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Tên đề *')).toHaveValue('Kiểm tra định kỳ — tuần 41')
+    expect(screen.getByLabelText('Ngày mở *')).toHaveValue('04/10/2026')
+    await fill(user, screen.getByLabelText('Kỹ năng'), 'Từ vựng và ngữ pháp')
+    await fill(user, screen.getByLabelText('Hướng dẫn làm bài'), 'Câu bỏ trống tính là sai.')
+
+    await user.click(screen.getByRole('button', { name: '+ Bài đọc chung' }))
+    const reading = screen.getByRole('article', { name: 'Bài đọc 1' })
+    await fill(user, within(reading).getByLabelText('Nội dung bài đọc *'), 'Lan packed her luggage the night before her flight.')
+
+    await user.click(screen.getByRole('button', { name: 'Thêm câu hỏi từ kho từ vựng' }))
+    const dialog = screen.getByRole('dialog', { name: 'Thêm câu hỏi từ kho từ vựng' })
+    await fill(user, within(dialog).getByRole('searchbox', { name: 'Tìm từ' }), 'lugg')
+    await user.click(await within(dialog).findByRole('button', { name: 'Chọn “luggage”' }))
+
+    const first = (await screen.findByRole('heading', { name: 'Câu 1' })).closest('article')
+    expect(within(first).getByLabelText('Đề bài *')).toHaveValue('Which word means “hành lý”?')
+    expect(within(first).getByText(/tạo từ kho từ vựng/)).toBeInTheDocument()
+    await user.selectOptions(within(first).getByLabelText('Tài liệu dùng chung'), 'Bài đọc 1')
+    await user.click(screen.getByRole('radio', { name: /Mở theo lịch/ }))
+    await user.click(screen.getByRole('button', { name: 'Lưu đề' }))
+
+    expect(await screen.findByText('“Kiểm tra định kỳ — tuần 41” sẽ mở theo lịch.')).toBeInTheDocument()
+    const body = callsTo('POST /api/admin/tests')[0].body
+    expect(body).toMatchObject({
+      type: 'PERIODIC',
+      skillText: 'Từ vựng và ngữ pháp',
+      instruction: 'Câu bỏ trống tính là sai.',
+      startDate: '2026-10-04',
+      endDate: '2026-10-10',
+      status: 'VISIBLE',
+      materials: [{ type: 'READING', title: null, audioUrl: null, text: 'Lan packed her luggage the night before her flight.' }],
+    })
+    expect(body.questions[0]).toMatchObject({ vocabularyId: 105, materialIndex: 0, type: 'MULTIPLE_CHOICE' })
+    expect(body.questions[0].options.filter((option) => option.correct)).toEqual([{ text: 'luggage', correct: true }])
+  })
+
+  it('dates a comprehensive test and asks for its four skills (scenario 24, branches 5a and 9b)', async () => {
+    renderAdmin('/admin/tests/new', { 'GET /api/admin/tests': () => ({ data: [week40] }) })
+    const user = userEvent.setup()
+
+    await user.selectOptions(await screen.findByLabelText('Loại đề'), 'COMPREHENSIVE')
+    const month = nextMonth(today)
+    expect(screen.getByLabelText('Tên đề *')).toHaveValue(`Kiểm tra tổng hợp tháng ${month.label}`)
+    expect(screen.getByLabelText('Ngày mở *')).toHaveValue(`01/${month.start.slice(5, 7)}/${month.start.slice(0, 4)}`)
+
+    await user.click(screen.getByRole('button', { name: 'Nói (AI chấm)' }))
+    const speaking = screen.getByRole('heading', { name: 'Câu 1' }).closest('article')
+    expect(within(speaking).getByRole('button', { name: 'Trắc nghiệm' })).toBeDisabled()
+    expect(within(speaking).getByText(/theo thang 10/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Lưu đề' }))
+
+    expect(await screen.findByText('Đề tổng hợp cần đủ 4 kỹ năng: còn thiếu Nghe, Đọc, Viết.')).toBeInTheDocument()
+    expect(callsTo('POST /api/admin/tests')).toHaveLength(0)
   })
 })
 

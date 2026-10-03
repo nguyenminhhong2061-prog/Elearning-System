@@ -58,7 +58,7 @@ describe('admin mock API', () => {
 
     const question = { skill: 'READING', type: 'MULTIPLE_CHOICE', points: 1, content: 'You need a ___ to enter some countries.', vocabularyId: unused.id }
     const options = [{ text: 'visa', correct: true }, { text: 'souvenir', correct: false }]
-    call('POST', '/api/admin/tests', { body: { type: 'PERIODIC', title: 'Nháp', startDate: '2026-10-12', endDate: '2026-10-18', draft: true, questions: [{ ...question, options }] } })
+    call('POST', '/api/admin/tests', { body: { type: 'PERIODIC', title: 'Nháp', startDate: '2026-10-12', endDate: '2026-10-18', questions: [{ ...question, options }] } })
     expect(call('GET', '/api/admin/vocabulary?q=visa').items[0]).toMatchObject({ questionCount: 1, openTests: [] })
     expect(call('DELETE', `/api/vocabulary/${unused.id}`)).toEqual({ result: 'HIDDEN' })
   })
@@ -71,17 +71,51 @@ describe('admin mock API', () => {
   it('reports next week as missing until a weekly test is scheduled in it', () => {
     expect(call('GET', `/api/admin/stats?from=2026-08-31&to=${TODAY}`).attention.periodicTestGap).toEqual({ weekStart: '2026-10-04', weekEnd: '2026-10-10' })
     const copy = call('POST', '/api/admin/tests/100/duplicate', { body: { title: 'Kiểm tra định kỳ — tuần 41', startDate: '2026-10-04', endDate: '2026-10-10' } })
-    expect(copy.status).toBe('DRAFT')
-    call('PUT', `/api/admin/tests/${copy.id}`, { body: { ...copy, draft: false } })
+    expect(copy).toMatchObject({ status: 'DRAFT', phase: 'UPCOMING', skillText: 'Từ vựng và ngữ pháp' })
+    call('PUT', `/api/admin/tests/${copy.id}`, { body: { ...copy, status: 'VISIBLE' } })
     expect(call('GET', `/api/admin/stats?from=2026-08-31&to=${TODAY}`).attention.periodicTestGap).toBeNull()
   })
 
-  it('only lets the wording of a test with submissions change', () => {
+  it('locks the content of a test with submissions, wording included (scenario 24, branch 2a)', () => {
     const test = call('GET', '/api/admin/tests/100')
+    expect(statusOf(() => call('PUT', '/api/admin/tests/100', { body: { ...test, title: 'Tuần 40 (sửa tên)', endDate: '2026-10-04' } }))).toBe(200)
     const reworded = { ...test, questions: test.questions.map((question, index) => (index === 0 ? { ...question, content: 'New wording ___' } : question)) }
-    expect(statusOf(() => call('PUT', '/api/admin/tests/100', { body: reworded }))).toBe(200)
-    const rescored = { ...test, questions: test.questions.map((question) => ({ ...question, points: 2 })) }
-    expect(statusOf(() => call('PUT', '/api/admin/tests/100', { body: rescored }))).toBe(409)
+    expect(statusOf(() => call('PUT', '/api/admin/tests/100', { body: reworded }))).toBe(409)
+    expect(statusOf(() => call('PUT', '/api/admin/tests/100', { body: { ...test, status: 'DRAFT' } }))).toBe(409)
+    expect(statusOf(() => call('PUT', '/api/admin/tests/100', { body: { ...test, status: 'HIDDEN' } }))).toBe(200)
+  })
+
+  it('hides a test with submissions and deletes one without (scenario 24, branch 2b)', () => {
+    expect(call('DELETE', '/api/admin/tests/100')).toEqual({ result: 'HIDDEN' })
+    expect(call('GET', '/api/admin/tests/100')).toMatchObject({ status: 'HIDDEN', phase: 'OPEN' })
+    const copy = call('POST', '/api/admin/tests/100/duplicate', { body: { title: 'Bản sao', startDate: '2026-10-04', endDate: '2026-10-10' } })
+    expect(call('DELETE', `/api/admin/tests/${copy.id}`)).toEqual({ result: 'DELETED' })
+    expect(statusOf(() => call('GET', `/api/admin/tests/${copy.id}`))).toBe(404)
+  })
+
+  it('dates the comprehensive test and links its questions to shared materials (scenario 24, branch 5a)', () => {
+    const test = call('GET', '/api/admin/tests/200')
+    expect(test).toMatchObject({ type: 'COMPREHENSIVE', startDate: '2026-09-01', endDate: '2026-09-30', phase: 'OPEN' })
+    expect(test.materials.map((material) => material.type)).toEqual(['LISTENING', 'READING'])
+    expect(test.questions.filter((question) => question.materialId === test.materials[1].id)).toHaveLength(2)
+    expect([...new Set(test.questions.map((question) => question.type))].sort()).toEqual(['ESSAY', 'FILL_BLANK', 'MULTIPLE_CHOICE', 'SPEAKING'])
+
+    const copy = call('POST', '/api/admin/tests/200/duplicate', { body: { title: 'Tổng hợp tháng 10', startDate: '2026-10-01', endDate: '2026-10-31' } })
+    expect(copy.materials).toHaveLength(2)
+    expect(copy.questions[0].materialId).toBe(copy.materials[0].id)
+    const body = { ...copy, questions: copy.questions.map((question) => ({ ...question, materialIndex: question.skill === 'SPEAKING' ? 1 : null })) }
+    expect(statusOf(() => call('PUT', `/api/admin/tests/${copy.id}`, { body }))).toBe(400)
+  })
+
+  it('makes a multiple-choice question from a word of the bank (scenario 24, step 6)', () => {
+    const [passport] = call('GET', '/api/admin/vocabulary?q=passport').items
+    const question = call('GET', `/api/admin/vocabulary/${passport.id}/test-question`)
+    expect(question).toMatchObject({ skill: 'READING', type: 'MULTIPLE_CHOICE', vocabularyId: passport.id, content: 'Which word means “hộ chiếu”?' })
+    expect(question.options).toHaveLength(4)
+    expect(question.options.filter((option) => option.correct).map((option) => option.text)).toEqual(['passport'])
+    const empty = call('POST', '/api/topics', { body: { name: 'Mua sắm' } })
+    const lonely = call('POST', '/api/vocabulary', { body: { topicId: empty.id, word: 'receipt', meaning: 'hóa đơn', difficultyLevel: 'A2' } })
+    expect(statusOf(() => call('GET', `/api/admin/vocabulary/${lonely.id}/test-question`))).toBe(422)
   })
 
   it('does not publish a listening lesson without its audio file', () => {

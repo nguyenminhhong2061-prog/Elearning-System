@@ -16,7 +16,7 @@ const tone = (error) => (error ? 'border-danger-solid focus:ring-danger-solid/20
  * @param {{ key: string, text: string, correct: boolean }[]} props.options
  * @param {(options: object[]) => void} props.onChange
  * @param {string} [props.error] problem of the whole list ("chọn đáp án đúng")
- * @param {boolean} [props.locked] answers cannot change (a test with submissions): texts stay editable
+ * @param {boolean} [props.locked] nothing can change (a test with submissions)
  * @param {string} [props.lang] language of the choices
  */
 export function OptionsEditor({ options, onChange, error, locked = false, lang }) {
@@ -43,6 +43,7 @@ export function OptionsEditor({ options, onChange, error, locked = false, lang }
             <input
               value={option.text}
               lang={lang}
+              disabled={locked}
               onChange={(event) => onChange(replaceAt(options, index, { ...option, text: event.target.value }))}
               aria-label={`Nội dung lựa chọn ${letter}`}
               aria-invalid={error && !option.text.trim() ? true : undefined}

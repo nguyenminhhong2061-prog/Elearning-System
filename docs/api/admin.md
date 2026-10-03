@@ -81,7 +81,7 @@ Cả hai tham số bắt buộc; giao diện tính sẵn cho "7 ngày", "30 ngà
 | `dailyActive` | Mỗi ngày trong kỳ một phần tử, kể cả ngày 0 người |
 | `levels` | Đếm theo `users.current_level` của người học hiện có; `NONE` là chưa có trình độ |
 | `topContent` | Bảng "Nội dung được học nhiều nhất" (`ContentStat` của thiết kế): tối đa 5 dòng gộp chủ đề, bài tập, đề kiểm tra, giảm dần theo `learnerCount` rồi `attemptCount`. `type`: `TOPIC` (lượt = lượt ôn từ của chủ đề, người = người ôn ít nhất một từ của chủ đề), `EXERCISE` (lượt làm bắt đầu trong kỳ; `skill` để giao diện ghi "Bài đọc hiểu", "Bài nghe hiểu"…), `TEST` (bài nộp trong kỳ). `skill` là `null` trừ `EXERCISE`. Kỳ không có hoạt động → `[]` |
-| `attention` | Việc cần xử lý, không phụ thuộc kỳ. `periodicTestGap` là **tuần tới**: 7 ngày ngay sau ngày đóng của đề định kỳ đã mở gần nhất (đề đang mở hôm nay, không có thì đề vừa đóng), khi chưa có đề định kỳ nào (không tính bản nháp) mở trong tuần đó; `null` nếu đã có |
+| `attention` | Việc cần xử lý, không phụ thuộc kỳ. `periodicTestGap` là **tuần tới**: 7 ngày ngay sau ngày đóng của đề định kỳ đã mở gần nhất (đề đang mở hôm nay, không có thì đề vừa đóng), khi chưa có đề định kỳ `VISIBLE` nào mở trong tuần đó; `null` nếu đã có. `lessonsWithIssues[].skill` cho biết bài nghe hay bài phát âm |
 
 ## Chủ đề và từ vựng (module A, Hồng)
 
@@ -232,48 +232,98 @@ Trả `{ "result": "HIDDEN" | "DELETED" }`.
 
 ## Đề kiểm tra (module C, Nhân)
 
+Theo `tbl_test`, `tbl_test_material`, `tbl_question` của thiết kế (KB 24).
+
 ### `GET /api/admin/tests`
 
 ```json
 [{
-  "id": 100, "title": "Kiểm tra định kỳ — tuần 40", "type": "PERIODIC",
-  "startDate": "2026-09-26", "endDate": "2026-10-03", "status": "OPEN",
-  "questionCount": 5, "skills": ["READING", "WRITING"], "submissions": 28, "averageScore": 72
+  "id": 100, "title": "Kiểm tra định kỳ — tuần 40", "type": "PERIODIC", "skillText": "Từ vựng và ngữ pháp",
+  "startDate": "2026-09-26", "endDate": "2026-10-03", "status": "VISIBLE", "phase": "OPEN",
+  "questionCount": 6, "skills": ["READING", "WRITING"], "submissions": 28, "averageScore": 72
 }]
 ```
 
-`status`: `DRAFT` (chưa mở cho người học, cần cột mới `tests.draft`), `UPCOMING`, `OPEN`, `CLOSED` (tính theo ngày mở,
-ngày đóng, giờ Việt Nam). Đề tổng hợp không giới hạn thời gian có `startDate`, `endDate` là `null` và `status` `OPEN`.
-`averageScore` 0–100, `null` khi chưa có bài nộp.
+- `status` (lưu trong DB, `TestStatus` của thiết kế): `DRAFT` (nháp, người học chưa thấy), `VISIBLE` (mở theo lịch),
+  `HIDDEN` (đã ẩn, xem `DELETE`). Thay cho cột `tests.draft` mà bản trước đề xuất.
+- `phase` (tính theo ngày mở, ngày đóng, giờ Việt Nam, cho mọi đề): `UPCOMING`, `OPEN`, `CLOSED`. Giao diện hiện
+  "Nháp", "Đã ẩn", hoặc với đề `VISIBLE` thì "Sắp mở", "Đang mở", "Đã đóng".
+- **Đề định kỳ và đề tổng hợp đều có `startDate`, `endDate`** (KB 24 nhánh 5a; `tbl_test.open_date`, `close_date`
+  `NOT NULL`). Không còn đề tổng hợp "luôn mở".
+- `skillText`: nội dung của đề ("Từ vựng và ngữ pháp"), cột `tbl_test.skill` của thiết kế, có thể `null`. `skills` là
+  các kỹ năng có câu hỏi trong đề. `averageScore` 0–100, `null` khi chưa có bài nộp.
 
 ### `GET /api/admin/tests/{id}`
 
 ```json
 {
-  "id": 101, "title": "Kiểm tra định kỳ — tuần 41", "type": "PERIODIC", "startDate": "2026-10-04", "endDate": "2026-10-10",
-  "status": "DRAFT", "submissions": 0, "duplicatedFrom": { "id": 100, "title": "Kiểm tra định kỳ — tuần 40" },
+  "id": 200, "title": "Kiểm tra tổng hợp tháng 10/2026", "type": "COMPREHENSIVE", "skillText": "Nghe, nói, đọc, viết",
+  "instruction": "Làm lần lượt bốn phần. …", "startDate": "2026-10-01", "endDate": "2026-10-31",
+  "status": "VISIBLE", "phase": "OPEN", "submissions": 15, "averageScore": 58, "duplicatedFrom": null,
+  "materials": [
+    { "id": 801, "type": "LISTENING", "title": "Thông báo ở sân bay", "audioUrl": "/media/tests/801.mp3", "text": null },
+    { "id": 802, "type": "READING", "title": "Hanoi", "audioUrl": null, "text": "Hanoi is the capital of Vietnam. …" }
+  ],
   "questions": [{
-    "id": 1001, "skill": "READING", "type": "MULTIPLE_CHOICE", "points": 1, "audioUrl": null,
-    "content": "Choose the correct form: She ___ (live) in Hanoi for five years.",
-    "options": [{ "id": 1, "text": "has lived", "correct": true }], "acceptedAnswers": []
+    "id": 2002, "skill": "READING", "type": "MULTIPLE_CHOICE", "points": 2, "audioUrl": null,
+    "content": "What is Hanoi known for?", "materialId": 802, "vocabularyId": null,
+    "options": [{ "id": 20021, "text": "Its Old Quarter and lake", "correct": true }], "acceptedAnswers": []
   }]
 }
 ```
 
-`type` của câu: `MULTIPLE_CHOICE`, `FILL_BLANK`, `LISTENING`, `READING`, `SPEAKING`, `WRITING`
-(`test_questions.question_type`). Câu Nói, Viết không có đáp án (AI chấm) trừ khi có `acceptedAnswers`.
-
-### `POST /api/admin/tests/{id}/duplicate`
-
-Thân `{ "title": "Kiểm tra định kỳ — tuần 41", "startDate": "2026-10-04", "endDate": "2026-10-10" }`. Tạo đề mới trạng
-thái nháp, chép toàn bộ câu hỏi. Trả `201` đề mới (dạng `GET` ở trên).
+- `instruction`: hướng dẫn làm bài (`tbl_test.instruction`), có thể `null`.
+- `materials`: tài liệu dùng chung cho một phần (`tbl_test_material`): `LISTENING` có `audioUrl` (bắt buộc), `READING`
+  có `text` (bắt buộc). Câu hỏi dùng tài liệu có `materialId`; câu nghe không dùng tài liệu chung vẫn có thể có
+  `audioUrl` riêng.
+- `type` của câu (theo `tbl_question` của thiết kế): `MULTIPLE_CHOICE`, `FILL_BLANK` (thiết kế gọi là `FILL_IN`),
+  `SPEAKING`, `ESSAY`; kỹ năng nằm ở `skill`. Bản trước trộn kỹ năng vào `type` (`LISTENING`, `READING`, `WRITING`).
+  Kỹ năng và loại đi được với nhau: Nghe, Đọc: trắc nghiệm hoặc điền từ; Viết: trắc nghiệm, điền từ hoặc `ESSAY`; Nói:
+  chỉ `SPEAKING`. `SPEAKING`, `ESSAY` do AI chấm theo thang 10 rồi quy ra `points` của câu, không có đáp án.
+- `vocabularyId`: từ mà câu hỏi được tạo từ đó (`tbl_question.vocabulary_id`), xem `GET /api/admin/vocabulary/{id}/test-question`.
 
 ### `POST /api/admin/tests`, `PUT /api/admin/tests/{id}`
 
-Thân như `GET` (bỏ `id`, `status`, `submissions`, `duplicatedFrom`) cộng `"draft": true|false`. Kiểm tra (sai → `400`):
-tiêu đề bắt buộc; đề định kỳ cần ngày mở và ngày đóng, ngày đóng sau ngày mở; ít nhất một câu hỏi; trắc nghiệm,
-nghe, đọc cần đúng một lựa chọn đúng; điền từ cần đáp án chấp nhận; đề tổng hợp cần đủ bốn kỹ năng.
-**Đề đã có bài nộp** chỉ được đổi tiêu đề, ngày đóng và lời văn câu hỏi; đổi đáp án, điểm, thêm hoặc xóa câu → `409`.
+Thân như `GET` (bỏ `id`, `phase`, `skills`, `questionCount`, `submissions`, `averageScore`, `duplicatedFrom`); tài
+liệu, câu hỏi, lựa chọn mới không có `id`. `POST` có thêm `type`. **Câu hỏi trỏ tới tài liệu bằng `materialIndex`** (vị
+trí trong `materials` của chính thân yêu cầu, từ 0) thay cho `materialId`, vì tài liệu mới chưa có id. `status` khi tạo:
+`DRAFT` hoặc `VISIBLE`; khi sửa thêm `HIDDEN`. Kiểm tra (sai → `400`): tiêu đề 1–200 ký tự; ngày mở, ngày đóng bắt buộc,
+ngày đóng sau ngày mở; ít nhất một câu hỏi; loại câu đúng với kỹ năng (ở trên); trắc nghiệm đúng một lựa chọn đúng;
+điền từ có đáp án chấp nhận; tài liệu nghe có file, tài liệu đọc có nội dung; `materialIndex` trỏ tới tài liệu cùng loại
+với kỹ năng của câu; đề tổng hợp cần đủ bốn kỹ năng.
+
+**Đề đã có bài nộp** (KB 24 nhánh 2a) chỉ được đổi tiêu đề, ngày đóng và chuyển giữa `VISIBLE` và `HIDDEN`. Đổi bất kỳ
+thứ gì khác, **kể cả lời văn câu hỏi**, `skillText`, `instruction`, tài liệu, hoặc đưa về `DRAFT` → `409`. Bản trước cho
+sửa lời văn; nay khóa để điểm của các bài đã nộp luôn khớp với đề.
+
+### `DELETE /api/admin/tests/{id}`
+
+KB 24 nhánh 2b, cùng mẫu với xóa bài tập: đề đã có bài nộp → chuyển `HIDDEN` (người học không thấy đề, lịch sử kiểm tra
+giữ nguyên); chưa có → xóa hẳn. Trả `200` `{ "result": "HIDDEN" | "DELETED" }`.
+
+### `POST /api/admin/tests/{id}/duplicate`
+
+Thân `{ "title": "Kiểm tra định kỳ — tuần 41", "startDate": "2026-10-04", "endDate": "2026-10-10" }` (đề tổng hợp cũng
+gửi ngày). Tạo đề mới `DRAFT`, chép `skillText`, `instruction`, tài liệu và toàn bộ câu hỏi (không chép bài nộp). Trả
+`201` đề mới (dạng `GET` ở trên).
+
+### `GET /api/admin/vocabulary/{id}/test-question`
+
+KB 24 bước 6, nút "Thêm câu hỏi từ kho từ vựng": trả một câu trắc nghiệm **chưa lưu** tạo từ từ đó, giao diện thêm vào
+đề rồi lưu cùng đề:
+
+```json
+{
+  "skill": "READING", "type": "MULTIPLE_CHOICE", "points": 1, "audioUrl": null, "vocabularyId": 356, "materialIndex": null,
+  "content": "___ officers checked our bags at the airport.",
+  "options": [{ "text": "Customs", "correct": true }, { "text": "Luggage", "correct": false }, { "text": "Departure", "correct": false }, { "text": "Itinerary", "correct": false }],
+  "acceptedAnswers": []
+}
+```
+
+Đề bài là câu ví dụ của từ với từ đó thay bằng `___` (viết hoa lựa chọn nếu chỗ trống đứng đầu câu); từ không có câu
+ví dụ thì hỏi "Which word means “nghĩa”?". Ba lựa chọn nhiễu là ba từ khác (khác chữ, khác nghĩa) cùng chủ đề, chưa ẩn.
+Từ không tồn tại hoặc đã ẩn → `404`; chủ đề không đủ ba từ khác → `422`.
 
 ## Người dùng (module `user`, Hồng)
 
@@ -338,7 +388,9 @@ hoặc lưu thời điểm khóa và từ chối token cấp trước đó); đ�
 | `vocabulary` | `status VARCHAR(20) NOT NULL DEFAULT 'visible'` (`visible`/`hidden`, chữ thường như các enum khác của DB hiện tại) | Ẩn thay cho xóa (kịch bản 21); `tbl_vocabulary.status` của thiết kế |
 | `exercise_lessons` | giá trị `archived` của `publication_status` đổi thành `hidden` | Cùng tên với thiết kế (`tbl_exercise_lesson.status`) |
 | `topics` | `updated_at TIMESTAMPTZ NULL` | Cột "Cập nhật" |
-| `tests` | `draft BOOLEAN NOT NULL DEFAULT FALSE` | Đề nháp (kịch bản 24) |
+| `tests` | Mới: `status VARCHAR(20) NOT NULL DEFAULT 'DRAFT'` (`DRAFT`/`VISIBLE`/`HIDDEN`, chữ hoa như `tests.type`), `instruction TEXT NULL`. Đã có `skill VARCHAR(100)` (dùng cho `skillText`; thiết kế để 200). `start_date`, `end_date` thành `NOT NULL` cho cả đề tổng hợp | Trạng thái, ẩn đề, hướng dẫn (KB 24); như `tbl_test` |
+| `test_materials` (mới) | `id`, `test_id → tests ON DELETE CASCADE`, `type` (`LISTENING`/`READING`), `title`, `audio_url`, `text`; CHECK nghe có audio, đọc có text | Tài liệu dùng chung (KB 24 nhánh 5a); như `tbl_test_material` |
+| `test_questions` | `material_id BIGINT NULL → test_materials`; `question_type` còn `MULTIPLE_CHOICE`, `FILL_BLANK`, `SPEAKING`, `ESSAY`: chuyển `LISTENING`, `READING` → `MULTIPLE_CHOICE` (hoặc `FILL_BLANK` nếu không có lựa chọn), `WRITING` → `FILL_BLANK` nếu có đáp án chấp nhận, không thì `ESSAY`; kỹ năng đã nằm ở cột `skill` | Loại câu theo thiết kế |
 | `users` | `last_active_at TIMESTAMPTZ NULL` | "Hoạt động gần nhất" |
 
 ## Câu hỏi mở
@@ -361,6 +413,10 @@ hoặc lưu thời điểm khóa và từ chối token cấp trước đó); đ�
 - **Người dùng (KB 25):** `stats` thêm `chatSessions`, `lastChatDate` cho thẻ "Phiên chat".
 - **Từ vựng (KB 21):** `questionCount`, `openTests` cho mỗi từ; từ có câu hỏi tham chiếu cũng chỉ bị ẩn; từ ẩn ra khỏi
   cả phiên ôn từ đến hạn.
+- **Đề kiểm tra (KB 24):** `status` `DRAFT`/`VISIBLE`/`HIDDEN` + `phase` thay `draft` và trạng thái tính sẵn; `DELETE`
+  (ẩn hoặc xóa); `skillText`, `instruction`; đề tổng hợp có ngày; `materials` + `materialIndex`/`materialId`; loại câu
+  `MULTIPLE_CHOICE`/`FILL_BLANK`/`SPEAKING`/`ESSAY` tách khỏi kỹ năng; khóa cả lời văn khi đã có bài nộp;
+  `GET /api/admin/vocabulary/{id}/test-question`; AI chấm theo thang 10.
 - **Bài tập (KB 23):** kỹ năng `READING`, `WRITING` thay `GRAMMAR`; `readingPassages` và `passageIndex`/`passageId`; câu
   viết `TRANSLATION`/`REWRITE`/`KEYWORD_SENTENCE` với `starter`, `sampleAnswers`; bài mới được tạo ở `PUBLISHED`; câu mẫu
   phát âm bắt buộc IPA và âm thanh mẫu (`issues` thêm `INCOMPLETE_ITEMS`); `passageCount` trong danh sách; xóa ngay ở

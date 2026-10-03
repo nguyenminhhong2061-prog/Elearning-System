@@ -150,8 +150,9 @@ const megabytes = (bytes) => `${Math.round(bytes / (1024 * 1024))} MB`
  * @param {boolean} [props.allowUrl] show "Hoặc dán đường dẫn"
  * @param {string} [props.urlError]
  * @param {string} [props.error] the file is required and missing
+ * @param {boolean} [props.disabled] the file can only be listened to (a test with submissions)
  */
-export function MediaPicker({ kind, label, value, onChange, maxBytes, emptyTitle, emptyNote, allowUrl = false, urlError, urlProps, error }) {
+export function MediaPicker({ kind, label, value, onChange, maxBytes, emptyTitle, emptyNote, allowUrl = false, urlError, urlProps, error, disabled = false }) {
   const media = MEDIA[kind]
   const inputRef = useRef(null)
   const upload = useUploadMedia()
@@ -214,7 +215,7 @@ export function MediaPicker({ kind, label, value, onChange, maxBytes, emptyTitle
             </>
           )}
         </div>
-        <div className="flex flex-none items-center gap-2">
+        <div className={cx('flex flex-none items-center gap-2', disabled && 'hidden')}>
           {hasFile && (
             <button
               type="button"
@@ -241,7 +242,7 @@ export function MediaPicker({ kind, label, value, onChange, maxBytes, emptyTitle
           {problem ?? error}
         </p>
       )}
-      {allowUrl && (
+      {allowUrl && !disabled && (
         <InputField
           label={kind === 'AUDIO' ? 'Hoặc dán đường dẫn audio' : 'Hoặc dán đường dẫn ảnh'}
           type="url"

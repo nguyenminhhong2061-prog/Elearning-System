@@ -1,4 +1,5 @@
 import { addDays } from '../src/lib/dates.js'
+import { listeningAudioUrl } from './media.js'
 import { MOCK_WORDS } from './vocabularyFixtures.js'
 
 // Sample data of the admin area for `npm run dev:mock` (docs/api/admin.md): the learners of the users page and the
@@ -156,24 +157,27 @@ export function learnerDetail(learner, today) {
 
 // --- Tests -------------------------------------------------------------------------------------------------------------
 
-const choice = (id, skill, content, options, correctIndex, type = 'MULTIPLE_CHOICE', points = 1) => ({
+// Question types follow the design (skill + type): MULTIPLE_CHOICE, FILL_BLANK, SPEAKING and ESSAY (AI graded).
+const choice = (id, skill, content, options, correctIndex, { points = 1, materialId = null } = {}) => ({
   id,
   skill,
-  type,
+  type: 'MULTIPLE_CHOICE',
   points,
   audioUrl: null,
   vocabularyId: null,
+  materialId,
   content,
   options: options.map((text, index) => ({ id: id * 10 + index + 1, text, correct: index === correctIndex })),
   acceptedAnswers: [],
 })
-const text = (id, skill, content, accepted, type = 'FILL_BLANK', points = 1) => ({
+const text = (id, skill, content, accepted, { type = 'FILL_BLANK', points = 1 } = {}) => ({
   id,
   skill,
   type,
   points,
   audioUrl: null,
   vocabularyId: null,
+  materialId: null,
   content,
   options: [],
   acceptedAnswers: accepted,
@@ -209,12 +213,25 @@ function olderWeek(base) {
   ]
 }
 
+/** Shared materials of the comprehensive test (tbl_test_material): an announcement to listen to and a text to read. */
+const COMPREHENSIVE_MATERIALS = [
+  { id: 801, type: 'LISTENING', title: 'Thông báo ở sân bay', audioUrl: listeningAudioUrl(12), text: null },
+  {
+    id: 802,
+    type: 'READING',
+    title: 'Hanoi',
+    audioUrl: null,
+    text: 'Hanoi is the capital of Vietnam. It is known for its Old Quarter and Hoan Kiem Lake.\n\nThe Museum of Ethnology opens at 8.30 a.m. and closes at 5 p.m. every day except Monday.',
+  },
+]
+
 const COMPREHENSIVE_QUESTIONS = [
-  choice(2001, 'LISTENING', 'Announcement: "Flight VN209 is now boarding at Gate 5. All passengers should proceed to the gate." Question: What should passengers do?', ['Go to Gate 5', 'Wait at the check-in counter', 'Collect luggage', 'Leave the airport'], 0, 'LISTENING', 2),
-  choice(2002, 'READING', 'Read the text: "Hanoi is the capital of Vietnam. It is known for its Old Quarter and Hoan Kiem Lake." Question: What is Hanoi known for?', ['Its beaches', 'Its Old Quarter and lake', 'Its mountains', 'Its desert'], 1, 'READING', 2),
-  text(2003, 'WRITING', 'Complete the sentence with a reason: I stayed home ___ it was raining.', ['because'], 'WRITING', 2),
-  { ...text(2004, 'SPEAKING', 'Read this sentence aloud: "Sustainability is a shared responsibility."', [], 'SPEAKING', 5) },
-  choice(2005, 'READING', 'Read the text: "The museum opens at 9 a.m. and closes at 5 p.m. every day except Monday." Question: When is the museum closed?', ['Monday', 'Tuesday', 'Sunday', 'Every day'], 0, 'READING', 2),
+  choice(2001, 'LISTENING', 'What should passengers do?', ['Go to Gate 5', 'Wait at the check-in counter', 'Collect luggage', 'Leave the airport'], 0, { points: 2, materialId: 801 }),
+  choice(2002, 'READING', 'What is Hanoi known for?', ['Its beaches', 'Its Old Quarter and lake', 'Its mountains', 'Its desert'], 1, { points: 2, materialId: 802 }),
+  text(2003, 'WRITING', 'Complete the sentence with a reason: I stayed home ___ it was raining.', ['because'], { points: 2 }),
+  text(2004, 'SPEAKING', 'Read this sentence aloud: "Sustainability is a shared responsibility."', [], { type: 'SPEAKING', points: 5 }),
+  choice(2005, 'READING', 'When is the museum closed?', ['Monday', 'Tuesday', 'Sunday', 'Every day'], 0, { points: 2, materialId: 802 }),
+  text(2006, 'WRITING', 'Write two or three sentences about your last holiday.', [], { type: 'ESSAY', points: 5 }),
 ]
 
 /** ISO week number of a "YYYY-MM-DD" date (the tests are named after the week they close in). */
@@ -227,9 +244,19 @@ export function isoWeek(isoDate) {
   return 1 + Math.round((date - firstThursday) / (7 * 24 * 3600 * 1000))
 }
 
+const WEEKLY = { skillText: 'Từ vựng và ngữ pháp', instruction: 'Chọn đáp án đúng hoặc điền từ vào chỗ trống. Câu bỏ trống tính là sai.' }
+
+/** First and last day of the month of a "YYYY-MM-DD" date. */
+function monthOf(isoDate) {
+  const [year, month] = isoDate.split('-').map(Number)
+  const last = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  const prefix = isoDate.slice(0, 8)
+  return { startDate: `${prefix}01`, endDate: `${prefix}${String(last).padStart(2, '0')}`, month, year }
+}
+
 /**
  * The tests of the mock: the open weekly test (opened 3 days ago for 7 days, like the seed), the two before it, and
- * the comprehensive test, which is always open.
+ * this month's comprehensive test (open for the whole month, scenario 24 branch 5a).
  */
 export function buildTests(today) {
   const start = addDays(today, -3)
@@ -241,27 +268,33 @@ export function buildTests(today) {
       id,
       title: `Kiểm tra định kỳ — tuần ${isoWeek(endDate)}`,
       type: 'PERIODIC',
+      ...WEEKLY,
       startDate,
       endDate,
-      draft: false,
+      status: 'VISIBLE',
       submissions,
       averageScore,
       duplicatedFrom: null,
+      materials: [],
       questions,
     }
   }
+  const month = monthOf(today)
   return [
     periodic(100, 0, WEEK_40_QUESTIONS, 28, 72),
     {
       id: 200,
-      title: 'Kiểm tra tổng hợp tháng 9',
+      title: `Kiểm tra tổng hợp tháng ${month.month}/${month.year}`,
       type: 'COMPREHENSIVE',
-      startDate: null,
-      endDate: null,
-      draft: false,
+      skillText: 'Nghe, nói, đọc, viết',
+      instruction: 'Làm lần lượt bốn phần. Phần Nói ghi âm câu trả lời; phần Nói và câu viết tự luận do trợ lý AI chấm.',
+      startDate: month.startDate,
+      endDate: month.endDate,
+      status: 'VISIBLE',
       submissions: 15,
       averageScore: 58,
       duplicatedFrom: null,
+      materials: COMPREHENSIVE_MATERIALS,
       questions: COMPREHENSIVE_QUESTIONS,
     },
     periodic(99, 1, [...olderWeek(990), souvenirQuestion(996)], 31, 69),

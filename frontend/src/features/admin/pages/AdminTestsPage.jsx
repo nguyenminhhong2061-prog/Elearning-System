@@ -3,18 +3,20 @@ import { Link } from 'react-router'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { LoadError } from '@/components/ui/LoadError'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { Tag } from '@/components/ui/Tag'
 import { paths } from '@/config/paths'
-import { addDays, formatDayMonth } from '@/lib/dates'
+import { formatDayMonth } from '@/lib/dates'
 import { cx } from '@/lib/cx'
 import { formatCount } from '@/lib/format'
 import { useAdminTests } from '../api/testsQueries'
 import { AdminPage } from '../components/AdminPage'
 import { InlineSelect, RowAction, Segmented, TABLE, TableCard, TD, TH } from '../components/controls'
 import { TEST_SKILL_LABELS } from '../constants'
-import { daysUntil, formatDateRange, isoWeek } from '../utils/format'
+import { formatDateRange, isoWeek } from '../utils/format'
+import { DeleteTestDialog } from '../components/tests/DeleteTestDialog'
 import { DuplicateTestDialog } from '../components/tests/DuplicateTestDialog'
-import { nextWeek } from '../utils/testDraft'
+import { TestSchedule } from '../components/tests/TestSchedule'
+import { TestStatusTag } from '../components/tests/TestStatusTag'
+import { displayStatus, nextWeek } from '../utils/testDraft'
 import { useUrlFilters } from '../hooks/useUrlFilters'
 
 const STATUS_OPTIONS = [
@@ -23,37 +25,23 @@ const STATUS_OPTIONS = [
   { value: 'UPCOMING', label: 'Sắp mở' },
   { value: 'OPEN', label: 'Đang mở' },
   { value: 'CLOSED', label: 'Đã đóng' },
+  { value: 'HIDDEN', label: 'Đã ẩn' },
 ]
 
-function statusTag(test) {
-  switch (test.status) {
-    case 'OPEN': {
-      if (!test.endDate) return <Tag variant="success">Đang mở</Tag>
-      const left = daysUntil(test.endDate)
-      return <Tag variant="success">Đang mở · {left === 0 ? 'đóng hôm nay' : `còn ${left} ngày`}</Tag>
-    }
-    case 'UPCOMING':
-      return <Tag variant="brand">Sắp mở</Tag>
-    case 'DRAFT':
-      return <Tag variant="warning">Nháp</Tag>
-    default:
-      return <Tag variant="neutral">Đã đóng</Tag>
-  }
-}
-
-/** Scenario 24, step 2: every test, the warning about next week's missing weekly test, and the schedule. */
+/** Scenario 24, step 2 and branch 2b: every test, the warning about next week's missing weekly test, and the schedule. */
 export function AdminTestsPage() {
   const [filters, setFilters] = useUrlFilters({ type: '', status: '' })
   const tests = useAdminTests()
   const [duplicating, setDuplicating] = useState(null) // { source, week }
+  const [deleting, setDeleting] = useState(null)
 
   const all = tests.data ?? []
-  const shown = all.filter((test) => (!filters.type || test.type === filters.type) && (!filters.status || test.status === filters.status))
+  const shown = all.filter((test) => (!filters.type || test.type === filters.type) && (!filters.status || displayStatus(test) === filters.status))
   const periodic = all.filter((test) => test.type === 'PERIODIC')
-  const openPeriodic = periodic.filter((test) => test.status === 'OPEN').length
+  const openPeriodic = periodic.filter((test) => displayStatus(test) === 'OPEN').length
   const comprehensive = all.filter((test) => test.type === 'COMPREHENSIVE').length
   const week = tests.data ? nextWeek(all) : null
-  const weekTaken = week && periodic.some((test) => test.status !== 'DRAFT' && test.startDate >= week.weekStart && test.startDate <= week.weekEnd)
+  const weekTaken = week && periodic.some((test) => test.status === 'VISIBLE' && test.startDate >= week.weekStart && test.startDate <= week.weekEnd)
   const weekDraft = week && !weekTaken ? periodic.find((test) => test.status === 'DRAFT' && test.startDate >= week.weekStart && test.startDate <= week.weekEnd) : null
 
   return (
@@ -149,18 +137,23 @@ export function AdminTestsPage() {
                       <Link to={paths.adminTest(test.id)} className="text-sm font-semibold">
                         {test.title}
                       </Link>
-                      <span className="text-xs text-muted-strong">{test.type === 'PERIODIC' ? 'Định kỳ' : 'Tổng hợp 4 kỹ năng · đổi trình độ người học'}</span>
+                      <span className="text-xs text-muted-strong">
+                        {test.type === 'PERIODIC' ? 'Định kỳ' : 'Tổng hợp 4 kỹ năng · đổi trình độ người học'}
+                        {test.skillText && ` · ${test.skillText}`}
+                      </span>
                     </div>
                   </td>
-                  <td className={cx(TD, 'whitespace-nowrap')}>{test.startDate ? formatDateRange(test.startDate, test.endDate) : 'Luôn mở'}</td>
-                  <td className={TD}>{statusTag(test)}</td>
+                  <td className={cx(TD, 'whitespace-nowrap')}>{formatDateRange(test.startDate, test.endDate)}</td>
+                  <td className={TD}>
+                    <TestStatusTag test={test} />
+                  </td>
                   <td className={cx(TD, 'text-ink-soft')}>
                     {test.questionCount} câu{test.skills.length > 0 && ` · ${test.skills.map((skill) => TEST_SKILL_LABELS[skill]).join(', ')}`}
                   </td>
                   <td className={cx(TD, 'text-right')}>{formatCount(test.submissions)}</td>
                   <td className={cx(TD, 'text-right')}>{test.averageScore ?? '—'}</td>
                   <td className={cx(TD, 'text-right whitespace-nowrap')}>
-                    {test.status !== 'CLOSED' && (
+                    {displayStatus(test) !== 'CLOSED' && (
                       <Link to={paths.adminTest(test.id)} aria-label={`Sửa ${test.title}`} className="inline-block px-2.5 py-1.5 text-label font-bold">
                         Sửa
                       </Link>
@@ -168,6 +161,11 @@ export function AdminTestsPage() {
                     <RowAction onClick={() => setDuplicating({ source: test, week: null })} aria-label={`Nhân bản ${test.title}`}>
                       Nhân bản
                     </RowAction>
+                    {test.status !== 'HIDDEN' && (
+                      <RowAction tone="danger" onClick={() => setDeleting(test)} aria-label={`Xóa ${test.title}`}>
+                        Xóa
+                      </RowAction>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -176,55 +174,10 @@ export function AdminTestsPage() {
         </TableCard>
       )}
 
-      {tests.data && <Schedule tests={periodic} />}
+      {tests.data && <TestSchedule tests={periodic} />}
 
       <DuplicateTestDialog source={duplicating?.source ?? null} week={duplicating?.week} onClose={() => setDuplicating(null)} />
+      <DeleteTestDialog test={deleting} onClose={() => setDeleting(null)} />
     </AdminPage>
-  )
-}
-
-/** Two weeks back, the current week and two ahead: which weekly test covers each, or none yet. */
-function Schedule({ tests }) {
-  const scheduled = tests.filter((test) => test.status !== 'DRAFT' && test.endDate).toSorted((a, b) => a.endDate.localeCompare(b.endDate))
-  if (scheduled.length === 0) return null
-  const rows = scheduled.slice(-3).map((test) => ({ key: test.id, week: isoWeek(test.endDate), start: test.startDate, end: test.endDate, test }))
-  let lastEnd = scheduled.at(-1).endDate
-  for (let step = 0; step < 2; step += 1) {
-    const start = addDays(lastEnd, 1)
-    const end = addDays(lastEnd, 7)
-    const draft = tests.find((test) => test.status === 'DRAFT' && test.startDate >= start && test.startDate <= end)
-    rows.push({ key: `gap-${start}`, week: isoWeek(end), start, end, draft })
-    lastEnd = end
-  }
-
-  const label = (row) => {
-    if (row.test) return row.test.status === 'OPEN' ? ['Đang mở', 'text-success'] : row.test.status === 'UPCOMING' ? ['Sắp mở', 'text-brand-dark'] : ['Đã đóng', 'text-muted-strong']
-    return row.draft ? ['Bản nháp', 'text-warning'] : ['Chưa có đề', 'text-danger']
-  }
-
-  return (
-    <section aria-labelledby="schedule-title" className="flex flex-col gap-3.5 rounded-xl border border-line bg-white px-5.5 py-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="schedule-title" className="text-base font-bold text-ink">
-          Lịch đề định kỳ
-        </h2>
-        <span className="text-label text-muted-strong">Mỗi tuần một đề, mở 7 ngày</span>
-      </div>
-      <ol className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-5">
-        {rows.map((row) => {
-          const [text, tone] = label(row)
-          const missing = !row.test && !row.draft
-          return (
-            <li key={row.key} className={cx('flex flex-col gap-1 rounded-[10px] border px-3.5 py-3', missing ? 'border-dashed border-danger-solid/50 bg-danger-bg/40' : 'border-line bg-surface-alt')}>
-              <span className="text-label font-bold text-ink">Tuần {row.week}</span>
-              <span className="text-xs text-muted-strong">
-                {formatDayMonth(row.start)} – {formatDayMonth(row.end)}
-              </span>
-              <span className={cx('text-xs font-semibold', tone)}>{text}</span>
-            </li>
-          )
-        })}
-      </ol>
-    </section>
   )
 }

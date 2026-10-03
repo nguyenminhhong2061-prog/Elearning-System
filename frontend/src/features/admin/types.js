@@ -129,13 +129,18 @@
  */
 
 /**
+ * A test of the list. `status` is the stored one (the design's TestStatus); `phase` says where its dates stand today,
+ * so a shown (VISIBLE) test is "Sắp mở", "Đang mở" or "Đã đóng".
+ *
  * @typedef {object} AdminTestSummary
  * @property {number} id
  * @property {string} title
  * @property {'PERIODIC' | 'COMPREHENSIVE'} type
- * @property {string | null} startDate
- * @property {string | null} endDate
- * @property {'DRAFT' | 'UPCOMING' | 'OPEN' | 'CLOSED'} status
+ * @property {string | null} skillText what the test covers ("Từ vựng và ngữ pháp"), tbl_test.skill of the design
+ * @property {string} startDate
+ * @property {string} endDate
+ * @property {'DRAFT' | 'VISIBLE' | 'HIDDEN'} status
+ * @property {'UPCOMING' | 'OPEN' | 'CLOSED'} phase
  * @property {number} questionCount
  * @property {TestSkill[]} skills
  * @property {number} submissions
@@ -143,19 +148,38 @@
  */
 
 /**
- * @typedef {object} AdminTestQuestion
+ * Listening or reading material shared by several questions of a part (tbl_test_material).
+ *
+ * @typedef {object} AdminTestMaterial
  * @property {number} [id]
- * @property {TestSkill} skill
- * @property {'MULTIPLE_CHOICE' | 'FILL_BLANK' | 'LISTENING' | 'READING' | 'SPEAKING' | 'WRITING'} type
- * @property {number} points
- * @property {string | null} audioUrl
- * @property {string} content
- * @property {{ id?: number, text: string, correct: boolean }[]} options
- * @property {string[]} acceptedAnswers
+ * @property {'LISTENING' | 'READING'} type
+ * @property {string | null} title
+ * @property {string | null} audioUrl LISTENING only
+ * @property {string | null} text READING only
  */
 
 /**
- * @typedef {AdminTestSummary & { questions: AdminTestQuestion[], duplicatedFrom: { id: number, title: string } | null }} AdminTest
+ * A question of a test. In GET it points at its material by `materialId`; in POST/PUT by `materialIndex`, the
+ * material's place in `materials` of the same body (a new material has no id yet).
+ *
+ * @typedef {object} AdminTestQuestion
+ * @property {number} [id]
+ * @property {TestSkill} skill
+ * @property {'MULTIPLE_CHOICE' | 'FILL_BLANK' | 'SPEAKING' | 'ESSAY'} type SPEAKING and ESSAY are graded by the AI
+ * @property {number} points
+ * @property {string | null} audioUrl LISTENING only, when the question has its own audio
+ * @property {string} content
+ * @property {{ id?: number, text: string, correct: boolean }[]} options
+ * @property {string[]} acceptedAnswers
+ * @property {number | null} vocabularyId the word the question was made from
+ * @property {number | null} [materialId]
+ * @property {number | null} [materialIndex]
+ */
+
+/**
+ * @typedef {AdminTestSummary & {
+ *   instruction: string | null, materials: AdminTestMaterial[], questions: AdminTestQuestion[], duplicatedFrom: { id: number, title: string } | null,
+ * }} AdminTest
  */
 
 /**
