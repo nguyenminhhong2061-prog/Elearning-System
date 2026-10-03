@@ -50,6 +50,19 @@ describe('admin mock API', () => {
     expect(call('GET', '/api/admin/vocabulary?q=passport').totalItems).toBe(0)
   })
 
+  it('counts the test questions made from a word and keeps a word they use (scenario 21)', () => {
+    const [souvenir] = call('GET', '/api/admin/vocabulary?q=souvenir').items
+    expect(souvenir).toMatchObject({ questionCount: 2, openTests: [{ id: 100, title: 'Kiểm tra định kỳ — tuần 40' }] })
+    const unused = call('POST', '/api/vocabulary', { body: { topicId: 2, word: 'visa', meaning: 'thị thực', difficultyLevel: 'B1' } })
+    expect(unused).toMatchObject({ learnerCount: 0, listCount: 0, questionCount: 0, openTests: [] })
+
+    const question = { skill: 'READING', type: 'MULTIPLE_CHOICE', points: 1, content: 'You need a ___ to enter some countries.', vocabularyId: unused.id }
+    const options = [{ text: 'visa', correct: true }, { text: 'souvenir', correct: false }]
+    call('POST', '/api/admin/tests', { body: { type: 'PERIODIC', title: 'Nháp', startDate: '2026-10-12', endDate: '2026-10-18', draft: true, questions: [{ ...question, options }] } })
+    expect(call('GET', '/api/admin/vocabulary?q=visa').items[0]).toMatchObject({ questionCount: 1, openTests: [] })
+    expect(call('DELETE', `/api/vocabulary/${unused.id}`)).toEqual({ result: 'HIDDEN' })
+  })
+
   it('does not delete a topic that still has words', () => {
     expect(statusOf(() => call('DELETE', '/api/topics/2'))).toBe(409)
     expect(statusOf(() => call('DELETE', '/api/topics/6'))).toBe(200)

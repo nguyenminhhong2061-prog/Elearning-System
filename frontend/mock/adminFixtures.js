@@ -1,4 +1,5 @@
 import { addDays } from '../src/lib/dates.js'
+import { MOCK_WORDS } from './vocabularyFixtures.js'
 
 // Sample data of the admin area for `npm run dev:mock` (docs/api/admin.md): the learners of the users page and the
 // tests of the tests page. Everything is dated relative to today, so the pages look the same whenever they are opened
@@ -161,6 +162,7 @@ const choice = (id, skill, content, options, correctIndex, type = 'MULTIPLE_CHOI
   type,
   points,
   audioUrl: null,
+  vocabularyId: null,
   content,
   options: options.map((text, index) => ({ id: id * 10 + index + 1, text, correct: index === correctIndex })),
   acceptedAnswers: [],
@@ -171,18 +173,29 @@ const text = (id, skill, content, accepted, type = 'FILL_BLANK', points = 1) => 
   type,
   points,
   audioUrl: null,
+  vocabularyId: null,
   content,
   options: [],
   acceptedAnswers: accepted,
 })
 
-/** The five questions of the seeded "tuần 40" test (V202610010910__seed_tests.sql). */
+/** A question made from a word of the bank (scenario 24, step 6): "souvenir" is used by two tests, as in scenario 21. */
+function souvenirQuestion(id) {
+  const souvenir = MOCK_WORDS.find((word) => word.word === 'souvenir')
+  return {
+    ...choice(id, 'READING', 'Tourists often buy a ___ to remember their trip.', ['souvenir', 'passport', 'luggage', 'departure'], 0),
+    vocabularyId: souvenir.id,
+  }
+}
+
+/** The five questions of the seeded "tuần 40" test (V202610010910__seed_tests.sql), plus one from the word bank. */
 const WEEK_40_QUESTIONS = [
   choice(1001, 'READING', 'Choose the correct form: She ___ (live) in Hanoi for five years.', ['lives', 'has lived', 'is living', 'lived'], 1),
   choice(1002, 'READING', 'Choose the correct form: If it ___ tomorrow, we will stay home.', ['rains', 'rained', 'will rain', 'raining'], 0),
   text(1003, 'WRITING', 'I have never ___ (see) such a beautiful beach.', ['seen']),
   text(1004, 'WRITING', 'They ___ (go) to the cinema last night.', ['went']),
   choice(1005, 'READING', 'Choose the correct word: She has worked here ___ 2010.', ['since', 'for', 'during', 'from'], 0),
+  souvenirQuestion(1006),
 ]
 
 /** Earlier weeks: the same kind of questions with other sentences. */
@@ -251,7 +264,7 @@ export function buildTests(today) {
       duplicatedFrom: null,
       questions: COMPREHENSIVE_QUESTIONS,
     },
-    periodic(99, 1, olderWeek(990), 31, 69),
+    periodic(99, 1, [...olderWeek(990), souvenirQuestion(996)], 31, 69),
     periodic(98, 2, olderWeek(980), 22, 74),
   ]
 }

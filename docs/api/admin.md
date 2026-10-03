@@ -123,13 +123,16 @@ tối đa 50.
   "items": [{
     "id": 105, "topicId": 2, "word": "luggage", "phonetic": "/ˈlʌɡɪdʒ/", "meaning": "hành lý",
     "exampleSentence": null, "audioUrl": null, "imageUrl": null, "difficultyLevel": "A2",
-    "learnerCount": 14, "listCount": 3, "updatedAt": "2026-09-25T03:00:00Z"
+    "learnerCount": 14, "listCount": 3, "questionCount": 0, "openTests": [], "updatedAt": "2026-09-25T03:00:00Z"
   }],
   "page": 0, "size": 10, "totalItems": 22, "totalPages": 3
 }
 ```
 
 `learnerCount`: số người học có từ này trong `user_vocabulary`. `listCount`: số danh sách riêng chứa từ.
+`questionCount`: số câu hỏi đề kiểm tra tạo từ từ này (`test_questions.vocabulary_id`), cột "Câu hỏi tham chiếu" (KB 21
+bước 4). `openTests`: các đề **đang mở** trong số đó, `[{ "id": 100, "title": "Kiểm tra định kỳ — tuần 40" }]`, để hộp
+thoại xóa nêu tên đề (KB 21 nhánh 6b).
 
 ### `POST /api/vocabulary`, `PUT /api/vocabulary/{id}` (đã có) — luật mới
 
@@ -138,9 +141,10 @@ Thân như hiện tại: `topicId`, `word`, `phonetic`, `meaning`, `exampleSente
 
 ### `DELETE /api/vocabulary/{id}` (đã có) — đổi cách trả lời
 
-Từ đã có người học hoặc nằm trong danh sách riêng thì **ẩn** (`status` = `HIDDEN`, như `tbl_vocabulary.status` của thiết
-kế; giao diện admin gọi là "Lưu trữ"): không còn xuất hiện trong phiên học, trò chơi, tìm kiếm và danh sách admin, tiến
-độ cũ giữ nguyên. Từ chưa ai dùng thì xóa hẳn.
+Từ đã có người học, nằm trong danh sách riêng hoặc có câu hỏi kiểm tra tham chiếu thì **ẩn** (`status` = `HIDDEN`, như
+`tbl_vocabulary.status` của thiết kế; giao diện admin gọi là "Lưu trữ"): không còn xuất hiện trong phiên học, phiên ôn
+(kể cả khi đến hạn), trò chơi, tìm kiếm, danh sách riêng của người học và danh sách admin (chi tiết ở mục "Từ bị admin ẩn"
+của `learning.md`); trạng thái học, lượt ôn cũ và nội dung câu hỏi kiểm tra giữ nguyên. Từ chưa ai dùng thì xóa hẳn.
 
 `200` `{ "result": "HIDDEN" }` hoặc `{ "result": "DELETED" }`. Hiện backend luôn xóa hẳn và xóa dây chuyền tiến độ học
 (`ON DELETE CASCADE`): phải sửa trước khi mở chức năng này.
@@ -335,3 +339,5 @@ hoặc lưu thời điểm khóa và từ chối token cấp trước đó); đ�
   `exercisesCompleted` → `exerciseAttempts` (lượt làm bài tập), `topTopics` + `topLessons` → `topContent` (gộp cả đề
   kiểm tra, sắp theo số người học).
 - **Người dùng (KB 25):** `stats` thêm `chatSessions`, `lastChatDate` cho thẻ "Phiên chat".
+- **Từ vựng (KB 21):** `questionCount`, `openTests` cho mỗi từ; từ có câu hỏi tham chiếu cũng chỉ bị ẩn; từ ẩn ra khỏi
+  cả phiên ôn từ đến hạn.

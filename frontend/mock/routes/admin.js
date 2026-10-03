@@ -70,9 +70,21 @@ function usageOf(word) {
 
 const liveWords = () => SYSTEM_WORDS.filter((word) => word.status !== 'HIDDEN')
 
-function toAdminWord(word) {
+/** Test questions made from a word (scenario 21): how many, and the open tests among theirs. */
+function questionsOf(s, wordId, today) {
+  let questionCount = 0
+  const openTests = []
+  for (const test of s.tests) {
+    const count = test.questions.filter((question) => question.vocabularyId === wordId).length
+    questionCount += count
+    if (count > 0 && testStatus(test, today) === 'OPEN') openTests.push({ id: test.id, title: test.title })
+  }
+  return { questionCount, openTests }
+}
+
+function toAdminWord(word, s, today) {
   const { status: _status, createdBy: _createdBy, ...fields } = word
-  return { ...fields, updatedAt: word.updatedAt ?? '2026-09-25T03:00:00Z', ...usageOf(word) }
+  return { ...fields, updatedAt: word.updatedAt ?? '2026-09-25T03:00:00Z', ...usageOf(word), ...questionsOf(s, word.id, today) }
 }
 
 function toAdminTopic(topic) {
@@ -349,6 +361,7 @@ function readTestQuestions(body, s) {
       content: question.content.trim(),
       options: (question.options ?? []).map((option) => ({ id: option.id ?? (s.nextId += 1), text: option.text.trim(), correct: Boolean(option.correct) })),
       acceptedAnswers: (question.acceptedAnswers ?? []).map((answer) => answer.trim()).filter(Boolean),
+      vocabularyId: question.vocabularyId ?? null,
     }
   })
 }
@@ -598,7 +611,7 @@ export const adminRoutes = [
   {
     method: 'GET',
     pattern: /^\/api\/admin\/vocabulary$/,
-    handle: adminOnly(({ searchParams }) => {
+    handle: adminOnly(({ s, today, searchParams }) => {
       const level = searchParams.get('level')
       if (level && !CEFR_LEVELS.includes(level)) throw new HttpError(400, 'level must be one of A1..C2')
       const missing = searchParams.get('missing')
@@ -614,7 +627,7 @@ export const adminRoutes = [
             (!q || word.word.toLocaleLowerCase('vi').includes(q) || word.meaning.toLocaleLowerCase('vi').includes(q)),
         )
         .sort(byLevel)
-        .map(toAdminWord)
+        .map((word) => toAdminWord(word, s, today))
       return paginate(matching, searchParams, { defaultSize: 10, maxSize: 50 })
     }),
   },
@@ -622,29 +635,30 @@ export const adminRoutes = [
     method: 'POST',
     pattern: /^\/api\/vocabulary$/,
     status: 201,
-    handle: adminOnly(({ body, s }) => {
+    handle: adminOnly(({ body, s, today }) => {
       const word = { id: (s.nextId += 1), createdBy: null, ...readWord(body), status: 'VISIBLE', updatedAt: nowIso() }
       SYSTEM_WORDS.push(word)
-      return toAdminWord(word)
+      return toAdminWord(word, s, today)
     }),
   },
   {
     method: 'PUT',
     pattern: /^\/api\/vocabulary\/(\d+)$/,
-    handle: adminOnly(({ body, match }) => {
+    handle: adminOnly(({ body, match, s, today }) => {
       const word = requireWord(id(match))
       Object.assign(word, readWord(body, word.id), { updatedAt: nowIso() })
-      return toAdminWord(word)
+      return toAdminWord(word, s, today)
     }),
   },
   {
     method: 'DELETE',
     pattern: /^\/api\/vocabulary\/(\d+)$/,
     status: 200,
-    handle: adminOnly(({ match }) => {
+    handle: adminOnly(({ match, s, today }) => {
       const word = requireWord(id(match))
       const { learnerCount, listCount } = usageOf(word)
-      if (learnerCount > 0 || listCount > 0) {
+      // Hidden, not deleted, while anything points at it; test questions keep their wording either way.
+      if (learnerCount > 0 || listCount > 0 || questionsOf(s, word.id, today).questionCount > 0) {
         Object.assign(word, { status: 'HIDDEN', updatedAt: nowIso() })
         return { result: 'HIDDEN' }
       }

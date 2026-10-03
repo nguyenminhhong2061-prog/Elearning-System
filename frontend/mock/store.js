@@ -63,9 +63,15 @@ export function allUsers() {
 /** Topic rows; the admin pages add, change and delete entries. */
 export const topics = MOCK_TOPICS.map((topic) => ({ ...topic }))
 
+/**
+ * Whether a word may still be studied. Words admins hid (scenario 21, step 8) keep their history, but sessions, reviews,
+ * games, searches and personal lists leave them out.
+ */
+export const notHidden = (word) => word !== undefined && word.status !== 'HIDDEN'
+
 /** Words a user may see: the shared ones and their own (created in personal lists). Hidden words are left out. */
 export function visibleWords(user) {
-  return [...SYSTEM_WORDS.filter((word) => word.status !== 'HIDDEN'), ...user.customWords]
+  return [...SYSTEM_WORDS.filter(notHidden), ...user.customWords]
 }
 
 /** A word by id, hidden ones included (history and personal lists keep them). */

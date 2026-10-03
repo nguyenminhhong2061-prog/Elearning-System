@@ -30,6 +30,8 @@ const word = (id, text, meaning, overrides = {}) => ({
   difficultyLevel: 'A2',
   learnerCount: 0,
   listCount: 0,
+  questionCount: 0,
+  openTests: [],
   updatedAt: '2026-09-25T03:00:00Z',
   ...overrides,
 })
@@ -37,6 +39,7 @@ const word = (id, text, meaning, overrides = {}) => ({
 const LUGGAGE = word(105, 'luggage', 'hành lý', { phonetic: '/ˈlʌɡɪdʒ/', learnerCount: 14, listCount: 2 })
 const PASSPORT = word(104, 'passport', 'hộ chiếu', { learnerCount: 12, listCount: 3 })
 const VISA = word(130, 'visa', 'thị thực', { difficultyLevel: 'B1' })
+const SOUVENIR = word(207, 'souvenir', 'quà lưu niệm', { difficultyLevel: 'B1', questionCount: 2, openTests: [{ id: 100, title: 'Kiểm tra định kỳ — tuần 40' }] })
 const page = (items) => ({ items, page: 0, size: 10, totalItems: items.length, totalPages: 1 })
 
 const STATS = {
@@ -250,6 +253,21 @@ describe('vocabulary administration', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Xóa vĩnh viễn' }))
     expect(await screen.findByText('Đã xóa vĩnh viễn “visa”.')).toBeInTheDocument()
     expect(callsTo('DELETE /api/vocabulary/130')).toHaveLength(1)
+  })
+
+  it('hides a word only test questions use and names the open test (scenario 21, branch 6b)', async () => {
+    renderAdmin('/admin/vocabulary/topics/2', { 'GET /api/admin/vocabulary': () => ({ data: page([SOUVENIR]) }) })
+    const user = userEvent.setup()
+
+    const row = (await screen.findByText('souvenir')).closest('tr')
+    const headers = screen.getAllByRole('columnheader').map((header) => header.textContent)
+    expect(within(row).getAllByRole('cell')[headers.indexOf('Câu hỏi tham chiếu')]).toHaveTextContent('2')
+
+    await user.click(within(row).getByRole('button', { name: 'Xóa “souvenir”' }))
+    const dialog = screen.getByRole('dialog', { name: 'Xóa từ “souvenir”?' })
+    expect(dialog).toHaveTextContent('Từ “souvenir” được 2 câu hỏi kiểm tra tham chiếu.')
+    expect(dialog).toHaveTextContent('Đề đang mở dùng từ này: Kiểm tra định kỳ — tuần 40. Câu hỏi của đề giữ nguyên nội dung.')
+    expect(within(dialog).getByRole('button', { name: 'Xóa từ' })).toBeInTheDocument()
   })
 
   it('refuses a duplicate topic name and blocks deleting a topic that still has words (scenario 22)', async () => {

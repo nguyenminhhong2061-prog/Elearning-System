@@ -1,6 +1,6 @@
 import { CEFR_LEVELS } from '../../src/api/constants.js'
 import { HttpError, paginate } from '../http.js'
-import { byLevel, countsFor, findWord, toItem } from '../store.js'
+import { byLevel, countsFor, findWord, notHidden, toItem } from '../store.js'
 
 // docs/api/custom-lists.md
 
@@ -19,7 +19,7 @@ function requireList(user, match) {
 }
 
 function listWords(user, list) {
-  return list.wordIds.map((id) => findWord(user, id)).filter(Boolean)
+  return list.wordIds.map((id) => findWord(user, id)).filter(notHidden)
 }
 
 function toList(user, list, today) {

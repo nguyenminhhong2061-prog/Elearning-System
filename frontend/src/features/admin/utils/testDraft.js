@@ -145,6 +145,7 @@ export function testPayload(draft) {
       content: question.content.trim(),
       options: question.mode === 'CHOICE' ? question.options.map(({ id, text, correct }) => ({ id, text: text.trim(), correct })) : [],
       acceptedAnswers: question.mode === 'TEXT' ? question.acceptedAnswers.map((answer) => answer.trim()).filter(Boolean) : [],
+      vocabularyId: question.vocabularyId ?? null,
     })),
   })
 }

@@ -63,7 +63,12 @@
  */
 
 /**
- * @typedef {WordInput & { id: number, learnerCount: number, listCount: number, updatedAt: string | null }} AdminWord
+ * A system word with what uses it: learners, personal lists, and test questions made from it (`openTests`: the open
+ * tests among those).
+ *
+ * @typedef {WordInput & {
+ *   id: number, learnerCount: number, listCount: number, questionCount: number, openTests: { id: number, title: string }[], updatedAt: string | null,
+ * }} AdminWord
  */
 
 /**

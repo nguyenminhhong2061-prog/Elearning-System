@@ -23,24 +23,32 @@ function WarningBox({ children }) {
   )
 }
 
+/** "a, b và c". */
+const joinAnd = (parts) => (parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} và ${parts.at(-1)}`)
+
 /** "đã được 3 người học học và nằm trong 2 danh sách riêng": what keeps a word from being deleted for good. */
 function usageOf(word) {
   const parts = []
   if (word.learnerCount > 0) parts.push(`đã được ${word.learnerCount} người học học`)
   if (word.listCount > 0) parts.push(`nằm trong ${word.listCount} danh sách riêng`)
-  return parts.join(' và ')
+  if (word.questionCount > 0) parts.push(`được ${word.questionCount} câu hỏi kiểm tra tham chiếu`)
+  return joinAnd(parts)
 }
 
+/** Whether a word must be hidden rather than deleted (scenario 21, step 6 and branch 6a). */
+const isWordUsed = (word) => word.learnerCount > 0 || word.listCount > 0 || word.questionCount > 0
+
 /**
- * Scenario 21: a word someone studies (or keeps in a list) is hidden ("Lưu trữ" on screen), an unused one is deleted
- * for good. The server makes the final call; the wording follows the counts the table already shows.
+ * Scenario 21: a word someone studies, keeps in a list or a test question uses is hidden ("Lưu trữ" on screen), an
+ * unused one is deleted for good; branch 6b names the open tests using it. The server makes the final call; the wording
+ * follows the counts the table already shows.
  *
  * @param {{ word: import('../../types').AdminWord | null, onClose: () => void }} props
  */
 export function DeleteWordDialog({ word, onClose }) {
   const remove = useDeleteWord()
   const toast = useToast()
-  const used = word ? word.learnerCount > 0 || word.listCount > 0 : false
+  const used = word ? isWordUsed(word) : false
 
   function close() {
     remove.reset()
@@ -67,10 +75,16 @@ export function DeleteWordDialog({ word, onClose }) {
             <p className="text-sm leading-5.5 text-ink-soft">
               Từ sẽ bị ẩn đối với các lượt học mới; lịch sử học cũ được giữ nguyên. Từ được chuyển vào <strong className="text-ink">Lưu trữ</strong> nên vẫn khôi phục được.
             </p>
+            {word.openTests.length > 0 && (
+              <p className="text-sm leading-5.5 text-ink-soft">
+                Đề đang mở dùng từ này: <strong className="text-ink">{word.openTests.map((test) => test.title).join(', ')}</strong>. Câu hỏi của đề giữ nguyên nội dung.
+              </p>
+            )}
           </>
         ) : (
           <p className="text-sm leading-5.5 text-ink-soft">
-            Chưa có người học nào học từ này và từ không nằm trong danh sách riêng nào. Từ sẽ bị xóa khỏi kho và <strong className="text-ink">không khôi phục được</strong>.
+            Chưa có người học nào học từ này, từ không nằm trong danh sách riêng nào và không có câu hỏi kiểm tra tham chiếu. Từ sẽ bị xóa khỏi kho và{' '}
+            <strong className="text-ink">không khôi phục được</strong>.
           </p>
         ))}
       {remove.isError && <Alert variant="error">{describeApiError(remove.error, 'Chưa xóa được từ. Vui lòng thử lại.')}</Alert>}

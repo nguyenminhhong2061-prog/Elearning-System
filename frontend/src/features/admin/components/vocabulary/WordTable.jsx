@@ -23,7 +23,7 @@ export function WordTable({ label, page, stale, term, topics, onPageChange, onEd
   const topicOf = (id) => topics?.find((topic) => topic.id === id)
   return (
     <TableCard label={label} footer={<Pagination data={page} unit="từ" onPageChange={onPageChange} />}>
-      <table className={cx(TABLE, 'min-w-220', stale && 'opacity-60')}>
+      <table className={cx(TABLE, 'min-w-240', stale && 'opacity-60')}>
         <thead className="bg-surface-alt">
           <tr>
             <th scope="col" className={TH}>Từ</th>
@@ -33,6 +33,7 @@ export function WordTable({ label, page, stale, term, topics, onPageChange, onEd
             <th scope="col" className={TH}>Câu ví dụ</th>
             <th scope="col" className={TH}>Audio</th>
             <th scope="col" className={cx(TH, 'text-right')}>Người học</th>
+            <th scope="col" className={cx(TH, 'text-right')}>Câu hỏi tham chiếu</th>
             <th scope="col" className={cx(TH, 'text-right')}>Thao tác</th>
           </tr>
         </thead>
@@ -73,6 +74,7 @@ export function WordTable({ label, page, stale, term, topics, onPageChange, onEd
                 <td className={TD}>{word.exampleSentence ? <Tag variant="success">Có</Tag> : <Tag variant="warning">Thiếu</Tag>}</td>
                 <td className={TD}>{word.audioUrl ? <Tag variant="success">Có</Tag> : <Tag variant="warning">Thiếu</Tag>}</td>
                 <td className={cx(TD, 'text-right text-ink-soft')}>{word.learnerCount}</td>
+                <td className={cx(TD, 'text-right text-ink-soft')}>{word.questionCount}</td>
                 <td className={cx(TD, 'text-right whitespace-nowrap')}>
                   <RowAction onClick={() => onEdit(word)} aria-label={`Sửa “${word.word}”`}>
                     Sửa
