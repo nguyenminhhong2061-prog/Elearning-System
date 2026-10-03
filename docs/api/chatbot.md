@@ -88,8 +88,11 @@ Trả `201` tin trả lời của AI:
 Nghiệp vụ B4: chat "mang ngữ cảnh bài tập đang làm (câu hỏi, đáp án của người học)". Giao diện chỉ gửi **id**, server tự
 tra nội dung:
 
-- `questionId`: đề, các lựa chọn, đáp án đúng, giải thích (`exercise_questions`, `question_options`, …).
-- `attemptId` + `questionId`: câu trả lời của người học trong lượt đó (`question_responses`), nếu đã trả lời.
+- `questionId`: đề, các lựa chọn, đáp án đúng, giải thích (`exercise_questions`, `question_options`, …). Câu hỏi về bài
+  đọc (02/10): kèm bài đọc (`reading_passages`). Câu viết (02/10): dạng câu, phần mở đầu cho sẵn, các câu trả lời mẫu
+  (`question_sample_answers`).
+- `attemptId` + `questionId`: câu trả lời của người học trong lượt đó (`question_responses`), nếu đã trả lời; với câu
+  viết đã chấm thì kèm điểm và nhận xét của AI (`ai_feedback`). Câu viết chưa trả lời thì chỉ gợi ý, không đưa câu mẫu.
 - `pronunciationItemId` + `attemptId`: câu mẫu, IPA và kết quả chấm gần nhất (`pronunciation_attempts`).
 - `sessionId`: các tin trước trong phiên (giới hạn vài tin gần nhất để tiết kiệm token).
 

@@ -8,10 +8,10 @@ const NOTHING_DONE = { resumed: false, responses: [], pronunciation: [] }
 
 /**
  * The attempt the learner is working on. Opening a lesson picks up the unfinished attempt when the server allows it
- * (grammar, pronunciation) or starts a new one; `progress` says which, and what was already done. `retry` opens the
- * lesson again after a failure (still picking up the unfinished attempt); `restart` always starts afresh ("Làm lại",
- * "Làm lại từ đầu"). While a restart is on its way the previous attempt stays on screen; when it arrives, `round`
- * changes so the exercise can remount fresh (use it as a React key).
+ * (reading, writing, pronunciation) or starts a new one; `progress` says which, and what was already done. `retry`
+ * opens the lesson again after a failure (still picking up the unfinished attempt); `restart` always starts afresh
+ * ("Làm lại", "Làm lại từ đầu"). While a restart is on its way the previous attempt stays on screen; when it arrives,
+ * `round` changes so the exercise can remount fresh (use it as a React key).
  *
  * @param {number} lessonId
  */

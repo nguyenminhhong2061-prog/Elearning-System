@@ -10,14 +10,15 @@ const TICK_MS = 250
  * @param {number | null} options.startedAt epoch ms; null while not running
  * @param {number | null} options.limitSeconds null for games without a limit
  * @param {() => void} options.onExpire called once when the limit is reached
+ * @param {boolean} [options.paused] stops the clock (the caller moves `startedAt` on by the paused time when resuming)
  * @returns {{ elapsedMs: number, remainingMs: number | null }}
  */
-export function useGameClock({ startedAt, limitSeconds, onExpire }) {
+export function useGameClock({ startedAt, limitSeconds, onExpire, paused = false }) {
   const [now, setNow] = useState(() => Date.now())
   const expire = useEffectEvent(onExpire)
 
   useEffect(() => {
-    if (startedAt === null) return undefined
+    if (startedAt === null || paused) return undefined
     let expired = false
     const tick = () => {
       const current = Date.now()
@@ -30,7 +31,7 @@ export function useGameClock({ startedAt, limitSeconds, onExpire }) {
     tick()
     const timer = setInterval(tick, TICK_MS)
     return () => clearInterval(timer)
-  }, [startedAt, limitSeconds])
+  }, [startedAt, limitSeconds, paused])
 
   const elapsedMs = startedAt === null ? 0 : Math.max(0, now - startedAt)
   const remainingMs = limitSeconds === null ? null : Math.max(0, limitSeconds * 1000 - elapsedMs)

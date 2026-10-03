@@ -161,6 +161,25 @@ class CustomListApiTests {
     }
 
     @Test
+    void aLearnerCannotHaveTwoListsWithTheSameName() throws Exception {
+        long interview = createList(LEARNER, "Phỏng vấn", "[]", "[]");
+        long travel = createList(LEARNER, "Du lịch", "[]", "[]");
+
+        // Scenario 7, branch 11a: the same name, ignoring case and spaces around it, is refused on create and rename.
+        as(LEARNER, post("/api/custom-lists").contentType(MediaType.APPLICATION_JSON).content("{\"name\": \"  phỏng VẤN \"}"))
+                .andExpect(status().isConflict());
+        as(LEARNER, put("/api/custom-lists/{id}", travel).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"PHỎNG VẤN\"}"))
+                .andExpect(status().isConflict());
+
+        // Keeping a list's own name, and another learner using the same name, are fine.
+        as(LEARNER, put("/api/custom-lists/{id}", interview).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"Phỏng vấn\"}"))
+                .andExpect(status().isOk());
+        assertThat(createList(OTHER_LEARNER, "Phỏng vấn", "[]", "[]")).isPositive();
+    }
+
+    @Test
     void aListIsOnlyReachableByItsOwner() throws Exception {
         long word = createWord(createTopic("Business"), "invoice", "B2");
         long list = createList(LEARNER, "Mine", "[" + word + "]", "[]");

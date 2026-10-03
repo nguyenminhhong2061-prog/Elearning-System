@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { describeApiError } from '@/api/errorMessages'
+import { useLogoutGuard } from '@/components/layout/logoutGuard'
 import { Page } from '@/components/layout/Page'
 import { Alert } from '@/components/ui/Alert'
 import { Button, ButtonLink } from '@/components/ui/Button'
@@ -11,11 +12,11 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { Tag } from '@/components/ui/Tag'
 import { useAuth } from '@/features/auth/context/useAuth'
 import { cx } from '@/lib/cx'
-import { answerPayload, answersFromSaved, firstUnansweredIndex, isChoice, unansweredQuestions } from '../answers'
+import { answerPayload, answersFromSaved, firstUnansweredIndex, isChoice, testParts, unansweredQuestions } from '../answers'
 import { startAttempt } from '../api/testsApi'
 import { useSubmitAttempt, useTest } from '../api/testsQueries'
 import { QuestionView } from '../components/QuestionView'
-import { ATTEMPT_STATUS, SKILL_LABELS, SKILL_ORDER, TEST_TYPE_LABELS, TEST_TYPES } from '../constants'
+import { ATTEMPT_STATUS, QUESTION_TYPES, SKILL_LABELS, SKILL_ORDER, TEST_TYPE_LABELS, TEST_TYPES } from '../constants'
 import { useAnswerSaver } from '../useAnswerSaver'
 
 const SAVE_TEXT = {
@@ -43,7 +44,48 @@ function SaveStatus({ status, onRetry }) {
   )
 }
 
+/** The numbered buttons, one row per part when the test has several skills ("Nghe 1–10, Nói 11–12…", scenario 15). */
 function QuestionNav({ questions, answers, currentIndex, onGo }) {
+  const parts = testParts(questions)
+  const byPart = parts.length > 1 && parts.every((part) => part.skill && SKILL_LABELS[part.skill])
+
+  function numberButton({ question, index }) {
+    const answered = Boolean(answerPayload(question, answers[question.id]))
+    const current = index === currentIndex
+    return (
+      <button
+        key={question.id}
+        type="button"
+        onClick={() => onGo(index)}
+        aria-current={current ? 'step' : undefined}
+        aria-label={`Câu ${index + 1}${answered ? ' (đã trả lời)' : ''}`}
+        className={cx(
+          'size-9 cursor-pointer rounded-lg border text-label font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand',
+          current
+            ? 'border-brand bg-brand text-white'
+            : answered
+              ? 'border-success-line bg-success-bg text-success'
+              : 'border-line bg-white text-ink-soft hover:border-brand-tint-line',
+        )}
+      >
+        {index + 1}
+      </button>
+    )
+  }
+
+  if (byPart) {
+    return (
+      <nav aria-label="Chuyển câu hỏi" className="flex flex-col gap-2">
+        {parts.map((part) => (
+          <div key={part.items[0].index} role="group" aria-label={`Phần ${SKILL_LABELS[part.skill]}`} className="flex flex-wrap items-center gap-2">
+            <span className="w-10 flex-none text-xs font-semibold text-muted">{SKILL_LABELS[part.skill]}</span>
+            {part.items.map(numberButton)}
+          </div>
+        ))}
+      </nav>
+    )
+  }
+
   return (
     <nav aria-label="Chuyển câu hỏi" className="flex flex-wrap gap-2">
       {questions.map((question, index) => {
@@ -73,13 +115,16 @@ function QuestionNav({ questions, answers, currentIndex, onGo }) {
   )
 }
 
-/** Asks before the final submission, and says how many questions are still empty (they count as wrong). */
-function SubmitDialog({ open, unanswered, submitting, error, onGoToFirstUnanswered, onSubmit, onClose }) {
+/**
+ * Asks before the final submission, and says which questions are still empty (they count as wrong): "Bạn còn 1 câu
+ * chưa trả lời (câu 7)" (scenario 14, step 11).
+ */
+function SubmitDialog({ open, unanswered, unansweredNumbers, submitting, error, onGoToFirstUnanswered, onSubmit, onClose }) {
   return (
     <Dialog open={open} onClose={onClose} title="Nộp bài kiểm tra?">
       <p className="text-body text-ink-soft">
         {unanswered.length > 0
-          ? `Bạn còn ${unanswered.length} câu chưa trả lời. Câu bỏ trống được tính 0 điểm.`
+          ? `Bạn còn ${unanswered.length} câu chưa trả lời (câu ${unansweredNumbers.join(', ')}). Câu bỏ trống được tính 0 điểm.`
           : 'Bạn đã trả lời tất cả các câu. Sau khi nộp, bạn không sửa được câu trả lời nữa.'}
       </p>
       {error && <Alert variant="error">{describeApiError(error, 'Không nộp được bài. Vui lòng thử lại.')}</Alert>}
@@ -114,6 +159,15 @@ function AttemptRunner({ test, attempt }) {
   const [confirming, setConfirming] = useState(false)
   const saver = useAnswerSaver(attempt.attemptId, attempt.answers)
   const submit = useSubmitAttempt()
+  // Signing out in the middle asks first; the attempt stays in progress with the answers saved (scenario 3, 4a).
+  const logoutGuard = useMemo(
+    () => ({
+      message: 'Bài kiểm tra đang làm sẽ được lưu ở trạng thái đang làm. Bạn có muốn đăng xuất?',
+      beforeLogout: saver.flush,
+    }),
+    [saver.flush],
+  )
+  useLogoutGuard(submit.isSuccess ? null : logoutGuard)
 
   const question = questions[currentIndex]
   const unanswered = unansweredQuestions(questions, answers)
@@ -208,6 +262,7 @@ function AttemptRunner({ test, attempt }) {
       <SubmitDialog
         open={confirming}
         unanswered={unanswered}
+        unansweredNumbers={unanswered.map((item) => questions.indexOf(item) + 1)}
         submitting={submit.isPending}
         error={submit.error}
         onGoToFirstUnanswered={() => {
@@ -231,7 +286,55 @@ function skillList(questions) {
     .join(', ')
 }
 
-/** What the test contains, and "Bắt đầu" / "Làm tiếp" / "Làm lại từ đầu" before the questions show. */
+const QUESTION_FORMS = {
+  [QUESTION_TYPES.MULTIPLE_CHOICE]: 'trắc nghiệm',
+  [QUESTION_TYPES.LISTENING]: 'trắc nghiệm',
+  [QUESTION_TYPES.READING]: 'trắc nghiệm',
+  [QUESTION_TYPES.FILL_BLANK]: 'điền từ',
+  [QUESTION_TYPES.SPEAKING]: 'đề bài nói',
+  [QUESTION_TYPES.WRITING]: 'bài viết',
+}
+
+/** "Cấu trúc đề" of a test with several parts (scenario 15, step 4): each part's skill, size and kind of question. */
+function PartTable({ questions }) {
+  const parts = testParts(questions)
+  if (parts.length < 2 || !parts.every((part) => part.skill && SKILL_LABELS[part.skill])) return null
+  return (
+    <table className="w-full text-label">
+      <caption className="pb-1.5 text-left text-label font-semibold text-ink">Cấu trúc đề</caption>
+      <thead>
+        <tr className="text-xs text-muted">
+          <th scope="col" className="py-1 pr-3 text-left font-medium">
+            Phần
+          </th>
+          <th scope="col" className="py-1 pr-3 text-left font-medium">
+            Số câu
+          </th>
+          <th scope="col" className="py-1 text-left font-medium">
+            Dạng câu
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {parts.map((part) => {
+          const forms = [...new Set(part.items.map(({ question }) => QUESTION_FORMS[question.type] ?? 'tự gõ'))]
+          return (
+            <tr key={part.items[0].index} className="border-t border-line">
+              <td className="py-1.5 pr-3 font-medium text-ink">{SKILL_LABELS[part.skill]}</td>
+              <td className="py-1.5 pr-3 tabular-nums">{part.items.length}</td>
+              <td className="py-1.5 text-ink-soft">{forms.join(', ')}</td>
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
+  )
+}
+
+/**
+ * The test's introduction (scenarios 14 and 15, step 6 and 4): what it contains, then "Bắt đầu" or, for an unfinished
+ * attempt, "Làm tiếp" only: a test is not restarted from scratch.
+ */
 function StartCard({ test, starting, error, onStart }) {
   const choiceCount = test.questions.filter(isChoice).length
   const typedCount = test.questions.length - choiceCount
@@ -243,6 +346,8 @@ function StartCard({ test, starting, error, onStart }) {
           {typedCount > 0 ? ` (${choiceCount} câu chọn đáp án, ${typedCount} câu tự gõ)` : ''}
           {skillList(test.questions) ? ` · Kỹ năng: ${skillList(test.questions)}` : ''}
         </p>
+        {test.skill && <p className="text-body text-ink-soft">Nội dung: {test.skill}</p>}
+        <PartTable questions={test.questions} />
         <ul className="flex list-disc flex-col gap-1 pl-5 text-label text-muted">
           <li>Câu trả lời được lưu ngay khi bạn chọn hoặc gõ; rời trang rồi quay lại vẫn làm tiếp được.</li>
           <li>Câu bỏ trống khi nộp bài được tính 0 điểm.</li>
@@ -256,16 +361,11 @@ function StartCard({ test, starting, error, onStart }) {
             <Button onClick={() => onStart(false)} loading={starting === 'resume'} disabled={Boolean(starting)}>
               Làm tiếp
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => onStart(true)}
-              loading={starting === 'restart'}
-              disabled={Boolean(starting)}
-            >
-              Làm lại từ đầu
-            </Button>
+            <ButtonLink to="/tests" variant="outline">
+              Về danh sách
+            </ButtonLink>
           </div>
-          <p className="text-label text-muted">Bạn đang làm dở bài này. Làm lại từ đầu sẽ xóa các câu đã trả lời.</p>
+          <p className="text-label text-muted">Bạn đang làm dở bài này. Các câu đã trả lời được giữ lại.</p>
         </div>
       ) : (
         <div className="flex flex-wrap gap-3">

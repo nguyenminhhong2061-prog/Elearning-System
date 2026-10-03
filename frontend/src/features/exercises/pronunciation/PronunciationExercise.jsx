@@ -14,6 +14,7 @@ import { ResumeNotice } from '../components/ResumeNotice'
 import { ScoreRing } from '../components/ScoreRing'
 import { MAX_RECORDING_MS, MIN_RECORDING_MS, scoreBand } from '../constants'
 import { formatPlayTime } from '../time'
+import { chatContextLabel } from '../chat/contextLabel'
 import { AssessmentView } from './AssessmentView'
 import { isRecordingSupported, TOO_SHORT_MESSAGE } from './recorder'
 import { useRecorder } from './useRecorder'
@@ -69,11 +70,13 @@ function firstOpenItem(items, practiced) {
  * like, skip an item, or go on; at the end the attempt is completed with each item's best score. A picked-up attempt
  * keeps the best scores already earned and opens at the first item not recorded yet.
  *
- * @param {object} props see GrammarExercise
+ * @param {object} props see ReadingExercise
  */
 export function PronunciationExercise({ lesson, attemptId, progress, nextLesson, onRestart, restarting, restartError, onChatContext }) {
   const items = lesson.pronunciationItems
   const [best, setBest] = useState(() => new Map(progress.pronunciation.map((item) => [item.itemId, item.bestScore]))) // itemId -> best overall score
+  // itemId -> recordings scored in this attempt, for the summary's "số lần thử" (scenario 12, step 13)
+  const [tries, setTries] = useState(() => new Map(progress.pronunciation.map((item) => [item.itemId, item.tryCount])))
   const [index, setIndex] = useState(() => firstOpenItem(items, best))
   const [assessing, setAssessing] = useState(false)
   const [assessment, setAssessment] = useState(null)
@@ -100,6 +103,7 @@ export function PronunciationExercise({ lesson, attemptId, progress, nextLesson,
         const result = await assessPronunciation(attemptId, item.id, wav)
         setAssessment(result)
         setBest((previous) => new Map(previous).set(item.id, Math.max(previous.get(item.id) ?? 0, result.overallScore)))
+        setTries((previous) => new Map(previous).set(item.id, (previous.get(item.id) ?? 0) + 1))
         markAttemptsStale(queryClient)
       } catch (error) {
         setAssessError(assessmentErrorMessage(error))
@@ -110,8 +114,9 @@ export function PronunciationExercise({ lesson, attemptId, progress, nextLesson,
   })
 
   useEffect(() => {
-    onChatContext({ pronunciationItemId: item.id })
-  }, [item.id, onChatContext])
+    const label = chatContextLabel({ unit: 'Mục', number: index + 1, lessonTitle: lesson.title, prompt: item.text })
+    onChatContext({ pronunciationItemId: item.id, label })
+  }, [item, index, lesson.title, onChatContext])
 
   // Each recording gets an object URL for "Nghe lại giọng bạn"; the previous one is released.
   useEffect(() => (recordingUrl ? () => URL.revokeObjectURL(recordingUrl) : undefined), [recordingUrl])
@@ -174,7 +179,10 @@ export function PronunciationExercise({ lesson, attemptId, progress, nextLesson,
                   {score === undefined ? (
                     <Tag>Bỏ qua</Tag>
                   ) : (
-                    <Tag variant={BAND_TAG[scoreBand(score)]}>{Math.round(score)} điểm</Tag>
+                    <span className="flex flex-none items-center gap-3">
+                      <span className="text-label text-muted">{tries.get(practiced.id) ?? 1} lần thử</span>
+                      <Tag variant={BAND_TAG[scoreBand(score)]}>{Math.round(score)} điểm</Tag>
+                    </span>
                   )}
                 </li>
               )

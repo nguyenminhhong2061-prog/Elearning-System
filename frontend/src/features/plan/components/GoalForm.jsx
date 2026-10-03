@@ -1,11 +1,13 @@
 import { useId, useState } from 'react'
+import { CEFR_LEVELS } from '@/api/constants'
 import { describeApiError } from '@/api/errorMessages'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Tag } from '@/components/ui/Tag'
 import { TextField } from '@/components/ui/TextField'
 import { cx } from '@/lib/cx'
-import { MONTH_CHOICES, goalTitle, minutesLabel, targetLevels } from '../plan'
+import { todayInVietnam } from '@/lib/dates'
+import { datesForMonths, goalErrors, goalTitle, levelWarning, minutesLabel, planWeeks } from '../plan'
 
 const CUSTOM = 'custom'
 const SELECT_CLASS =
@@ -36,33 +38,86 @@ function GoalCard({ name, checked, onSelect, title, detail, recommended, childre
   )
 }
 
+/** The level one step above, the usual next goal (A2 when the level is unknown). */
+function nextLevel(currentLevel) {
+  const index = currentLevel ? CEFR_LEVELS.indexOf(currentLevel) : 0
+  return CEFR_LEVELS[Math.min(index + 1, CEFR_LEVELS.length - 1)]
+}
+
 /**
- * "Đặt mục tiêu học tập" (D2: when there is no plan the system asks for a goal): the suggested goals as the design's
- * cards, or the learner's own level and duration, plus an optional note. "Gợi ý lộ trình" asks the AI for a weekly
- * plan to preview; nothing is saved here.
+ * "Đặt mục tiêu học tập" (scenario 17): a suggested goal fills in the level and the dates, or the learner picks any
+ * level; the description is required and the dates bound the plan. "Gợi ý lộ trình" asks the AI for a weekly plan to
+ * preview; nothing is saved here. When the AI fails, "Tự lập kế hoạch" opens empty weeks instead (branch 5a).
  *
  * @param {object} props
  * @param {import('../types').GoalOption[]} props.goalOptions
  * @param {string | null} props.currentLevel
- * @param {boolean} props.replacing a plan already exists (the new one will replace it)
- * @param {(goal: { targetLevel: string, months: number, note: string | null }) => void} props.onPreview
+ * @param {boolean} props.replacing a plan is active (it will be paused when the new one is applied)
+ * @param {{ attemptId: number, targetLevel: string, roadmap: string } | null} props.fromTest branch 2a: the roadmap of a comprehensive test
+ * @param {(goal: import('../types').GoalRequest) => void} props.onPreview
+ * @param {(goal: import('../types').GoalRequest) => void} props.onManual
  * @param {boolean} props.previewing
  * @param {unknown} props.error failed preview
  * @param {() => void} [props.onCancel] only when a plan exists to go back to
  */
-export function GoalForm({ goalOptions, currentLevel, replacing, onPreview, previewing, error, onCancel }) {
+export function GoalForm({ goalOptions, currentLevel, replacing, fromTest, onPreview, onManual, previewing, error, onCancel }) {
   const name = useId()
-  const levels = targetLevels(currentLevel)
   const recommended = goalOptions.findIndex((option) => option.recommended)
-  const [choice, setChoice] = useState(() => (goalOptions.length > 0 ? Math.max(recommended, 0) : CUSTOM))
-  const [custom, setCustom] = useState(() => ({ targetLevel: levels[Math.min(1, levels.length - 1)], months: 3 }))
-  const [note, setNote] = useState('')
+  const firstChoice = fromTest || goalOptions.length === 0 ? CUSTOM : Math.max(recommended, 0)
+  const [choice, setChoice] = useState(firstChoice)
+  const [customLevel, setCustomLevel] = useState(fromTest?.targetLevel ?? nextLevel(currentLevel))
+  const [description, setDescription] = useState('')
+  const [dates, setDates] = useState(() =>
+    firstChoice === CUSTOM ? { startDate: '', endDate: '' } : datesForMonths(goalOptions[firstChoice].months, todayInVietnam()),
+  )
+  const [submitted, setSubmitted] = useState(false)
+
+  const today = todayInVietnam()
+  const errors = submitted ? goalErrors({ description, ...dates }, today) : {}
+  const targetLevel = choice === CUSTOM ? customLevel : goalOptions[choice].targetLevel
+  const dateErrors = goalErrors({ description: '-', ...dates }, today)
+  const weekCount = dateErrors.startDate || dateErrors.endDate ? null : planWeeks(dates.startDate, dates.endDate).length
+  const warning = choice === CUSTOM ? levelWarning(customLevel, currentLevel) : null
+
+  function selectOption(index) {
+    setChoice(index)
+    setDates(datesForMonths(goalOptions[index].months, today))
+  }
+
+  // Dates typed by hand no longer match "trong 3 tháng": keep the card's level as the learner's own goal.
+  function changeDate(field, value) {
+    if (choice !== CUSTOM) {
+      setCustomLevel(goalOptions[choice].targetLevel)
+      setChoice(CUSTOM)
+    }
+    setDates((current) => ({ ...current, [field]: value }))
+  }
+
+  /** The goal to send, or null when a field is wrong (the errors then show under the fields). */
+  function validGoal() {
+    setSubmitted(true)
+    if (Object.keys(goalErrors({ description, ...dates }, today)).length > 0) return null
+    return {
+      targetLevel,
+      startDate: dates.startDate,
+      endDate: dates.endDate,
+      description: description.trim(),
+      ...(fromTest ? { fromAttemptId: fromTest.attemptId } : {}),
+    }
+  }
 
   function submit(event) {
     event.preventDefault()
-    const goal = choice === CUSTOM ? custom : goalOptions[choice]
-    onPreview({ targetLevel: goal.targetLevel, months: goal.months, note: note.trim() || null })
+    const goal = validGoal()
+    if (goal) onPreview(goal)
   }
+
+  function writeMyself() {
+    const goal = validGoal()
+    if (goal) onManual(goal)
+  }
+
+  const aiDown = error?.status === 503
 
   return (
     <section aria-labelledby="goal-title" className="flex min-w-0 flex-col gap-4 rounded-xl border border-line bg-surface-alt p-5 sm:p-6">
@@ -72,12 +127,20 @@ export function GoalForm({ goalOptions, currentLevel, replacing, onPreview, prev
         </h2>
         <p className="text-label text-ink-soft">
           {replacing
-            ? 'Chọn mục tiêu mới rồi xem trước lộ trình. Kế hoạch hiện tại chỉ được thay khi bạn bấm "Áp dụng kế hoạch".'
+            ? 'Chọn mục tiêu mới rồi xem trước lộ trình. Kế hoạch hiện tại sẽ chuyển sang tạm dừng khi bạn bấm “Áp dụng kế hoạch”.'
             : 'Bạn chưa có kế hoạch học. Chọn mục tiêu, trợ lý AI sẽ gợi ý lộ trình theo từng tuần để bạn xem trước.'}
         </p>
       </div>
 
-      <form onSubmit={submit} className="flex flex-col gap-4">
+      {fromTest?.roadmap && (
+        <div className="flex flex-col gap-1 rounded-[10px] border border-brand-tint-line bg-white px-4 py-3">
+          <span className="text-label font-semibold text-brand-dark">Lộ trình đề xuất từ bài kiểm tra tổng hợp</span>
+          <p className="text-label whitespace-pre-line text-ink-soft">{fromTest.roadmap}</p>
+          <span className="text-xs text-muted">Trợ lý AI sẽ chia lộ trình này theo từng tuần.</span>
+        </div>
+      )}
+
+      <form onSubmit={submit} noValidate className="flex flex-col gap-4">
         <fieldset className="flex flex-col gap-2">
           <legend className="sr-only">Mục tiêu</legend>
           {goalOptions.map((option, index) => (
@@ -85,7 +148,7 @@ export function GoalForm({ goalOptions, currentLevel, replacing, onPreview, prev
               key={`${option.targetLevel}-${option.months}`}
               name={name}
               checked={choice === index}
-              onSelect={() => setChoice(index)}
+              onSelect={() => selectOption(index)}
               title={goalTitle(option, currentLevel)}
               detail={minutesLabel(option.dailyMinutes)}
               recommended={option.recommended}
@@ -99,60 +162,77 @@ export function GoalForm({ goalOptions, currentLevel, replacing, onPreview, prev
             detail={choice === CUSTOM ? null : 'Tự chọn trình độ và thời gian'}
           >
             {choice === CUSTOM && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
                 <label className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-ink-soft">Trình độ mục tiêu</span>
-                  <select
-                    value={custom.targetLevel}
-                    onChange={(event) => setCustom((current) => ({ ...current, targetLevel: event.target.value }))}
-                    className={SELECT_CLASS}
-                  >
-                    {levels.map((level) => (
+                  <select value={customLevel} onChange={(event) => setCustomLevel(event.target.value)} className={SELECT_CLASS}>
+                    {CEFR_LEVELS.map((level) => (
                       <option key={level} value={level}>
                         {level === currentLevel ? `${level} (giữ vững)` : level}
                       </option>
                     ))}
                   </select>
                 </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs font-medium text-ink-soft">Thời gian</span>
-                  <select
-                    value={custom.months}
-                    onChange={(event) => setCustom((current) => ({ ...current, months: Number(event.target.value) }))}
-                    className={SELECT_CLASS}
-                  >
-                    {MONTH_CHOICES.map((months) => (
-                      <option key={months} value={months}>
-                        {months} tháng
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                {warning && (
+                  <span aria-live="polite" className="text-xs text-warning">
+                    {warning}
+                  </span>
+                )}
               </div>
             )}
           </GoalCard>
         </fieldset>
 
         <TextField
-          label="Ghi chú mục tiêu (không bắt buộc)"
-          placeholder="Ví dụ: giao tiếp khi đi du lịch"
+          label="Mô tả mục tiêu"
+          placeholder="Ví dụ: Đạt B2 để phỏng vấn học bổng vào tháng 1/2027"
           maxLength={255}
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          error={errors.description}
+          required
         />
 
+        <div className="grid gap-3 sm:grid-cols-2">
+          <TextField
+            label="Ngày bắt đầu"
+            type="date"
+            min={today}
+            value={dates.startDate}
+            onChange={(event) => changeDate('startDate', event.target.value)}
+            error={errors.startDate}
+          />
+          <TextField
+            label="Ngày kết thúc"
+            type="date"
+            min={dates.startDate || today}
+            value={dates.endDate}
+            onChange={(event) => changeDate('endDate', event.target.value)}
+            error={errors.endDate}
+            hint={weekCount ? `${weekCount} tuần` : undefined}
+          />
+        </div>
+
         {error && (
-          <Alert variant="error">
-            {error.status === 503
-              ? 'Trợ lý AI chưa gợi ý được lộ trình lúc này. Vui lòng thử lại sau.'
-              : describeApiError(error, 'Chưa gợi ý được lộ trình. Vui lòng thử lại.')}
+          <Alert variant="error" className="flex flex-col items-start gap-2">
+            <span>
+              {aiDown
+                ? 'Trợ lý AI chưa gợi ý được lộ trình lúc này. Vui lòng thử lại sau.'
+                : describeApiError(error, 'Chưa gợi ý được lộ trình. Vui lòng thử lại.')}
+            </span>
+            {aiDown && <span className="font-normal">Bạn có thể bấm “Gợi ý lộ trình” lần nữa, hoặc tự lập kế hoạch theo từng tuần.</span>}
           </Alert>
         )}
 
         <div className="flex flex-wrap gap-3">
           <Button type="submit" loading={previewing}>
-            Gợi ý lộ trình
+            {previewing ? 'Đang tạo lộ trình…' : 'Gợi ý lộ trình'}
           </Button>
+          {aiDown && !previewing && (
+            <Button type="button" variant="outline" onClick={writeMyself}>
+              Tự lập kế hoạch
+            </Button>
+          )}
           {onCancel && (
             <Button type="button" variant="outline" onClick={onCancel} disabled={previewing}>
               Hủy

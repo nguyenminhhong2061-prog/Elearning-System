@@ -63,7 +63,6 @@ function TestCard({ test }) {
 }
 
 function TestGroup({ type, description, tests }) {
-  if (tests.length === 0) return null
   const headingId = `tests-${type.toLowerCase()}`
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-3">
@@ -73,13 +72,20 @@ function TestGroup({ type, description, tests }) {
         </h2>
         <p className="text-label text-muted">{description}</p>
       </div>
-      <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] gap-3">
-        {tests.map((test) => (
-          <li key={test.id}>
-            <TestCard test={test} />
-          </li>
-        ))}
-      </ul>
+      {tests.length === 0 ? (
+        // Scenario 14 branch 4a, scenario 15 branch 2a: the block stays and says so.
+        <p className="rounded-xl border border-dashed border-line px-4 py-3 text-sm text-muted">
+          Hiện chưa có bài {TEST_TYPE_LABELS[type].toLowerCase()} nào đang mở
+        </p>
+      ) : (
+        <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] gap-3">
+          {tests.map((test) => (
+            <li key={test.id}>
+              <TestCard test={test} />
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   )
 }

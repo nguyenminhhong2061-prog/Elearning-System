@@ -6,6 +6,7 @@ import { exerciseCompletionsOn } from './exercises.js'
 // learner, and only what this mock can see happening is added live (study minutes, exercises completed today).
 
 const PERIODS = { DAY: 7, WEEK: 12, MONTH: 6 }
+const MAX_BUCKETS = 31 // a chosen range (from, to) is cut into at most this many days, weeks or months
 const HISTORY_DAYS = 200 // enough for 6 calendar months
 const STARTED_DAYS_AGO = 58 // a learner who began about two months ago
 
@@ -154,26 +155,55 @@ export function periodsFor(period, today) {
   })
 }
 
-export function activity(userId, period, today) {
+/** A chosen range cut into days, weeks (Monday to Sunday) or calendar months; the first and last ones are clipped to it. */
+export function periodsBetween(period, from, to) {
+  const buckets = []
+  for (let start = from; start <= to; ) {
+    let end = start
+    if (period === 'WEEK') end = addDays(mondayOf(start), 6)
+    if (period === 'MONTH') end = lastDayOfMonth(`${start.slice(0, 7)}-01`)
+    if (end > to) end = to
+    buckets.push({ start, end })
+    start = addDays(end, 1)
+  }
+  return buckets
+}
+
+/** The query's from and to (scenario 16), checked like docs/api/progress.md says; null when neither is given. */
+export function chosenRange(period, searchParams, today) {
+  const from = searchParams.get('from')
+  const to = searchParams.get('to')
+  if (from === null && to === null) return null
+  const isDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value ?? '')
+  if (!isDate(from) || !isDate(to)) throw new HttpError(400, 'from and to must both be dates (YYYY-MM-DD)')
+  if (from > to) throw new HttpError(400, 'from must not be after to')
+  if (to > today) throw new HttpError(400, 'to must not be after today')
+  if (periodsBetween(period, from, to).length > MAX_BUCKETS) throw new HttpError(400, `the range holds more than ${MAX_BUCKETS} periods`)
+  return { from, to }
+}
+
+/** Counts per period: the default 7 days, 12 weeks or 6 months up to today, or the chosen range. */
+export function activity(userId, period, today, range = null) {
   const days = history(userId, today)
-  const buckets = periodsFor(period, today)
+  const buckets = range ? periodsBetween(period, range.from, range.to) : periodsFor(period, today)
   const from = buckets[0].start
-  const within = (start, end) => days.filter((day) => day.date >= start && day.date <= end && day.date <= today)
+  const to = range ? range.to : today
+  const within = (start, end) => days.filter((day) => day.date >= start && day.date <= end && day.date <= to)
   return {
     period,
     from,
-    to: today,
+    to,
     items: buckets.map(({ start, end }) => ({ start, end, ...sumUp(within(start, end)) })),
-    totals: sumUp(within(from, today)),
+    totals: sumUp(within(from, to)),
   }
 }
 
 export function summary(userId, today) {
   const days = history(userId, today)
-  const { exercisesCompleted, testsCompleted, studyMinutes } = sumUp(days)
+  const { exercisesCompleted, testsCompleted, studyMinutes, averageTestScore } = sumUp(days)
   return {
     streak: { current: currentStreak(days), activeToday: isActive(days.at(-1)) },
-    totals: { exercisesCompleted, testsCompleted, studyMinutes },
+    totals: { exercisesCompleted, testsCompleted, studyMinutes, averageTestScore },
   }
 }
 
@@ -246,7 +276,8 @@ export const progressRoutes = [
     handle({ userId, searchParams }) {
       const period = searchParams.get('period') ?? 'DAY'
       if (!(period in PERIODS)) throw new HttpError(400, 'period must be DAY, WEEK or MONTH')
-      return activity(userId, period, todayInVietnam())
+      const today = todayInVietnam()
+      return activity(userId, period, today, chosenRange(period, searchParams, today))
     },
   },
   {
@@ -277,11 +308,14 @@ export const progressRoutes = [
 /** A learner with nothing yet, as each progress endpoint answers them ("Người mới" scenario). */
 export function newLearnerReply(pathname, searchParams, today = todayInVietnam()) {
   const zero = { wordsLearned: 0, exercisesCompleted: 0, testsCompleted: 0, studyMinutes: 0, averageTestScore: null }
-  if (pathname === '/api/progress/summary') return { streak: { current: 0, activeToday: false }, totals: { exercisesCompleted: 0, testsCompleted: 0, studyMinutes: 0 } }
+  if (pathname === '/api/progress/summary') {
+    return { streak: { current: 0, activeToday: false }, totals: { exercisesCompleted: 0, testsCompleted: 0, studyMinutes: 0, averageTestScore: null } }
+  }
   if (pathname === '/api/progress/activity') {
-    const period = searchParams.get('period') ?? 'DAY'
-    const buckets = periodsFor(period in PERIODS ? period : 'DAY', today)
-    return { period, from: buckets[0].start, to: today, items: buckets.map((bucket) => ({ ...bucket, ...zero })), totals: zero }
+    const period = searchParams.get('period') in PERIODS ? searchParams.get('period') : 'DAY'
+    const range = chosenRange(period, searchParams, today)
+    const buckets = range ? periodsBetween(period, range.from, range.to) : periodsFor(period, today)
+    return { period, from: buckets[0].start, to: range ? range.to : today, items: buckets.map((bucket) => ({ ...bucket, ...zero })), totals: zero }
   }
   if (pathname === '/api/progress/skills') return { latest: null }
   if (pathname === '/api/progress/badges') {

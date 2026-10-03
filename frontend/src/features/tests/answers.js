@@ -31,6 +31,21 @@ export function answersFromSaved(saved) {
 }
 
 /** Questions without a usable answer, in test order. */
+/**
+ * The test's parts in order (scenario 15): consecutive questions of one skill, each with its position in the test.
+ * @returns {Array<{ skill: string | null, items: Array<{ question: object, index: number }> }>}
+ */
+export function testParts(questions) {
+  const parts = []
+  questions.forEach((question, index) => {
+    const skill = question.skill?.toLowerCase() ?? null
+    const last = parts.at(-1)
+    if (last && last.skill === skill) last.items.push({ question, index })
+    else parts.push({ skill, items: [{ question, index }] })
+  })
+  return parts
+}
+
 export function unansweredQuestions(questions, answers) {
   return questions.filter((question) => !answerPayload(question, answers[question.id]))
 }

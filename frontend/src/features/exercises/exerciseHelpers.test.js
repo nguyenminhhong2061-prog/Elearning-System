@@ -3,15 +3,18 @@ import { scoreBand, skillFromParam, skillPath } from './constants'
 import { activeSegmentId, formatPlayTime } from './time'
 
 describe('skill URLs', () => {
-  it('reads ?skill= and falls back to grammar', () => {
+  it('reads ?skill= and falls back to reading, the first tab (old grammar links too)', () => {
+    expect(skillFromParam('writing')).toBe('WRITING')
     expect(skillFromParam('listening')).toBe('LISTENING')
     expect(skillFromParam('pronunciation')).toBe('PRONUNCIATION')
-    expect(skillFromParam(null)).toBe('GRAMMAR')
-    expect(skillFromParam('LISTENING')).toBe('GRAMMAR')
+    expect(skillFromParam(null)).toBe('READING')
+    expect(skillFromParam('grammar')).toBe('READING')
+    expect(skillFromParam('LISTENING')).toBe('READING')
   })
 
   it('keeps the bare path for the default tab', () => {
-    expect(skillPath('GRAMMAR')).toBe('/exercises')
+    expect(skillPath('READING')).toBe('/exercises')
+    expect(skillPath('WRITING')).toBe('/exercises?skill=writing')
     expect(skillPath('LISTENING')).toBe('/exercises?skill=listening')
   })
 })

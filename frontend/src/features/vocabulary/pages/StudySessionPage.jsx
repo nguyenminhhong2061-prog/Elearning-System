@@ -20,14 +20,17 @@ const MODES = {
   due: { param: null, back: () => VOCABULARY_PATH, backLabel: 'Về từ vựng', title: 'Ôn tập hôm nay' },
 }
 
-function Message({ title, backTo, backLabel, children }) {
+function Message({ title, backTo, backLabel, extra, children }) {
   return (
     <Page title={title} width="focus">
       <Card className="flex flex-col items-start gap-4">
         <p className="text-sm text-muted">{children}</p>
-        <ButtonLink to={backTo} variant="outline" size="sm">
-          ← {backLabel}
-        </ButtonLink>
+        <div className="flex flex-wrap items-center gap-4">
+          <ButtonLink to={backTo} variant="outline" size="sm">
+            ← {backLabel}
+          </ButtonLink>
+          {extra}
+        </div>
       </Card>
     </Page>
   )
@@ -89,7 +92,18 @@ export function StudySessionPage({ mode }) {
 
   if (cards.length === 0) {
     return (
-      <Message title={title} backTo={backTo} backLabel={config.backLabel}>
+      <Message
+        title={title}
+        backTo={backTo}
+        backLabel={config.backLabel}
+        extra={
+          mode === 'due' && (
+            <Link to={VOCABULARY_PATH} className="text-label font-semibold">
+              Học theo chủ đề →
+            </Link>
+          )
+        }
+      >
         {mode === 'due'
           ? 'Hôm nay bạn không có từ nào cần ôn. Hãy quay lại vào ngày mai nhé!'
           : `Không còn từ mới hay từ đến hạn ôn trong ${mode === 'list' ? 'danh sách' : 'chủ đề'} “${origin.name}”. Các từ đã học sẽ được nhắc lại theo lịch ôn.`}
@@ -102,6 +116,7 @@ export function StudySessionPage({ mode }) {
       <FlashcardSession
         key={`${JSON.stringify(source)}:${round}`}
         cards={cards}
+        summaryTitle={mode === 'due' ? 'Hoàn thành phiên ôn tập' : `Hoàn thành phiên học · ${origin.name}`}
         backTo={backTo}
         backLabel={config.backLabel}
         onContinue={() => setRound((previous) => previous + 1)}

@@ -1,6 +1,7 @@
 import { Page } from '@/components/layout/Page'
 import { Avatar } from '@/components/ui/Avatar'
 import { useAuth } from '@/features/auth/context/useAuth'
+import { PlanNotice } from '@/features/plan/components/PlanNotice'
 import { Achievements } from '@/features/progress/components/Achievements'
 import { ActivityChart } from '@/features/progress/components/ActivityChart'
 import { ContinueCard } from '@/features/progress/components/ContinueCard'
@@ -8,6 +9,7 @@ import { LevelJourney } from '@/features/progress/components/LevelJourney'
 import { ProgressStats } from '@/features/progress/components/ProgressStats'
 import { SkillRadar } from '@/features/progress/components/SkillRadar'
 import { WelcomeBanner } from '@/features/progress/components/WelcomeBanner'
+import { OpenTestNotice } from '@/features/tests/components/OpenTestNotice'
 import { getGivenName } from '@/lib/personName'
 
 /**
@@ -28,6 +30,8 @@ export function HomePage() {
       }
     >
       <WelcomeBanner />
+      <OpenTestNotice />
+      <PlanNotice />
       <ProgressStats />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)]">
         <ActivityChart />

@@ -34,7 +34,7 @@ public class VocabularyExceptionHandler {
         return badRequest(exception.getMessage());
     }
 
-    @ExceptionHandler({ConcurrentReviewException.class, WordAlreadyInListException.class})
+    @ExceptionHandler({ConcurrentReviewException.class, WordAlreadyInListException.class, DuplicateListNameException.class})
     public ResponseEntity<ApiErrorResponse> handleConflict(RuntimeException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ApiErrorResponse(Instant.now(), 409, exception.getMessage()));

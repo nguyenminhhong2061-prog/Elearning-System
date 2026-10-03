@@ -21,14 +21,14 @@ function DarkCard({ to, title, detail, action }) {
 
 /**
  * The design's "Tiếp tục" card: the unfinished lesson the learner worked on last, opened where they left it
- * (docs/api/exercises.md). With nothing unfinished it suggests the next grammar lesson instead ("Học tiếp"); with no
+ * (docs/api/exercises.md). With nothing unfinished it suggests the next reading lesson instead ("Học tiếp"); with no
  * such lesson, or while loading, it is not shown.
  */
 export function ContinueCard() {
   const { user } = useAuth()
   const current = useCurrentAttempt()
   const suggest = current.isSuccess && current.data === null
-  const lessons = useLessons(suggest ? 'GRAMMAR' : null)
+  const lessons = useLessons(suggest ? 'READING' : null)
 
   if (current.data) {
     const { lesson, doneCount } = current.data

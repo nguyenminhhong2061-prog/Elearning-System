@@ -1,10 +1,9 @@
-import { describeApiError } from '@/api/errorMessages'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Tag } from '@/components/ui/Tag'
 import { cx } from '@/lib/cx'
-import { useChangePlanStatus } from '../api/planQueries'
-import { currentWeekOf, formatDate, formatRange, goalTitle, lastMissedWeek, minutesLabel, share } from '../plan'
+import { todayInVietnam } from '@/lib/dates'
+import { REMINDER_LINE, currentWeekOf, formatDate, formatRange, lastMissedWeek, levelPath, minutesLabel, periodLine, planPhase, share } from '../plan'
 import { WeekList } from './WeekList'
 
 const STATUS = {
@@ -38,21 +37,44 @@ function ProgressRow({ label, done, target, unit }) {
   )
 }
 
+/** Scenario 17 step 9: before its first day a plan says so, with what week 1 asks. */
+function NotStarted({ plan }) {
+  const first = plan.weeks[0]
+  return (
+    <div className="flex flex-col gap-1.5 rounded-[10px] bg-surface-alt p-4">
+      <h3 className="text-body font-semibold text-ink">Tuần hiện tại: chưa bắt đầu</h3>
+      <p className="text-label text-ink-soft">Kế hoạch bắt đầu ngày {formatDate(plan.startDate)}.</p>
+      {first && (
+        <p className="text-label text-ink-soft">
+          Tuần 1 ({formatRange(first.startDate, first.endDate)}): {first.description ? `${first.description} · ` : ''}mục tiêu{' '}
+          {first.targetWords} từ, {first.targetExercises} bài tập.
+        </p>
+      )}
+    </div>
+  )
+}
+
 /**
- * "Kế hoạch của bạn": the goal, this week's targets and progress, the D2 warning when the last week fell short (no
- * penalty, just a suggestion to adjust), the whole schedule, and pausing or resuming.
+ * "Kế hoạch của bạn" (scenarios 17 step 9 and 18 step 3): the goal, the levels, the dates, this week's targets and
+ * progress, the D2 warning when the last week fell short (no penalty, just a suggestion to adjust), the whole
+ * schedule, the weekly reminder, and pausing or adjusting the plan.
  *
  * @param {object} props
  * @param {import('../types').StudyPlan} props.plan
  * @param {string | null} props.currentLevel
- * @param {() => void} props.onAdjust opens the goal form
+ * @param {() => void} props.onAdjust opens "Điều chỉnh kế hoạch"
+ * @param {() => void} props.onNewPlan opens the goal form, once the plan's last day has passed
+ * @param {(status: 'ACTIVE' | 'PAUSED') => void} props.onStatus
+ * @param {boolean} props.changingStatus
  */
-export function PlanOverview({ plan, currentLevel, onAdjust }) {
-  const changeStatus = useChangePlanStatus()
+export function PlanOverview({ plan, currentLevel, onAdjust, onNewPlan, onStatus, changingStatus }) {
   const status = STATUS[plan.status] ?? STATUS.ACTIVE
   const week = currentWeekOf(plan)
+  const phase = planPhase(plan, todayInVietnam())
   const missed = plan.status === 'ACTIVE' ? lastMissedWeek(plan) : null
   const paused = plan.status === 'PAUSED'
+  const period = [periodLine(plan.startDate, plan.endDate, plan.weeks.length)]
+  if (plan.dailyMinutes) period.push(minutesLabel(plan.dailyMinutes))
 
   return (
     <section aria-labelledby="plan-title" className="flex min-w-0 flex-col gap-5 rounded-xl border border-line bg-white p-5 sm:p-6">
@@ -61,11 +83,9 @@ export function PlanOverview({ plan, currentLevel, onAdjust }) {
           <h2 id="plan-title" className="text-lg font-semibold text-ink">
             Kế hoạch của bạn
           </h2>
-          <p className="text-xl font-bold text-brand-dark">{goalTitle(plan.goal, plan.startLevel)}</p>
-          <p className="text-label text-muted">
-            {formatDate(plan.startDate)} – {formatDate(plan.endDate)} · {minutesLabel(plan.dailyMinutes)}
-          </p>
-          {plan.goal.note && <p className="text-label text-ink-soft">Mục tiêu của bạn: “{plan.goal.note}”</p>}
+          <p className="text-label text-ink-soft">Mục tiêu của bạn: “{plan.goal.description}”</p>
+          <p className="text-xl font-bold text-brand-dark">Trình độ {levelPath(plan.startLevel, plan.goal.targetLevel)}</p>
+          <p className="text-label text-muted">{period.join(' · ')}</p>
         </div>
         <Tag variant={status.variant}>{status.label}</Tag>
       </div>
@@ -77,17 +97,21 @@ export function PlanOverview({ plan, currentLevel, onAdjust }) {
       {missed && (
         <Alert variant="warning" className="flex flex-col items-start gap-2 font-normal">
           <span>
-            <strong>Tuần {missed.weekNumber} chưa đạt mục tiêu</strong> ({missed.wordsDone}/{missed.targetWords} từ,{' '}
-            {missed.exercisesDone}/{missed.targetExercises} bài tập). Không sao, kế hoạch vẫn tiếp tục. Nếu mục tiêu đang
-            quá sức, bạn có thể đặt lại mục tiêu với thời gian dài hơn.
+            <strong>
+              Tuần {missed.weekNumber} chưa đạt mục tiêu ({missed.wordsDone}/{missed.targetWords} từ, {missed.exercisesDone}/
+              {missed.targetExercises} bài)
+            </strong>
+            . Không sao, kết quả đã học vẫn được giữ. Nếu mục tiêu đang quá sức, bạn có thể giảm mục tiêu các tuần tới.
           </span>
           <button type="button" onClick={onAdjust} className="cursor-pointer font-semibold underline">
-            Điều chỉnh mục tiêu
+            Điều chỉnh ngay
           </button>
         </Alert>
       )}
 
-      {week ? (
+      {phase === 'NOT_STARTED' ? (
+        <NotStarted plan={plan} />
+      ) : week ? (
         <div className="flex flex-col gap-3 rounded-[10px] bg-surface-alt p-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h3 className="text-body font-semibold text-ink">
@@ -102,8 +126,8 @@ export function PlanOverview({ plan, currentLevel, onAdjust }) {
       ) : (
         <Alert variant="info" className="flex flex-col items-start gap-2 font-normal">
           <span>Kế hoạch đã kết thúc ngày {formatDate(plan.endDate)}. Làm bài kiểm tra tổng hợp để xem mình đã tiến bộ thế nào, rồi đặt mục tiêu mới.</span>
-          <button type="button" onClick={onAdjust} className="cursor-pointer font-semibold underline">
-            Đặt mục tiêu mới
+          <button type="button" onClick={onNewPlan} className="cursor-pointer font-semibold underline">
+            Lập kế hoạch mới
           </button>
         </Alert>
       )}
@@ -125,20 +149,14 @@ export function PlanOverview({ plan, currentLevel, onAdjust }) {
         </div>
       </details>
 
-      {changeStatus.isError && (
-        <Alert variant="error">{describeApiError(changeStatus.error, 'Không đổi được trạng thái kế hoạch. Vui lòng thử lại.')}</Alert>
-      )}
+      <p className="text-label text-ink-soft">{paused ? 'Nhắc nhở: tạm ngừng trong lúc kế hoạch tạm dừng' : REMINDER_LINE}</p>
+
       <div className="flex flex-wrap gap-3">
-        <Button variant="outline" size="sm" onClick={onAdjust}>
-          Đặt lại mục tiêu
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          loading={changeStatus.isPending}
-          onClick={() => changeStatus.mutate(paused ? 'ACTIVE' : 'PAUSED')}
-        >
+        <Button variant="outline" size="sm" loading={changingStatus} onClick={() => onStatus(paused ? 'ACTIVE' : 'PAUSED')}>
           {paused ? 'Tiếp tục kế hoạch' : 'Tạm dừng kế hoạch'}
+        </Button>
+        <Button size="sm" onClick={onAdjust}>
+          Điều chỉnh kế hoạch
         </Button>
       </div>
       {currentLevel && currentLevel !== plan.startLevel && (

@@ -64,6 +64,7 @@ async function handle(req, res, route, match, url) {
       match,
       searchParams: url.searchParams,
       body,
+      aiDown: scenarioOf(req) === 'ai-down', // the AI grader of writing answers fails, the answer is still saved
     })
     const status = typeof route.status === 'function' ? route.status(result) : (route.status ?? (result === undefined ? 204 : 200))
     send(res, status, result)

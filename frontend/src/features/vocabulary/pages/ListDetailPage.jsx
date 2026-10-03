@@ -64,7 +64,13 @@ function RenameForm({ list, onDone }) {
           Hủy
         </Button>
       </div>
-      {rename.isError && <Alert variant="error">{describeApiError(rename.error, 'Chưa đổi được tên. Vui lòng thử lại.')}</Alert>}
+      {rename.isError && (
+        <Alert variant="error">
+          {rename.error?.status === 409
+            ? 'Bạn đã có danh sách tên này.'
+            : describeApiError(rename.error, 'Chưa đổi được tên. Vui lòng thử lại.')}
+        </Alert>
+      )}
     </form>
   )
 }

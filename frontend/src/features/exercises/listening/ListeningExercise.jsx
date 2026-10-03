@@ -4,6 +4,7 @@ import { Page } from '@/components/layout/Page'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { ChoiceOptions } from '@/components/ui/ChoiceOptions'
+import { Dialog } from '@/components/ui/Dialog'
 import { TextField } from '@/components/ui/TextField'
 import { Switch } from '@/components/ui/Switch'
 import { useCompleteAttempt } from '../api/exercisesQueries'
@@ -12,6 +13,7 @@ import { ExerciseHeading } from '../components/ExerciseHeading'
 import { ResultCard } from '../components/ResultCard'
 import { ScoreRing } from '../components/ScoreRing'
 import { activeSegmentId } from '../time'
+import { answerText, chatContextLabel } from '../chat/contextLabel'
 import { AudioPlayer } from './AudioPlayer'
 import { Transcript } from './Transcript'
 
@@ -21,6 +23,7 @@ function isAnswered(question, answer) {
 }
 
 function toResponse(question, answer) {
+  if (!isAnswered(question, answer)) return null
   return question.type === 'FILL_BLANK'
     ? { questionId: question.id, answer: answer.answer.trim() }
     : { questionId: question.id, optionId: answer.optionId }
@@ -31,7 +34,7 @@ function toResponse(question, answer) {
  * screens). Questions can be answered before the audio ends (exception of B2). The whole test is handed in at once;
  * the server grades it and returns the right answers and the translation of each segment to compare with.
  *
- * @param {object} props see GrammarExercise
+ * @param {object} props see ReadingExercise
  */
 export function ListeningExercise({ lesson, attemptId, nextLesson, onRestart, restarting, restartError, onChatContext, onAskAssistant }) {
   const { passage, questions } = lesson
@@ -40,12 +43,17 @@ export function ListeningExercise({ lesson, attemptId, nextLesson, onRestart, re
   const [showSubtitles, setShowSubtitles] = useState(false)
   const [showTranslation, setShowTranslation] = useState(true)
   const [answers, setAnswers] = useState(() => new Map()) // questionId -> { optionId, answer }
-  const [missing, setMissing] = useState(0)
+  const [confirmingMissing, setConfirmingMissing] = useState(0) // unanswered questions shown in the dialog
+  const [audioFailed, setAudioFailed] = useState(false)
   const complete = useCompleteAttempt(attemptId)
   const player = useRef(null)
   const resultArea = useRef(null)
 
   const result = complete.data ?? null
+  // Scenario 11, step 8: once the learner starts answering, the subtitles are hidden and locked until hand-in.
+  const answering = !result && answers.size > 0
+  // Branch 5a: without the recording the questions cannot be answered fairly.
+  const locked = !result && audioFailed
   const review = new Map(result?.review.map((item) => [item.questionId, item]) ?? [])
   const translations = result && showTranslation ? new Map(result.translations.map((item) => [item.segmentId, item.translation])) : null
 
@@ -55,21 +63,24 @@ export function ListeningExercise({ lesson, attemptId, nextLesson, onRestart, re
 
   function answer(question, patch) {
     setAnswers((previous) => new Map(previous).set(question.id, { optionId: null, answer: '', ...patch }))
-    setMissing(0)
+    setShowSubtitles(false)
+  }
+
+  function handIn() {
+    setConfirmingMissing(0)
+    complete.mutate(
+      // Questions left empty are not sent; the server counts them as wrong (branch 9a).
+      { responses: questions.map((question) => toResponse(question, answers.get(question.id))).filter(Boolean), playbackRate: rate },
+      // After hand-in the transcript and its translation are the point: show them.
+      { onSuccess: () => setShowSubtitles(true) },
+    )
   }
 
   function submit(event) {
     event.preventDefault()
     const unanswered = questions.filter((question) => !isAnswered(question, answers.get(question.id))).length
-    if (unanswered > 0) {
-      setMissing(unanswered)
-      return
-    }
-    complete.mutate(
-      { responses: questions.map((question) => toResponse(question, answers.get(question.id))), playbackRate: rate },
-      // After hand-in the transcript and its translation are the point: show them.
-      { onSuccess: () => setShowSubtitles(true) },
-    )
+    if (unanswered > 0) setConfirmingMissing(unanswered)
+    else handIn()
   }
 
   return (
@@ -86,11 +97,12 @@ export function ListeningExercise({ lesson, attemptId, nextLesson, onRestart, re
             rate={rate}
             onRateChange={setRate}
             onPosition={setPosition}
+            onFailedChange={setAudioFailed}
           />
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-2.5">
             <span className="text-label font-medium text-ink-soft">Bản chép lời</span>
             <div className="flex flex-wrap gap-4">
-              <Switch label="Hiện phụ đề" checked={showSubtitles} onChange={setShowSubtitles} />
+              <Switch label="Hiện phụ đề" checked={showSubtitles} onChange={setShowSubtitles} disabled={answering} />
               {result && showSubtitles && <Switch label="Hiện bản dịch" checked={showTranslation} onChange={setShowTranslation} />}
             </div>
           </div>
@@ -103,7 +115,9 @@ export function ListeningExercise({ lesson, attemptId, nextLesson, onRestart, re
             />
           ) : (
             <p className="text-label text-muted">
-              Nghe trước, bật phụ đề khi cần đọc theo. Bạn có thể trả lời câu hỏi bất cứ lúc nào, kể cả khi chưa nghe hết.
+              {answering
+                ? 'Phụ đề tạm ẩn trong lúc bạn trả lời câu hỏi và hiện lại sau khi nộp bài.'
+                : 'Nghe trước, bật phụ đề khi cần đọc theo. Bạn có thể trả lời câu hỏi bất cứ lúc nào, kể cả khi chưa nghe hết.'}
             </p>
           )}
         </section>
@@ -152,7 +166,7 @@ export function ListeningExercise({ lesson, attemptId, nextLesson, onRestart, re
                         lang="en"
                         maxLength={200}
                         value={given?.answer ?? ''}
-                        disabled={Boolean(result)}
+                        disabled={Boolean(result) || locked}
                         onChange={(event) => answer(question, { answer: event.target.value })}
                       />
                     ) : (
@@ -163,6 +177,7 @@ export function ListeningExercise({ lesson, attemptId, nextLesson, onRestart, re
                         selectedId={given?.optionId ?? null}
                         onSelect={(optionId) => answer(question, { optionId })}
                         graded={graded ?? null}
+                        disabled={locked}
                       />
                     )}
                     {graded && (
@@ -170,7 +185,16 @@ export function ListeningExercise({ lesson, attemptId, nextLesson, onRestart, re
                         <button
                           type="button"
                           onClick={() => {
-                            onChatContext({ questionId: question.id })
+                            onChatContext({
+                              questionId: question.id,
+                              label: chatContextLabel({
+                                number: number + 1,
+                                lessonTitle: lesson.title,
+                                prompt: question.prompt,
+                                answer: answerText(question, given),
+                                correct: graded.correct,
+                              }),
+                            })
                             onAskAssistant()
                           }}
                           className="cursor-pointer self-start text-label font-semibold text-brand-dark hover:text-brand"
@@ -186,14 +210,25 @@ export function ListeningExercise({ lesson, attemptId, nextLesson, onRestart, re
 
             {!result && (
               <>
-                {missing > 0 && <Alert variant="error">Bạn còn {missing} câu chưa trả lời.</Alert>}
                 {complete.isError && <Alert variant="error">{describeApiError(complete.error, 'Chưa nộp được bài. Hãy thử lại.')}</Alert>}
-                <Button type="submit" loading={complete.isPending}>
+                <Button type="submit" loading={complete.isPending} disabled={locked}>
                   Nộp bài
                 </Button>
               </>
             )}
           </form>
+
+          <Dialog open={confirmingMissing > 0} onClose={() => setConfirmingMissing(0)} title="Nộp bài?">
+            <p className="text-body text-ink-soft">
+              Còn {confirmingMissing} câu chưa trả lời. Câu chưa trả lời được tính sai.
+            </p>
+            <div className="flex flex-wrap justify-end gap-3">
+              <Button variant="outline" onClick={() => setConfirmingMissing(0)}>
+                Làm tiếp
+              </Button>
+              <Button onClick={handIn}>Nộp bài</Button>
+            </div>
+          </Dialog>
         </div>
       </div>
     </Page>

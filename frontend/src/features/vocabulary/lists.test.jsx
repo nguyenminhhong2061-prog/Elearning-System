@@ -103,10 +103,20 @@ describe('creating a list', () => {
     await user.click(await screen.findByRole('button', { name: '+ Tạo danh sách mới' }))
     const dialog = await screen.findByRole('dialog', { name: 'Tạo danh sách riêng' })
     const create = within(dialog).getByRole('button', { name: 'Tạo danh sách' })
-    expect(create).toBeDisabled()
+    const nameField = within(dialog).getByLabelText('Tên danh sách')
 
-    await user.type(within(dialog).getByLabelText('Tên danh sách'), 'Du lịch hè')
-    expect(create).toBeEnabled()
+    // Scenario 7, branch 11a: an empty name, or the name of another list of the learner, is refused at the field.
+    await user.click(create)
+    expect(within(dialog).getByText('Vui lòng nhập tên danh sách.')).toBeInTheDocument()
+    expect(nameField).toHaveAttribute('aria-invalid', 'true')
+    await user.type(nameField, '  phỏng vấn XIN việc ')
+    await user.click(create)
+    expect(within(dialog).getByText('Bạn đã có danh sách tên này.')).toBeInTheDocument()
+    expect(callsTo('POST /api/custom-lists')).toHaveLength(0)
+
+    await user.clear(nameField)
+    await user.type(nameField, 'Du lịch hè')
+    expect(within(dialog).queryByText('Bạn đã có danh sách tên này.')).not.toBeInTheDocument()
 
     // A typed entry that is not "word — meaning" is refused with an explanation.
     const entry = within(dialog).getByLabelText('Thêm từ')
@@ -117,6 +127,11 @@ describe('creating a list', () => {
     await user.type(entry, 'negotiate — thương lượng')
     await user.click(within(dialog).getByRole('button', { name: 'Thêm' }))
     expect(within(dialog).getByRole('list', { name: 'Từ đã chọn' })).toHaveTextContent('negotiate — thương lượng')
+
+    // Branch 6a: nothing in the vocabulary contains the term, so typing the word in is suggested.
+    await user.type(entry, 'zzz')
+    expect(await within(dialog).findByText(/Không tìm thấy từ phù hợp. Bạn có thể tự nhập theo dạng/)).toBeInTheDocument()
+    await user.clear(entry)
 
     // A suggestion from the shared vocabulary.
     await user.type(entry, 'reven')

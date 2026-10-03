@@ -1,15 +1,18 @@
 import { CEFR_LEVELS } from '../../src/api/constants.js'
 import { todayInVietnam } from '../../src/lib/dates.js'
-import { HttpError } from '../http.js'
+import { delay, HttpError } from '../http.js'
 import { MOCK_LESSONS } from '../exerciseFixtures.js'
 import { listeningAudioUrl } from '../media.js'
 
 // docs/api/exercises.md
 
-const SKILLS = ['GRAMMAR', 'LISTENING', 'PRONUNCIATION']
+const SKILLS = ['READING', 'WRITING', 'LISTENING', 'PRONUNCIATION']
 const MAX_RECORDING_BYTES = 1024 * 1024
 // Only these skills can be picked up again; listening answers reach the server only with the whole test.
-const RESUMABLE_SKILLS = ['GRAMMAR', 'PRONUNCIATION']
+const RESUMABLE_SKILLS = ['READING', 'WRITING', 'PRONUNCIATION']
+const WRITING_TYPES = ['TRANSLATION', 'REWRITE', 'KEYWORD_SENTENCE']
+const MAX_WRITING_LENGTH = 1000
+const AI_GRADING_MS = 900 // the AI reading a sentence
 const RESUME_WINDOW_MS = 7 * 86_400_000
 
 const attempts = new Map() // attemptId -> attempt
@@ -24,6 +27,7 @@ const SEEDED_HISTORY = [
   [3, 50, 3],
   [12, 67, 4],
   [22, 74, 1],
+  [31, 90, 3], // Viết câu về gia đình: best 90%
 ]
 // Unfinished attempts, so "Tiếp tục" and "Đang làm dở" show right away. [lessonId, answered or recorded, hours since
 // the last activity]. Lesson 4's is older than 7 days: it cannot be resumed and must not show anywhere.
@@ -161,8 +165,10 @@ export function normalizeAnswer(text) {
   return text.trim().replace(/\s+/g, ' ').toLowerCase().replace(/[‘’]/g, "'")
 }
 
+export const isWriting = (question) => WRITING_TYPES.includes(question.type)
+
 /**
- * Grades one answer against a fixture question.
+ * Grades one answer against a fixture question (reading, listening).
  * @returns {{ questionId, correct, optionId, answer, correctOptionId, correctAnswer, explanation, awardedPoints }}
  */
 export function grade(question, input) {
@@ -203,14 +209,102 @@ function recordResponse(attempt, lesson, input) {
   const question = lesson.questions.find((candidate) => candidate.id === input?.questionId)
   if (!question) throw new HttpError(400, 'Question does not belong to the lesson')
   if (attempt.responses.has(question.id)) throw new HttpError(409, 'Question already answered in this attempt')
+  if (isWriting(question)) throw new HttpError(400, 'Writing answers are sent one by one to /responses')
   const graded = grade(question, input)
   attempt.responses.set(question.id, graded)
   attempt.lastActivityAt = new Date().toISOString()
   return graded
 }
 
-/** A graded response as the review lists it: without the points. */
+// --- Writing (scenario 10) -----------------------------------------------------------------------------------------
+
+const VIETNAMESE_LETTERS = /[àáảãạăằắẳẵặâầấẩẫậđèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵ]/i
+const plain = (text) => normalizeAnswer(text).replace(/[.!?,;:"]/g, '').replace(/\s+/g, ' ').trim()
+const wordsOf = (text) => plain(text).split(' ').filter(Boolean)
+
+/** Every word of a keyword starts some word of the answer ("check" matches "checked"). */
+const usesKeyword = (answerWords, keyword) => wordsOf(keyword).every((part) => answerWords.some((word) => word.startsWith(part)))
+
+/**
+ * A believable fake of the AI grader: no AI here, so a few rules decide the points and the feedback. The fixtures'
+ * own rules come first (the mistakes of scenario 10), then: not English, missing keywords, a rewrite without the given
+ * start, an answer equal to a sample, and otherwise how many words of the closest sample it shares.
+ * @returns {{ points: number, feedback: string }}
+ */
+export function fakeWritingGrade(question, answer) {
+  const max = question.points
+  const text = plain(answer)
+  const sample = question.sampleAnswers[0]
+  const rule = question.rules.find((candidate) => text.includes(candidate.includes))
+  if (rule) return { points: rule.points, feedback: rule.feedback }
+  if (VIETNAMESE_LETTERS.test(answer)) return { points: 0, feedback: 'Câu trả lời chưa viết bằng tiếng Anh. Hãy viết lại câu bằng tiếng Anh.' }
+  const words = wordsOf(answer)
+  if (question.type === 'KEYWORD_SENTENCE') {
+    const missing = question.prompt.split('/').map((keyword) => keyword.trim()).filter((keyword) => !usesKeyword(words, keyword))
+    if (missing.length > 0) {
+      return { points: Math.max(0, max - missing.length), feedback: `Thiếu từ khóa ${missing.join(', ')}: câu cần dùng đủ các từ gợi ý. Câu gợi ý: ${sample}` }
+    }
+  }
+  if (question.type === 'REWRITE' && question.starter && !text.startsWith(plain(question.starter))) {
+    return { points: max / 2, feedback: `Câu viết lại cần bắt đầu bằng "${question.starter} …" như đề cho sẵn. Câu gợi ý: ${sample}` }
+  }
+  if (question.sampleAnswers.some((candidate) => plain(candidate) === text)) {
+    return { points: max, feedback: question.perfect ?? 'Chính xác: câu đúng ngữ pháp, đủ ý và diễn đạt tự nhiên.' }
+  }
+  const overlap = Math.max(...question.sampleAnswers.map((candidate) => {
+    const target = wordsOf(candidate)
+    return target.filter((word) => words.includes(word)).length / target.length
+  }))
+  if (overlap >= 0.8) return { points: max - 0.5, feedback: `Câu gần đúng và đủ ý, còn một chỗ diễn đạt chưa tự nhiên. Câu gợi ý: ${sample}` }
+  if (overlap >= 0.5) return { points: max / 2, feedback: `Câu mới đủ một phần ý và còn lỗi diễn đạt. Câu gợi ý: ${sample}` }
+  return { points: 0, feedback: `Câu chưa đúng yêu cầu của đề. Câu gợi ý: ${sample}` }
+}
+
+/** A writing answer as the API returns it: graded (points, feedback, samples, explanation) or not yet. */
+function writingResult(question, answer, grading) {
+  return {
+    questionId: question.id,
+    correct: null,
+    graded: Boolean(grading),
+    optionId: null,
+    answer,
+    awardedPoints: grading ? grading.points : null,
+    maxPoints: question.points,
+    feedback: grading ? grading.feedback : null,
+    sampleAnswers: grading ? question.sampleAnswers : [],
+    explanation: grading ? question.explanation : null,
+    correctOptionId: null,
+    correctAnswer: null,
+  }
+}
+
+/** Asks the (fake) AI to grade a saved answer; when the AI is down the answer stays saved without points. */
+async function gradeWriting(attempt, question, aiDown) {
+  await delay(AI_GRADING_MS)
+  const saved = attempt.responses.get(question.id)
+  const result = writingResult(question, saved.answer, aiDown ? null : fakeWritingGrade(question, saved.answer))
+  attempt.responses.set(question.id, result)
+  attempt.lastActivityAt = new Date().toISOString()
+  return result
+}
+
+/** Scenario 10, steps 5 to 8: the answer is saved first, then graded. */
+async function answerWriting(attempt, lesson, input, aiDown) {
+  const question = lesson.questions.find((candidate) => candidate.id === input?.questionId)
+  if (!question || !isWriting(question)) throw new HttpError(400, 'Question is not a writing question of the lesson')
+  if (attempt.responses.has(question.id)) throw new HttpError(409, 'Question already answered in this attempt')
+  if (input.optionId !== undefined && input.optionId !== null) throw new HttpError(400, 'Writing questions take an answer, not an option')
+  if (typeof input.answer !== 'string' || !input.answer.trim() || input.answer.length > MAX_WRITING_LENGTH) {
+    throw new HttpError(400, `answer must be 1 to ${MAX_WRITING_LENGTH} characters`)
+  }
+  attempt.responses.set(question.id, writingResult(question, input.answer, null))
+  attempt.lastActivityAt = new Date().toISOString()
+  return gradeWriting(attempt, question, aiDown)
+}
+
+/** A response as the review lists it: without the points of a reading or listening question. */
 function reviewItem(response) {
+  if (response.maxPoints !== undefined) return response
   const { awardedPoints: _points, ...item } = response
   return item
 }
@@ -219,16 +313,38 @@ function completedAttempts(userId, lessonId) {
   return [...attempts.values()].filter((attempt) => attempt.userId === userId && attempt.lessonId === lessonId && attempt.status === 'COMPLETED')
 }
 
+/** Different items recorded at least once over every attempt; a seeded finished attempt counts as all of them. */
+function practicedCountOf(userId, lesson) {
+  if (lesson.skill !== 'PRONUNCIATION') return null
+  const mine = [...attempts.values()].filter((attempt) => attempt.userId === userId && attempt.lessonId === lesson.id)
+  if (mine.some((attempt) => attempt.seeded && attempt.status === 'COMPLETED')) return lesson.pronunciationItems.length
+  return new Set(mine.flatMap((attempt) => [...attempt.recordings.keys()])).size
+}
+
+/** The latest finished attempt as "8/10"; a seeded one only has its percentage, so the count is derived from it. */
+function lastResultOf(lesson, done) {
+  if (lesson.skill === 'PRONUNCIATION' || lesson.skill === 'WRITING' || done.length === 0) return null
+  const last = done.at(-1)
+  const questionCount = lesson.questions.length
+  const correctCount = last.responses.size > 0
+    ? [...last.responses.values()].filter((response) => response.correct).length
+    : Math.round((last.scorePercent / 100) * questionCount)
+  return { correctCount, questionCount }
+}
+
 function progressOf(userId, lessonId) {
   ensureHistory(userId)
+  const lesson = findLesson(lessonId)
   const done = completedAttempts(userId, lessonId)
-  const inProgress = inProgressOf(userId, findLesson(lessonId))
-  if (done.length === 0) return { attemptCount: 0, bestScorePercent: null, lastCompletedAt: null, inProgress }
+  const inProgress = inProgressOf(userId, lesson)
+  const extra = { practicedCount: practicedCountOf(userId, lesson), lastResult: lastResultOf(lesson, done) }
+  if (done.length === 0) return { attemptCount: 0, bestScorePercent: null, lastCompletedAt: null, inProgress, ...extra }
   return {
     attemptCount: done.length,
     bestScorePercent: Math.max(...done.map((attempt) => attempt.scorePercent)),
     lastCompletedAt: done.at(-1).finishedAt,
     inProgress,
+    ...extra,
   }
 }
 
@@ -241,11 +357,13 @@ function toSummary(lesson, userId) {
   return { ...fields, itemCount: itemCount(lesson), progress: progressOf(userId, lesson.id) }
 }
 
-/** The lesson as the API sends it: no answers, explanations or translations. */
+/** The lesson as the API sends it: no answers, sample answers, explanations or translations. */
 function toPublicLesson(lesson) {
   return {
     ...lesson,
-    questions: lesson.questions.map(({ correctOptionId: _c, accepted: _a, explanation: _e, ...question }) => question),
+    questions: lesson.questions.map(
+      ({ correctOptionId: _c, accepted: _a, explanation: _e, sampleAnswers: _s, rules: _r, perfect: _p, ...question }) => question,
+    ),
     passage: lesson.passage && {
       title: lesson.passage.title,
       audioUrl: listeningAudioUrl(lesson.id),
@@ -369,6 +487,24 @@ function finish(attempt, lesson, body) {
         itemCount: total,
       },
     }
+  } else if (lesson.skill === 'WRITING') {
+    const ungraded = [...attempt.responses.values()].filter((response) => !response.graded).length
+    if (ungraded > 0) throw new HttpError(409, `${ungraded} writing answer(s) not graded yet`)
+    const review = lesson.questions.map(
+      (question) => attempt.responses.get(question.id) ?? { ...writingResult(question, null, { points: 0, feedback: null }) }, // unanswered
+    )
+    const totalPoints = lesson.questions.reduce((sum, question) => sum + question.points, 0)
+    const earnedPoints = review.reduce((sum, item) => sum + item.awardedPoints, 0)
+    result = {
+      correctCount: review.filter((item) => item.awardedPoints === item.maxPoints).length,
+      questionCount: lesson.questions.length,
+      earnedPoints,
+      totalPoints,
+      scorePercent: totalPoints ? Math.round((earnedPoints / totalPoints) * 100) : 0,
+      review,
+      translations: [],
+      pronunciation: null,
+    }
   } else {
     const review = lesson.questions.map((question) => {
       const response = attempt.responses.get(question.id)
@@ -407,7 +543,7 @@ export const exerciseRoutes = [
     pattern: /^\/api\/exercises$/,
     handle({ userId, searchParams }) {
       const skill = searchParams.get('skill')
-      if (!SKILLS.includes(skill)) throw new HttpError(400, 'skill must be GRAMMAR, LISTENING or PRONUNCIATION')
+      if (!SKILLS.includes(skill)) throw new HttpError(400, 'skill must be READING, WRITING, LISTENING or PRONUNCIATION')
       return MOCK_LESSONS.filter((lesson) => lesson.skill === skill && itemCount(lesson) > 0)
         .toSorted((a, b) => CEFR_LEVELS.indexOf(a.cefrLevel) - CEFR_LEVELS.indexOf(b.cefrLevel) || a.id - b.id)
         .map((lesson) => toSummary(lesson, userId))
@@ -458,9 +594,28 @@ export const exerciseRoutes = [
   {
     method: 'POST',
     pattern: /^\/api\/exercise-attempts\/(\d+)\/responses$/,
-    handle({ userId, match, body }) {
+    async handle({ userId, match, body, aiDown }) {
       const attempt = requireOpenAttempt(userId, match)
-      const { optionId: _o, answer: _a, ...graded } = recordResponse(attempt, findLesson(attempt.lessonId), body)
+      const lesson = findLesson(attempt.lessonId)
+      const writing = lesson.skill === 'WRITING'
+      const { optionId: _o, answer: _a, ...graded } = writing
+        ? await answerWriting(attempt, lesson, body, aiDown)
+        : recordResponse(attempt, lesson, body)
+      return graded
+    },
+  },
+  {
+    // Scenario 10, branches 7b and 14a: send a saved writing answer to the AI again.
+    method: 'POST',
+    pattern: /^\/api\/exercise-attempts\/(\d+)\/responses\/(\d+)\/grade$/,
+    async handle({ userId, match, aiDown }) {
+      const attempt = requireOpenAttempt(userId, match)
+      const question = findLesson(attempt.lessonId).questions.find((candidate) => candidate.id === Number(match[2]))
+      if (!question || !isWriting(question) || !attempt.responses.has(question.id)) {
+        throw new HttpError(400, 'Not an answered writing question of this attempt')
+      }
+      if (attempt.responses.get(question.id).graded) throw new HttpError(409, 'Answer already graded')
+      const { optionId: _o, answer: _a, ...graded } = await gradeWriting(attempt, question, aiDown)
       return graded
     },
   },

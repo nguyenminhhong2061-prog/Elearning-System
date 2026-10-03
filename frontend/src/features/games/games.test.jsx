@@ -167,6 +167,11 @@ describe('playing', () => {
     expect(await screen.findByText('Điểm của bạn')).toBeInTheDocument()
     expect(screen.getByText('130')).toBeInTheDocument()
     expect(screen.getByText('Đúng 1/2 câu')).toBeInTheDocument()
+    expect(screen.getByText(/^Thời gian \d+ giây$/)).toBeInTheDocument()
+    // Scenario 8, step 8: the wrong answers, with what was picked and the right meaning.
+    const wrong = screen.getByRole('table')
+    expect(within(wrong).getAllByRole('row')).toHaveLength(2)
+    expect(within(wrong).getByRole('row', { name: /budget/ })).toHaveTextContent('2budgethợp đồngngân sách')
     const handIn = callsTo('POST /api/games/1/sessions')
     expect(handIn).toHaveLength(1)
     expect(handIn[0].body).toEqual({
@@ -213,10 +218,31 @@ describe('playing', () => {
     expect(await screen.findByLabelText('Thời gian còn lại')).toHaveTextContent('00:01')
 
     expect(await screen.findByText('Điểm của bạn', {}, { timeout: 4000 })).toBeInTheDocument()
+    // Questions left unanswered count as wrong (branch 7a).
+    expect(within(screen.getByRole('table')).getAllByText('Chưa trả lời')).toHaveLength(2)
     expect(callsTo('POST /api/games/2/sessions')[0].body.answers).toEqual([
       { questionId: 11, optionId: null, responseTimeMs: null },
       { questionId: 12, optionId: null, responseTimeMs: null },
     ])
+  })
+
+  it('stops the clock while asking about leaving, and goes on when the learner stays (branch 6a)', async () => {
+    renderAt('/vocabulary/games/2')
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'Bắt đầu' }))
+    await user.click(await screen.findByRole('button', { name: 'Thoát ván' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Thoát ván này?' })
+    expect(within(dialog).getByText('Thoát bây giờ sẽ không lưu điểm ván này. Bạn có chắc?')).toBeInTheDocument()
+
+    // The round lasts one second; while the question is open it does not run out.
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    expect(callsTo('POST /api/games/2/sessions')).toHaveLength(0)
+
+    await user.click(within(dialog).getByRole('button', { name: 'Chơi tiếp' }))
+    expect(screen.getByText('revenue')).toBeInTheDocument()
+    expect(await screen.findByText('Điểm của bạn', {}, { timeout: 4000 })).toBeInTheDocument()
+    expect(callsTo('POST /api/games/2/sessions')).toHaveLength(1)
   })
 
   it('asks before leaving a round, and then saves nothing', async () => {

@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ATTEMPT_ID, baseRoutes, renderApp } from './testFixtures'
+import '@/test/preloadPages'
 
 // The AI assistant panel (B4), against docs/api/chatbot.md.
 
@@ -66,6 +67,8 @@ describe('AI assistant', () => {
     const input = within(panel).getByRole('textbox', { name: 'Câu hỏi cho trợ lý AI' })
     expect(input).toHaveFocus()
     expect(within(panel).getByRole('button', { name: 'Giải thích câu này giúp tôi' })).toBeInTheDocument()
+    // Scenario 13, step 3: the panel says which question it is about.
+    expect(within(panel).getByText('Câu 1 – Thì hiện tại hoàn thành: She ___ (live) in Hanoi for five years.')).toBeInTheDocument()
 
     await user.type(input, 'Vì sao dùng has lived?{Enter}')
 
@@ -93,13 +96,37 @@ describe('AI assistant', () => {
     expect(app.callsTo(MESSAGES)[1].body).toMatchObject({ content: 'Còn câu này?', questionId: 32 })
   })
 
+  it('reopens the latest chat of this lesson when the learner comes back to it (scenario 13, branch 2a)', async () => {
+    app = renderApp('/exercises/lessons/3', chatRoutes({
+      'GET /api/chat/sessions': () => ({ data: { content: [
+        { id: 8, title: 'Hỏi đáp chung', lessonId: null, createdAt: '2026-09-26T03:00:00Z', updatedAt: '2026-09-26T03:00:00Z' },
+        { id: 9, title: 'Thì hiện tại hoàn thành', lessonId: 3, createdAt: '2026-09-26T02:00:00Z', updatedAt: '2026-09-26T02:03:00Z' },
+      ], last: true } }),
+      'GET /api/chat/sessions/9/messages': () => ({ data: { content: [
+        { id: 31, role: 'ASSISTANT', content: '<p>Câu này nói về trải nghiệm.</p>', sources: [] },
+        { id: 30, role: 'USER', content: 'Tại sao không dùng saw?', sources: [] },
+      ], last: true } }),
+    }))
+    const user = userEvent.setup()
+    await screen.findByText('Câu 1/2')
+
+    const panel = await openAssistant(user)
+    expect(await within(panel).findByText('Tại sao không dùng saw?')).toBeInTheDocument()
+    expect(within(panel).getByText('Câu này nói về trải nghiệm.')).toBeInTheDocument()
+
+    await user.type(within(panel).getByRole('textbox', { name: 'Câu hỏi cho trợ lý AI' }), 'Thêm ví dụ?{Enter}')
+    await within(panel).findByText('has/have + V3', { selector: 'strong' })
+    expect(app.callsTo(SESSIONS)).toHaveLength(0)
+    expect(app.callsTo(MESSAGES)).toHaveLength(1)
+  })
+
   it('renders allowed HTML but drops dangerous tags and attributes', async () => {
     app = renderApp('/exercises/lessons/3', chatRoutes({ [MESSAGES]: () => reply('<p onclick="alert(1)"><strong>ok</strong><img src=x onerror="alert(1)"><script>alert(1)</script></p>') }))
     const user = userEvent.setup()
     await screen.findByText('Câu 1/2')
     const panel = await openAssistant(user)
 
-    await user.click(within(panel).getByRole('button', { name: 'Mẹo để nhớ cấu trúc này' }))
+    await user.click(within(panel).getByRole('button', { name: 'Cho tôi thêm ví dụ tương tự' }))
 
     expect(await within(panel).findByText('ok', { selector: 'strong' })).toBeInTheDocument()
     expect(panel.querySelector('img')).toBeNull()
@@ -170,9 +197,10 @@ describe('AI assistant', () => {
     await user.type(screen.getByRole('textbox', { name: 'Đáp án của bạn' }), 'seen{Enter}')
     await user.click(await screen.findByRole('button', { name: 'Xem kết quả' }))
 
-    const review = (await screen.findByRole('heading', { name: 'Câu cần xem lại (1)' })).closest('section')
-    await user.click(within(review).getByRole('button', { name: 'Hỏi trợ lý AI về câu này →' }))
+    const review = (await screen.findByRole('heading', { name: /^Xem lại từng câu/ })).closest('section')
+    await user.click(within(review).getAllByRole('button', { name: 'Hỏi trợ lý AI về câu này →' })[0])
     const panel = screen.getByRole('dialog', { name: 'Trợ lý AI' })
+    expect(within(panel).getByText(/^Câu 1 – .*Bạn chọn: lives \(sai\)$/)).toBeInTheDocument()
     await user.type(within(panel).getByRole('textbox', { name: 'Câu hỏi cho trợ lý AI' }), 'Vì sao sai?{Enter}')
 
     await within(panel).findByText('has/have + V3', { selector: 'strong' })
@@ -187,6 +215,7 @@ describe('AI assistant', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Hỏi trợ lý AI về câu này →' }))
 
-    expect(screen.getByRole('dialog', { name: 'Trợ lý AI' })).toBeInTheDocument()
+    const panel = screen.getByRole('dialog', { name: 'Trợ lý AI' })
+    expect(within(panel).getByText(/^Câu 1 – .*Bạn chọn: lives \(sai\)$/)).toBeInTheDocument()
   })
 })

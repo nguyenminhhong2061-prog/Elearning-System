@@ -2,6 +2,7 @@ import { fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ATTEMPT_ID, baseRoutes, renderApp } from './testFixtures'
+import '@/test/preloadPages'
 
 // The listening exercise (B2), against docs/api/exercises.md. jsdom has no media playback, so play() and pause() are
 // replaced by versions that only fire the events a browser would.
@@ -96,16 +97,27 @@ describe('listening exercise', () => {
     expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(2)
   })
 
-  it('asks for every answer, hands the test in with the speed, then shows the answers and the translation', async () => {
+  it('hides the subtitles while answering, asks before handing in empty questions, then shows the answers', async () => {
     app = renderApp('/exercises/lessons/11', listeningRoutes())
     const user = userEvent.setup()
     await screen.findByRole('heading', { level: 1, name: 'Hội thoại tại sân bay' })
 
+    // Scenario 11, step 8: the first answer hides the subtitles and locks them until hand-in.
+    await user.click(screen.getByRole('switch', { name: 'Hiện phụ đề' }))
+    expect(screen.getByRole('list', { name: 'Phụ đề' })).toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: 'Quầy làm thủ tục' }))
+    expect(screen.queryByRole('list', { name: 'Phụ đề' })).not.toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: 'Hiện phụ đề' })).toBeDisabled()
+    expect(screen.getByText(/Phụ đề tạm ẩn trong lúc bạn trả lời câu hỏi/)).toBeInTheDocument()
+
+    // Branch 9a: an empty question is announced; staying sends nothing.
     await user.click(screen.getByRole('button', { name: 'Nộp bài' }))
-    expect(screen.getByRole('alert')).toHaveTextContent('Bạn còn 2 câu chưa trả lời.')
+    const dialog = await screen.findByRole('dialog', { name: 'Nộp bài?' })
+    expect(within(dialog).getByText('Còn 1 câu chưa trả lời. Câu chưa trả lời được tính sai.')).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Làm tiếp' }))
+    expect(screen.queryByRole('dialog', { name: 'Nộp bài?' })).not.toBeInTheDocument()
     expect(app.callsTo(`POST /api/exercise-attempts/${ATTEMPT_ID}/complete`)).toHaveLength(0)
 
-    await user.click(screen.getByRole('radio', { name: 'Quầy làm thủ tục' }))
     await user.type(screen.getByRole('textbox', { name: 'Đáp án của bạn' }), '2')
     await user.click(screen.getByRole('button', { name: '0.75x' }))
     await user.click(screen.getByRole('button', { name: 'Nộp bài' }))
@@ -127,5 +139,44 @@ describe('listening exercise', () => {
     await user.click(screen.getByRole('switch', { name: 'Hiện bản dịch' }))
     expect(screen.queryByText('Đó là quầy số mười hai.')).not.toBeInTheDocument()
     expect(screen.getByText('It’s counter number twelve.')).toBeInTheDocument()
+  })
+
+  it('hands in with an empty question counted wrong once the learner confirms', async () => {
+    app = renderApp('/exercises/lessons/11', listeningRoutes())
+    const user = userEvent.setup()
+    await screen.findByRole('heading', { level: 1, name: 'Hội thoại tại sân bay' })
+
+    await user.click(screen.getByRole('radio', { name: 'Quầy làm thủ tục' }))
+    await user.click(screen.getByRole('button', { name: 'Nộp bài' }))
+    await user.click(within(await screen.findByRole('dialog', { name: 'Nộp bài?' })).getByRole('button', { name: 'Nộp bài' }))
+
+    expect(await screen.findByRole('heading', { name: 'Hoàn thành bài nghe' })).toBeInTheDocument()
+    expect(app.callsTo(`POST /api/exercise-attempts/${ATTEMPT_ID}/complete`)[0].body.responses).toEqual([
+      { questionId: 1111, optionId: 11111 },
+    ])
+  })
+
+  it('goes back five seconds, and offers to load the recording again when it failed (branch 5a)', async () => {
+    const load = vi.spyOn(window.HTMLMediaElement.prototype, 'load').mockImplementation(() => {})
+    app = renderApp('/exercises/lessons/11', listeningRoutes())
+    const user = userEvent.setup()
+    await screen.findByRole('heading', { level: 1, name: 'Hội thoại tại sân bay' })
+    const audio = document.querySelector('audio')
+
+    audio.currentTime = 12
+    fireEvent.timeUpdate(audio)
+    await user.click(screen.getByRole('button', { name: 'Lùi 5 giây' }))
+    expect(audio.currentTime).toBe(7)
+
+    fireEvent.error(audio)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Không tải được bài nghe, vui lòng thử lại')
+    expect(screen.getByRole('radio', { name: 'Quầy làm thủ tục' })).toBeDisabled()
+    expect(screen.getByRole('textbox', { name: 'Đáp án của bạn' })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: 'Tải lại' }))
+    expect(load).toHaveBeenCalled()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Quầy làm thủ tục' })).toBeEnabled()
+    load.mockRestore()
   })
 })

@@ -14,8 +14,8 @@ import { createContext } from 'react'
  * @property {boolean} isAdmin
  * @property {(credentials: { email: string, password: string }) => Promise<import('@/api/types').User>} login
  *   rejects with an ApiError when the credentials are refused
- * @property {(details: { fullName: string, email: string, password: string }) => Promise<{ signedIn: boolean }>} register
- *   creates the account and then logs in; signedIn is false if the account was created but the automatic login failed
+ * @property {(details: { fullName: string, email: string, password: string }) => Promise<void>} register
+ *   creates the account only; the learner then signs in on the login page
  * @property {() => void} logout
  * @property {() => void} retry
  */

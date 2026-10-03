@@ -7,7 +7,10 @@ import { Card } from '@/components/ui/Card'
 import { LoadError } from '@/components/ui/LoadError'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Tag } from '@/components/ui/Tag'
+import { CEFR_LEVELS } from '@/api/constants'
+import { useAuth } from '@/features/auth/context/useAuth'
 import { cx } from '@/lib/cx'
+import { formatDate, todayInVietnam } from '@/lib/dates'
 import { useTest, useTestResult } from '../api/testsQueries'
 import { ATTEMPT_STATUS, SKILL_LABELS, SKILL_ORDER, TEST_TYPE_LABELS, TEST_TYPES } from '../constants'
 
@@ -129,6 +132,20 @@ function levelChangeNote(result, levelBefore) {
   return `Trình độ của bạn đổi từ ${levelBefore} thành ${result.suggestedLevel}.`
 }
 
+/** The next CEFR level, the goal a comprehensive test's roadmap aims at ("12 tuần hướng tới B2"). */
+function nextLevel(level) {
+  const position = CEFR_LEVELS.indexOf(level)
+  return position === -1 ? null : CEFR_LEVELS[Math.min(position + 1, CEFR_LEVELS.length - 1)]
+}
+
+/** "Người học: … · Ngày làm: … · Trình độ trước khi làm bài: …" of a comprehensive test (scenario 15, step 18). */
+function reportLine(fullName, submittedAt, levelBefore) {
+  const parts = [`Người học: ${fullName}`]
+  if (submittedAt) parts.push(`Ngày làm: ${formatDate(todayInVietnam(new Date(submittedAt)))}`)
+  if (levelBefore) parts.push(`Trình độ trước khi làm bài: ${levelBefore}`)
+  return parts.join(' · ')
+}
+
 /** /tests/:testId/result/:attemptId: the graded result of one attempt. */
 export function TestResultPage() {
   const params = useParams()
@@ -138,6 +155,7 @@ export function TestResultPage() {
   const test = useTest(testId)
   const location = useLocation()
   const navigate = useNavigate()
+  const { user } = useAuth()
   // Set by the taking screen right after submitting. It is kept for this visit only: the browser stores history state
   // across reloads, so it is removed from the history entry and a reload or a later visit shows no "level" note.
   const [{ justSubmitted = false, levelBefore = null }] = useState(() => location.state ?? {})
@@ -172,6 +190,12 @@ export function TestResultPage() {
   const data = result.data
   const pending = SKILL_ORDER.filter((key) => data.skills[key] !== undefined && data.skills[key].score === null)
   const levelNote = justSubmitted ? levelChangeNote(data, levelBefore) : null
+  const comprehensive = data.type === TEST_TYPES.COMPREHENSIVE
+  // Scenario 15 branch 18a: the roadmap goes to the plan page with the next level as the goal.
+  const applyRoadmap =
+    comprehensive && data.status === ATTEMPT_STATUS.GRADED && data.suggestedRoadmap
+      ? { attemptId: data.attemptId, targetLevel: nextLevel(data.suggestedLevel), roadmap: data.suggestedRoadmap }
+      : null
 
   return (
     <Page
@@ -183,6 +207,9 @@ export function TestResultPage() {
             {TEST_TYPE_LABELS[data.type]}
           </Tag>
           <h1 className="text-title font-bold text-ink">{data.title}</h1>
+          {comprehensive && (
+            <p className="text-label text-muted">{reportLine(user.fullName, data.submittedAt, justSubmitted ? levelBefore : null)}</p>
+          )}
         </div>
       }
     >
@@ -222,9 +249,15 @@ export function TestResultPage() {
           ← Về danh sách bài kiểm tra
         </ButtonLink>
         <ButtonLink to={`/tests/${data.testId}`}>Làm lại</ButtonLink>
-        <ButtonLink to="/plan" variant="outline">
-          Xem kế hoạch cá nhân →
-        </ButtonLink>
+        {applyRoadmap ? (
+          <ButtonLink to="/plan" state={{ fromTest: applyRoadmap }} variant="outline">
+            Áp dụng lộ trình vào kế hoạch học →
+          </ButtonLink>
+        ) : (
+          <ButtonLink to="/plan" variant="outline">
+            Xem kế hoạch cá nhân →
+          </ButtonLink>
+        )}
       </div>
     </Page>
   )

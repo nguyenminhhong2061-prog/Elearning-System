@@ -25,13 +25,19 @@ function StatCard({ label, value, caption, valueClassName }) {
   )
 }
 
+/** Scenario 16: the average sits under the count; it may be missing while the backend does not send it yet. */
+function testsCaption({ testsCompleted, averageTestScore }) {
+  if (testsCompleted === 0) return 'Chưa làm bài kiểm tra nào'
+  return averageTestScore == null ? 'Định kỳ và tổng hợp' : `Điểm trung bình ${averageTestScore}/100`
+}
+
 function streakCaption({ current, activeToday }) {
   if (activeToday) return 'Hôm nay đã học, chuỗi được giữ'
   return current > 0 ? `Học hôm nay để giữ chuỗi ${current} ngày` : 'Học hôm nay để bắt đầu chuỗi'
 }
 
 /**
- * The four cards at the top of the home page. Word counts come from the vocabulary module (the same numbers as the
+ * The five cards at the top of the home page. Word counts come from the vocabulary module (the same numbers as the
  * Từ vựng page), exercises and the streak from the progress module.
  */
 export function ProgressStats() {
@@ -41,7 +47,7 @@ export function ProgressStats() {
   const streak = progress.data?.streak
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-4 xl:grid-cols-5">
       <StatCard
         label="Từ đã học"
         value={shown(learning, (data) => formatCount(data.learningCount + data.masteredCount))}
@@ -50,7 +56,12 @@ export function ProgressStats() {
       <StatCard
         label="Bài tập đã hoàn thành"
         value={shown(progress, (data) => formatCount(data.totals.exercisesCompleted))}
-        caption="Ngữ pháp, nghe hiểu, phát âm"
+        caption="Đọc hiểu, viết, nghe hiểu, phát âm"
+      />
+      <StatCard
+        label="Bài kiểm tra đã làm"
+        value={shown(progress, (data) => formatCount(data.totals.testsCompleted))}
+        caption={progress.data && testsCaption(progress.data.totals)}
       />
       <StatCard
         label="Streak"

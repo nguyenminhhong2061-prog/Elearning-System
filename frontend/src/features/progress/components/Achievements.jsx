@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { LoadError } from '@/components/ui/LoadError'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { formatDayMonth, todayInVietnam } from '@/lib/dates'
+import { formatDate, todayInVietnam } from '@/lib/dates'
 import { cx } from '@/lib/cx'
 import { useBadges } from '../api/progressQueries'
 import { BADGE_UNITS } from '../constants'
@@ -30,7 +30,7 @@ function BadgeIcon({ badge, earned, size }) {
   )
 }
 
-const earnedDate = (badge) => formatDayMonth(todayInVietnam(new Date(badge.earnedAt)))
+const earnedDate = (badge) => formatDate(todayInVietnam(new Date(badge.earnedAt)))
 
 function EarnedTile({ badge }) {
   return (

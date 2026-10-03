@@ -1,9 +1,10 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
-import { ATTEMPT_ID, baseRoutes, GRAMMAR_LESSON, gradeGrammar, LESSONS, renderApp } from './testFixtures'
+import { ATTEMPT_ID, baseRoutes, READING_LESSON, gradeReading, LESSONS, renderApp } from './testFixtures'
+import '@/test/preloadPages'
 
-// Lesson lists and the grammar exercise (B1), against docs/api/exercises.md.
+// Lesson lists and the reading exercise (scenario 9), against docs/api/exercises.md.
 
 let app
 afterEach(() => app?.backend.restore())
@@ -26,7 +27,7 @@ const RESULT = {
   pronunciation: null,
 }
 
-function grammarRoutes(overrides) {
+function readingRoutes(overrides) {
   return baseRoutes({
     [`POST /api/exercise-attempts/${ATTEMPT_ID}/complete`]: () => ({ data: RESULT }),
     ...overrides,
@@ -34,13 +35,15 @@ function grammarRoutes(overrides) {
 }
 
 describe('lesson list', () => {
-  it('groups the grammar lessons by level, easiest first, with the learner’s best score', async () => {
+  it('groups the reading lessons by level, easiest first, with the learner’s best score (scenario 9, steps 2 to 4)', async () => {
     app = renderApp('/exercises', baseRoutes())
 
-    expect(await screen.findByText('Đã hoàn thành 1 / 3 bài ngữ pháp')).toBeInTheDocument()
+    expect(await screen.findByText('Đã hoàn thành 1 / 3 bài đọc hiểu')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1, name: 'Bài tập' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Ngữ pháp' })).toHaveAttribute('aria-current', 'page')
-    expect(app.callsTo('GET /api/exercises')[0].params).toEqual({ skill: 'GRAMMAR' })
+    const tabs = screen.getByRole('navigation', { name: 'Kỹ năng' })
+    expect(within(tabs).getAllByRole('link').map((link) => link.textContent)).toEqual(['Đọc hiểu', 'Viết', 'Nghe hiểu', 'Phát âm'])
+    expect(screen.getByRole('link', { name: 'Đọc hiểu' })).toHaveAttribute('aria-current', 'page')
+    expect(app.callsTo('GET /api/exercises')[0].params).toEqual({ skill: 'READING' })
 
     const levels = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)
     expect(levels).toEqual(['A1 · Mới bắt đầu', 'B1 · Trung cấpTrình độ của bạn', 'B2 · Trung cao cấp'])
@@ -66,6 +69,22 @@ describe('lesson list', () => {
     expect(app.callsTo('GET /api/exercises').at(-1).params).toEqual({ skill: 'LISTENING' })
   })
 
+  it('shows the grammar lessons of a backend not updated yet as reading lessons, and no writing lesson', async () => {
+    const legacy = LESSONS.READING.map((lesson) => ({ ...lesson, skill: 'GRAMMAR' }))
+    app = renderApp(
+      '/exercises',
+      baseRoutes({
+        'GET /api/exercises': ({ params }) => (params.skill === 'GRAMMAR' ? { data: legacy } : { status: 400, data: { status: 400, message: 'Request parameter has an invalid value' } }),
+      }),
+    )
+    const user = userEvent.setup()
+
+    expect(await screen.findByRole('link', { name: /Thì hiện tại hoàn thành/ })).toHaveAttribute('href', '/exercises/lessons/3')
+    expect(app.callsTo('GET /api/exercises').map((call) => call.params.skill)).toEqual(['READING', 'GRAMMAR'])
+    await user.click(screen.getByRole('link', { name: 'Viết' }))
+    expect(await screen.findByRole('heading', { name: 'Chưa có bài tập' })).toBeInTheDocument()
+  })
+
   it('says when a skill has no lessons yet, and offers a retry when loading fails', async () => {
     let fail = true
     app = renderApp(
@@ -82,9 +101,9 @@ describe('lesson list', () => {
   })
 })
 
-describe('grammar exercise', () => {
+describe('reading exercise', () => {
   it('starts one attempt, grades each answer with the server and ends with the score and the questions to review', async () => {
-    app = renderApp('/exercises/lessons/3', grammarRoutes())
+    app = renderApp('/exercises/lessons/3', readingRoutes())
     const user = userEvent.setup()
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Thì hiện tại hoàn thành' })).toBeInTheDocument()
@@ -121,13 +140,39 @@ describe('grammar exercise', () => {
     expect(result).toHaveTextContent('Điểm 50% · Cao nhất 80%')
     expect(within(result).getByRole('link', { name: 'Bài tiếp theo' })).toHaveAttribute('href', '/exercises/lessons/5')
 
-    const review = screen.getByRole('heading', { name: 'Câu cần xem lại (1)' }).closest('section')
-    expect(review).toHaveTextContent('Bạn trả lời: lives')
-    expect(review).toHaveTextContent('Đáp án đúng: has lived')
+    // Step 16: every question is listed again, right or wrong.
+    const review = screen.getByRole('heading', { name: 'Xem lại từng câu · đúng 1/2' }).closest('section')
+    const items = within(review).getAllByRole('listitem')
+    expect(items[0]).toHaveTextContent('Câu 1 · ✗ Sai')
+    expect(items[0]).toHaveTextContent('Bạn trả lời: lives')
+    expect(items[0]).toHaveTextContent('Đáp án đúng: has lived')
+    expect(items[1]).toHaveTextContent('Câu 2 · ✓ Đúng')
+    expect(items[1]).toHaveTextContent('Bạn trả lời: seen')
+    expect(items[1]).not.toHaveTextContent('Đáp án đúng')
+  })
+
+  it('shows the passage beside a question about it, and only then (scenario 9, step 13)', async () => {
+    app = renderApp('/exercises/lessons/8', readingRoutes())
+    const user = userEvent.setup()
+
+    expect(await screen.findByText('Câu 1/2')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'A trip to Ha Long Bay' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: 'saw' }))
+    await user.click(screen.getByRole('button', { name: 'Kiểm tra' }))
+    await user.click(await screen.findByRole('button', { name: 'Câu tiếp theo →' }))
+
+    const passage = await screen.findByRole('region', { name: 'A trip to Ha Long Bay' })
+    expect(within(passage).getByText('Bài đọc')).toBeInTheDocument()
+    expect(within(passage).getByText('We spent one night on a boat.')).toBeInTheDocument()
+    expect(screen.getByText('How did they get to Ha Long Bay?')).toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: 'By bus' }))
+    await user.click(screen.getByRole('button', { name: 'Kiểm tra' }))
+    expect(await screen.findByText('✓ Chính xác!')).toBeInTheDocument()
+    expect(passage).toBeInTheDocument()
   })
 
   it('picks answers with the number keys', async () => {
-    app = renderApp('/exercises/lessons/3', grammarRoutes())
+    app = renderApp('/exercises/lessons/3', readingRoutes())
     const user = userEvent.setup()
     await screen.findByText('Câu 1/2')
 
@@ -141,8 +186,8 @@ describe('grammar exercise', () => {
     let fail = true
     app = renderApp(
       '/exercises/lessons/3',
-      grammarRoutes({
-        [`POST /api/exercise-attempts/${ATTEMPT_ID}/responses`]: ({ body }) => (fail ? { networkError: true } : { data: gradeGrammar(body) }),
+      readingRoutes({
+        [`POST /api/exercise-attempts/${ATTEMPT_ID}/responses`]: ({ body }) => (fail ? { networkError: true } : { data: gradeReading(body) }),
       }),
     )
     const user = userEvent.setup()
@@ -160,7 +205,7 @@ describe('grammar exercise', () => {
   it('starts a new attempt for "Làm lại"', async () => {
     app = renderApp(
       '/exercises/lessons/3',
-      grammarRoutes({ 'GET /api/exercises/3': () => ({ data: { ...GRAMMAR_LESSON, questions: [GRAMMAR_LESSON.questions[0]] } }) }),
+      readingRoutes({ 'GET /api/exercises/3': () => ({ data: { ...READING_LESSON, questions: [READING_LESSON.questions[0]] } }) }),
     )
     const user = userEvent.setup()
     await user.click(await screen.findByRole('radio', { name: 'has lived' }))
@@ -179,8 +224,8 @@ describe('grammar exercise', () => {
     let down = true
     app = renderApp(
       '/exercises/lessons/3',
-      grammarRoutes({
-        'GET /api/exercises/3': () => (down ? { status: 500, data: {} } : { data: GRAMMAR_LESSON }),
+      readingRoutes({
+        'GET /api/exercises/3': () => (down ? { status: 500, data: {} } : { data: READING_LESSON }),
         'POST /api/exercises/3/attempts': () => (down ? { status: 500, data: {} } : { status: 201, data: { attemptId: ATTEMPT_ID } }),
       }),
     )
@@ -215,7 +260,7 @@ describe('picking up an unfinished lesson', () => {
   const resumed = { status: 200, data: { attemptId: ATTEMPT_ID, startedAt: '2026-09-25T02:00:00Z', resumed: true, responses: [RESULT.review[0]], pronunciation: [] } }
 
   it('opens at the first question not answered and keeps the earlier answers', async () => {
-    app = renderApp('/exercises/lessons/3', grammarRoutes({ [ATTEMPTS]: () => resumed }))
+    app = renderApp('/exercises/lessons/3', readingRoutes({ [ATTEMPTS]: () => resumed }))
     const user = userEvent.setup()
 
     expect(await screen.findByText('Câu 2/2')).toBeInTheDocument()
@@ -233,7 +278,7 @@ describe('picking up an unfinished lesson', () => {
 
   it('shows the last question already graded when every question was answered', async () => {
     const allAnswered = { ...resumed, data: { ...resumed.data, responses: RESULT.review } }
-    app = renderApp('/exercises/lessons/3', grammarRoutes({ [ATTEMPTS]: () => allAnswered }))
+    app = renderApp('/exercises/lessons/3', readingRoutes({ [ATTEMPTS]: () => allAnswered }))
 
     expect(await screen.findByText('Câu 2/2')).toBeInTheDocument()
     expect(screen.getByLabelText('Đáp án của bạn')).toHaveValue('seen')
@@ -243,7 +288,7 @@ describe('picking up an unfinished lesson', () => {
   it('starts over from the first question with "Làm lại từ đầu"', async () => {
     app = renderApp(
       '/exercises/lessons/3',
-      grammarRoutes({
+      readingRoutes({
         [ATTEMPTS]: ({ params }) =>
           params?.restart ? { status: 201, data: { attemptId: ATTEMPT_ID, startedAt: '2026-09-27T02:00:00Z', resumed: false, responses: [], pronunciation: [] } } : resumed,
       }),
@@ -259,7 +304,7 @@ describe('picking up an unfinished lesson', () => {
 
   it('marks the lessons that can be picked up in the list', async () => {
     const inProgress = { attemptId: 57, doneCount: 1, lastActivityAt: '2026-09-26T14:10:00Z' }
-    const lessons = LESSONS.GRAMMAR.map((lesson) => (lesson.id === 3 ? { ...lesson, progress: { ...lesson.progress, inProgress } } : lesson))
+    const lessons = LESSONS.READING.map((lesson) => (lesson.id === 3 ? { ...lesson, progress: { ...lesson.progress, inProgress } } : lesson))
     app = renderApp('/exercises', baseRoutes({ 'GET /api/exercises': () => ({ data: lessons }) }))
 
     expect(await screen.findByRole('link', { name: /Thì hiện tại hoàn thành/ })).toHaveTextContent('Đang làm dở · 1/2 câu')

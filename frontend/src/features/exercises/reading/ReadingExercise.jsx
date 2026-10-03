@@ -6,15 +6,19 @@ import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { ChoiceOptions } from '@/components/ui/ChoiceOptions'
 import { TextField } from '@/components/ui/TextField'
+import { cx } from '@/lib/cx'
 import { answerQuestion } from '../api/exercisesApi'
 import { markAttemptsStale, useCompleteAttempt } from '../api/exercisesQueries'
 import { AnswerFeedback } from '../components/AnswerFeedback'
 import { ExerciseHeading } from '../components/ExerciseHeading'
+import { HintToggle } from '../components/HintToggle'
 import { QuestionProgress } from '../components/QuestionProgress'
 import { ResultCard } from '../components/ResultCard'
 import { ResumeNotice } from '../components/ResumeNotice'
 import { ScoreRing } from '../components/ScoreRing'
-import { GrammarReview } from './GrammarReview'
+import { answerText, chatContextLabel } from '../chat/contextLabel'
+import { PassagePanel } from './PassagePanel'
+import { ReadingReview } from './ReadingReview'
 
 const EMPTY_CHOICE = { optionId: null, answer: '' }
 
@@ -41,9 +45,11 @@ function resumeState(questions, responses) {
 }
 
 /**
- * B1, grammar: one question at a time. The learner picks or types an answer and presses "Kiểm tra"; the server grades
- * it at once and returns the right answer and the explanation. After the last question the attempt is completed and
- * the score shown, with the questions to review. A picked-up attempt opens at the first question not answered yet.
+ * Reading (scenario 9): one question at a time, grammar multiple choice, fill in the blank, or a question about a
+ * passage, which then shows in a left column. The learner picks or types an answer and presses "Kiểm tra"; the server
+ * grades it at once and returns the right answer and the explanation. After the last question the attempt is
+ * completed and the score shown, with every question to go over. A picked-up attempt opens at the first question not
+ * answered yet.
  *
  * @param {object} props
  * @param {import('../types').Lesson} props.lesson
@@ -56,8 +62,9 @@ function resumeState(questions, responses) {
  * @param {(context: { questionId?: number }) => void} props.onChatContext
  * @param {() => void} props.onAskAssistant
  */
-export function GrammarExercise({ lesson, attemptId, progress, nextLesson, onRestart, restarting, restartError, onChatContext, onAskAssistant }) {
+export function ReadingExercise({ lesson, attemptId, progress, nextLesson, onRestart, restarting, restartError, onChatContext, onAskAssistant }) {
   const questions = lesson.questions
+  const passages = lesson.readingPassages ?? []
   const [resumed] = useState(() => resumeState(questions, progress.responses))
   const [index, setIndex] = useState(resumed.index)
   const [choice, setChoice] = useState(resumed.choice)
@@ -65,21 +72,50 @@ export function GrammarExercise({ lesson, attemptId, progress, nextLesson, onRes
   const [graded, setGraded] = useState(resumed.graded) // questionId -> ResponseResult
   const [checking, setChecking] = useState(false)
   const [checkError, setCheckError] = useState(null)
-  const [hintShown, setHintShown] = useState(false)
   const complete = useCompleteAttempt(attemptId)
   const queryClient = useQueryClient()
   const nextButton = useRef(null)
   const resultHeading = useRef(null)
 
   const question = questions[index]
+  const passage = passages.find((candidate) => candidate.id === question.passageId) ?? null
   const result = graded.get(question.id) ?? null
   const isLast = index === questions.length - 1
 
   // The assistant is told which question is on screen, so its answer is about this one. On the result there is no
   // single question: the review items below ask about their own.
+  const chosen = choices.get(question.id)
   useEffect(() => {
-    onChatContext(complete.isSuccess ? {} : { questionId: question.id })
-  }, [complete.isSuccess, question.id, onChatContext])
+    if (complete.isSuccess) {
+      onChatContext({})
+      return
+    }
+    const label = chatContextLabel({
+      number: index + 1,
+      lessonTitle: lesson.title,
+      prompt: question.prompt,
+      answer: result ? answerText(question, chosen) : null,
+      correct: result?.correct ?? null,
+    })
+    onChatContext({ questionId: question.id, label })
+  }, [complete.isSuccess, question, index, lesson.title, result, chosen, onChatContext])
+
+  /** The context of a question asked about from the review list. */
+  function reviewContext(questionId) {
+    const position = questions.findIndex((item) => item.id === questionId)
+    const item = questions[position]
+    const outcome = graded.get(questionId) ?? complete.data?.review.find((entry) => entry.questionId === questionId)
+    return {
+      questionId,
+      label: chatContextLabel({
+        number: position + 1,
+        lessonTitle: lesson.title,
+        prompt: item.prompt,
+        answer: answerText(item, choices.get(questionId)),
+        correct: outcome?.correct ?? null,
+      }),
+    }
+  }
 
   // Once graded, focus goes to "Câu tiếp theo" so Enter moves on (the feedback is announced by the live region).
   useEffect(() => {
@@ -113,7 +149,6 @@ export function GrammarExercise({ lesson, attemptId, progress, nextLesson, onRes
     }
     setIndex(index + 1)
     setChoice(EMPTY_CHOICE)
-    setHintShown(false)
     setCheckError(null)
   }
 
@@ -159,11 +194,11 @@ export function GrammarExercise({ lesson, attemptId, progress, nextLesson, onRes
             restarting={restarting}
             restartError={restartError}
           />
-          <GrammarReview
+          <ReadingReview
             lesson={lesson}
             review={summary.review}
             onAsk={(questionId) => {
-              onChatContext({ questionId })
+              onChatContext(reviewContext(questionId))
               onAskAssistant()
             }}
           />
@@ -175,10 +210,87 @@ export function GrammarExercise({ lesson, attemptId, progress, nextLesson, onRes
   const outcomes = questions.map((item) => graded.get(item.id)?.correct)
   const ready = hasChoice(question, choice)
 
+  const form = (
+    <form
+      key={question.id}
+      onSubmit={submit}
+      onKeyDown={(event) => {
+        // Enter on a focused radio button does not submit a form by itself.
+        if (event.key === 'Enter' && event.target instanceof HTMLInputElement && event.target.type === 'radio') {
+          event.preventDefault()
+          event.currentTarget.requestSubmit()
+        }
+      }}
+      className="flex min-w-0 animate-screen-in flex-col gap-5"
+    >
+      <p lang="en" className="text-[19px] leading-relaxed font-semibold text-ink">
+        {question.prompt}
+      </p>
+
+      {question.type === 'FILL_BLANK' ? (
+        <TextField
+          label="Đáp án của bạn"
+          placeholder="Nhập từ còn thiếu"
+          autoComplete="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          lang="en"
+          maxLength={200}
+          autoFocus
+          value={choice.answer}
+          disabled={Boolean(result)}
+          onChange={(event) => setChoice({ ...EMPTY_CHOICE, answer: event.target.value })}
+        />
+      ) : (
+        <ChoiceOptions
+          name={`question-${question.id}`}
+          label={question.prompt}
+          options={question.options}
+          selectedId={result ? (choices.get(question.id)?.optionId ?? null) : choice.optionId}
+          onSelect={(optionId) => setChoice({ ...EMPTY_CHOICE, optionId })}
+          graded={result}
+          shortcuts
+        />
+      )}
+
+      {question.hint && !result && <HintToggle hint={question.hint} />}
+
+      <div aria-live="polite">
+        {result && (
+          <AnswerFeedback correct={result.correct} correctAnswer={result.correctAnswer} explanation={result.explanation}>
+            <button
+              type="button"
+              onClick={onAskAssistant}
+              className="cursor-pointer self-start text-label font-semibold text-brand-dark hover:text-brand"
+            >
+              Hỏi trợ lý AI về câu này →
+            </button>
+          </AnswerFeedback>
+        )}
+      </div>
+
+      {checkError && <Alert variant="error">{checkError}</Alert>}
+      {complete.isError && (
+        <Alert variant="error">{describeApiError(complete.error, 'Chưa nộp được bài. Bấm "Xem kết quả" để thử lại.')}</Alert>
+      )}
+
+      <Button
+        ref={nextButton}
+        type="submit"
+        disabled={!result && !ready}
+        loading={checking || complete.isPending}
+        className="disabled:bg-line disabled:opacity-100"
+      >
+        {!result ? 'Kiểm tra' : isLast ? 'Xem kết quả' : 'Câu tiếp theo →'}
+      </Button>
+    </form>
+  )
+
   return (
     <Page
       title={lesson.title}
-      width="focus"
+      // A lesson with passages needs room for the passage beside its questions (scenario 9, step 13).
+      width={passages.length > 0 ? 'medium' : 'focus'}
       className="pb-20"
       heading={
         <ExerciseHeading
@@ -202,92 +314,14 @@ export function GrammarExercise({ lesson, attemptId, progress, nextLesson, onRes
       )}
       <QuestionProgress outcomes={outcomes} current={index} />
 
-      <form
-        key={question.id}
-        onSubmit={submit}
-        onKeyDown={(event) => {
-          // Enter on a focused radio button does not submit a form by itself.
-          if (event.key === 'Enter' && event.target instanceof HTMLInputElement && event.target.type === 'radio') {
-            event.preventDefault()
-            event.currentTarget.requestSubmit()
-          }
-        }}
-        className="flex animate-screen-in flex-col gap-5"
-      >
-        <p lang="en" className="text-[19px] leading-relaxed font-semibold text-ink">
-          {question.prompt}
-        </p>
-
-        {question.type === 'FILL_BLANK' ? (
-          <TextField
-            label="Đáp án của bạn"
-            placeholder="Nhập từ còn thiếu"
-            autoComplete="off"
-            autoCapitalize="off"
-            spellCheck={false}
-            lang="en"
-            maxLength={200}
-            autoFocus
-            value={choice.answer}
-            disabled={Boolean(result)}
-            onChange={(event) => setChoice({ ...EMPTY_CHOICE, answer: event.target.value })}
-          />
-        ) : (
-          <ChoiceOptions
-            name={`question-${question.id}`}
-            label={question.prompt}
-            options={question.options}
-            selectedId={result ? (choices.get(question.id)?.optionId ?? null) : choice.optionId}
-            onSelect={(optionId) => setChoice({ ...EMPTY_CHOICE, optionId })}
-            graded={result}
-            shortcuts
-          />
-        )}
-
-        {question.hint && !result && (
-          <div className="text-label">
-            {hintShown ? (
-              <p className="rounded-lg bg-brand-tint px-3.5 py-2.5 text-brand-dark">
-                <span className="font-semibold">Gợi ý: </span>
-                {question.hint}
-              </p>
-            ) : (
-              <button type="button" onClick={() => setHintShown(true)} className="cursor-pointer font-semibold text-brand-dark hover:text-brand">
-                Xem gợi ý
-              </button>
-            )}
-          </div>
-        )}
-
-        <div aria-live="polite">
-          {result && (
-            <AnswerFeedback correct={result.correct} correctAnswer={result.correctAnswer} explanation={result.explanation}>
-              <button
-                type="button"
-                onClick={onAskAssistant}
-                className="cursor-pointer self-start text-label font-semibold text-brand-dark hover:text-brand"
-              >
-                Hỏi trợ lý AI về câu này →
-              </button>
-            </AnswerFeedback>
-          )}
+      {passage ? (
+        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+          <PassagePanel key={passage.id} passage={passage} />
+          {form}
         </div>
-
-        {checkError && <Alert variant="error">{checkError}</Alert>}
-        {complete.isError && (
-          <Alert variant="error">{describeApiError(complete.error, 'Chưa nộp được bài. Bấm "Xem kết quả" để thử lại.')}</Alert>
-        )}
-
-        <Button
-          ref={nextButton}
-          type="submit"
-          disabled={!result && !ready}
-          loading={checking || complete.isPending}
-          className="disabled:bg-line disabled:opacity-100"
-        >
-          {!result ? 'Kiểm tra' : isLast ? 'Xem kết quả' : 'Câu tiếp theo →'}
-        </Button>
-      </form>
+      ) : (
+        <div className={cx(passages.length > 0 && 'mx-auto w-full max-w-130')}>{form}</div>
+      )}
     </Page>
   )
 }

@@ -34,14 +34,26 @@ const rateLabel = (rate) => `${rate}x`
  * @param {number} props.rate
  * @param {(rate: number) => void} props.onRateChange
  * @param {(positionMs: number) => void} [props.onPosition]
+ * @param {(failed: boolean) => void} [props.onFailedChange] the file could not be loaded, or loads again after "Tải lại"
  * @param {import('react').Ref<{ playFrom: (ms: number) => void }>} [props.ref]
  */
-export function AudioPlayer({ src, durationMs, rate, onRateChange, onPosition, ref }) {
+export function AudioPlayer({ src, durationMs, rate, onRateChange, onPosition, onFailedChange, ref }) {
   const audio = useRef(null)
   const [playing, setPlaying] = useState(false)
   const [position, setPosition] = useState(0)
   const [duration, setDuration] = useState(durationMs)
   const [failed, setFailed] = useState(false)
+
+  function markFailed(value) {
+    setFailed(value)
+    onFailedChange?.(value)
+  }
+
+  // Scenario 11, branch 5a: "Tải lại" asks the browser for the file again.
+  function reload() {
+    markFailed(false)
+    audio.current?.load()
+  }
 
   useImperativeHandle(ref, () => ({
     playFrom(ms) {
@@ -60,7 +72,7 @@ export function AudioPlayer({ src, durationMs, rate, onRateChange, onPosition, r
   function toggle() {
     const element = audio.current
     if (element.paused) {
-      element.play().catch(() => setFailed(true))
+      element.play().catch(() => markFailed(true))
     } else {
       element.pause()
     }
@@ -73,6 +85,7 @@ export function AudioPlayer({ src, durationMs, rate, onRateChange, onPosition, r
   }
 
   const percent = duration > 0 ? Math.min(100, (position / duration) * 100) : 0
+  const back5 = () => seek(Math.max(0, position - 5000))
 
   return (
     <div className="flex flex-col gap-2">
@@ -93,7 +106,7 @@ export function AudioPlayer({ src, durationMs, rate, onRateChange, onPosition, r
           if (Number.isFinite(seconds) && seconds > 0) setDuration(seconds * 1000)
           event.currentTarget.playbackRate = rate // some browsers reset the rate when a source loads
         }}
-        onError={() => setFailed(true)}
+        onError={() => markFailed(true)}
       />
       <div className="flex flex-wrap items-center gap-3.5">
         <button
@@ -104,6 +117,14 @@ export function AudioPlayer({ src, durationMs, rate, onRateChange, onPosition, r
           className="flex size-11 flex-none cursor-pointer items-center justify-center rounded-full bg-brand text-white hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:bg-line"
         >
           {playing ? <PauseIcon /> : <PlayIcon />}
+        </button>
+        <button
+          type="button"
+          onClick={back5}
+          disabled={failed}
+          className="flex-none cursor-pointer rounded-md border border-line bg-white px-2.5 py-1.25 text-xs font-semibold text-ink-soft hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Lùi 5 giây
         </button>
         <div className="flex min-w-40 flex-1 flex-col gap-1.5">
           <div className="relative rounded-full has-focus-visible:outline-2 has-focus-visible:outline-offset-4 has-focus-visible:outline-brand">
@@ -150,9 +171,16 @@ export function AudioPlayer({ src, durationMs, rate, onRateChange, onPosition, r
         </div>
       </div>
       {failed && (
-        <p role="alert" className="text-label font-semibold text-danger">
-          Không phát được file âm thanh. Hãy tải lại trang hoặc thử lại sau.
-        </p>
+        <div role="alert" className="flex flex-wrap items-center gap-3 text-label font-semibold text-danger">
+          Không tải được bài nghe, vui lòng thử lại
+          <button
+            type="button"
+            onClick={reload}
+            className="cursor-pointer rounded-md border border-danger px-2.5 py-1 text-xs font-semibold text-danger hover:bg-danger-bg"
+          >
+            Tải lại
+          </button>
+        </div>
       )}
     </div>
   )
