@@ -5,21 +5,23 @@ import { LoadError } from '@/components/ui/LoadError'
 import { SearchField } from '@/components/ui/SearchField'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Tag } from '@/components/ui/Tag'
+import { paths } from '@/config/paths'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import { cx } from '@/lib/cx'
-import { useAdminTopics, useAdminWords } from '../api/adminQueries'
+import { formatCount } from '@/lib/format'
+import { useAdminTopics, useAdminWords } from '../api/vocabularyQueries'
 import { AdminPage } from '../components/AdminPage'
 import { RowAction, TABLE, TableCard, TD, TH } from '../components/controls'
-import { formatFullDate, formatNumber } from '../format'
-import { useClampPage, useUrlFilters } from '../useUrlFilters'
-import { DeleteTopicDialog, DeleteWordDialog, TopicDialog } from '../vocabulary/vocabularyDialogs'
-import { WordDrawer } from '../vocabulary/WordDrawer'
-import { WordTable } from '../vocabulary/WordTable'
+import { formatFullDate } from '../utils/format'
+import { useClampPage, useUrlFilters } from '../hooks/useUrlFilters'
+import { DeleteTopicDialog, DeleteWordDialog, TopicDialog } from '../components/vocabulary/vocabularyDialogs'
+import { WordDrawer } from '../components/vocabulary/WordDrawer'
+import { WordTable } from '../components/vocabulary/WordTable'
 
 const MISSING_LABELS = { AUDIO: 'Từ chưa có audio phát âm', EXAMPLE: 'Từ chưa có câu ví dụ', IMAGE: 'Từ chưa có ảnh minh họa' }
 
 /**
- * Scenarios 18.1, 19 and 21: every topic with what it still lacks, a search across the whole word bank, and the
+ * Scenarios 19, 20 and 22: every topic with what it still lacks, a search across the whole word bank, and the
  * topic dialogs. `?q=` or `?missing=AUDIO|EXAMPLE|IMAGE` lists matching words of every topic instead of the topics.
  */
 export function AdminTopicsPage() {
@@ -49,7 +51,7 @@ export function AdminTopicsPage() {
     <AdminPage
       title="Từ vựng"
       section="Nội dung học"
-      summary={topics.data ? `${list.length} chủ đề · ${formatNumber(totalWords)} từ hệ thống` : ' '}
+      summary={topics.data ? `${list.length} chủ đề · ${formatCount(totalWords)} từ hệ thống` : ' '}
       actions={
         <>
           <Button variant="outline" size="xs" onClick={() => setWordTarget({ mode: 'add', topicId: null })} disabled={!topics.data}>
@@ -82,7 +84,7 @@ export function AdminTopicsPage() {
           <div className="flex flex-wrap items-center gap-3">
             <h2 id="word-results" className="text-base font-bold text-ink">
               {filters.missing ? MISSING_LABELS[filters.missing] : 'Kết quả tìm kiếm'}
-              {words.data && ` (${formatNumber(words.data.totalItems)})`}
+              {words.data && ` (${formatCount(words.data.totalItems)})`}
             </h2>
             {filters.q && filters.missing && <span className="text-label text-muted-strong">có “{filters.q}”</span>}
             <button
@@ -127,13 +129,13 @@ export function AdminTopicsPage() {
               </svg>
               <p className="min-w-60 flex-1 text-label leading-4.5">
                 <strong>Nội dung còn thiếu:</strong>{' '}
-                {[missingAudio > 0 && `${formatNumber(missingAudio)} từ chưa có audio phát âm`, missingExample > 0 && `${formatNumber(missingExample)} từ chưa có câu ví dụ`]
+                {[missingAudio > 0 && `${formatCount(missingAudio)} từ chưa có audio phát âm`, missingExample > 0 && `${formatCount(missingExample)} từ chưa có câu ví dụ`]
                   .filter(Boolean)
                   .join(', ')}
                 . Khi thiếu audio, người học nghe giọng đọc của trình duyệt.
               </p>
               {missingAudio > 0 && (
-                <Link to="/admin/vocabulary?missing=AUDIO" className="text-label font-bold whitespace-nowrap text-warning">
+                <Link to={paths.adminMissingWords('AUDIO')} className="text-label font-bold whitespace-nowrap text-warning">
                   Xem từ thiếu audio →
                 </Link>
               )}
@@ -169,7 +171,7 @@ export function AdminTopicsPage() {
                             <span aria-hidden="true" className="size-10 flex-none rounded-lg bg-[repeating-linear-gradient(135deg,var(--color-brand-tint)_0_8px,var(--color-brand-stripe)_8px_16px)]" />
                           )}
                           <div className="flex min-w-0 flex-col gap-0.5">
-                            <Link to={`/admin/vocabulary/topics/${topic.id}`} className="text-sm font-semibold text-ink hover:text-brand-dark">
+                            <Link to={paths.adminTopic(topic.id)} className="text-sm font-semibold text-ink hover:text-brand-dark">
                               {topic.name}
                             </Link>
                             {topic.description && <span className="text-xs text-muted-strong">{topic.description}</span>}

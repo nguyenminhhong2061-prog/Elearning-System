@@ -5,15 +5,17 @@ import { LoadError } from '@/components/ui/LoadError'
 import { SearchField } from '@/components/ui/SearchField'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Tag } from '@/components/ui/Tag'
+import { paths } from '@/config/paths'
 import { getInitials } from '@/lib/personName'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import { cx } from '@/lib/cx'
-import { useAdminUsers, useUsersSummary } from '../api/adminQueries'
+import { formatCount } from '@/lib/format'
+import { useAdminUsers, useUsersSummary } from '../api/usersQueries'
 import { AdminPage } from '../components/AdminPage'
 import { Highlight } from '../components/Highlight'
 import { InlineSelect, LevelTag, Pagination, Segmented, TABLE, TableCard, TD, TH } from '../components/controls'
-import { describeLastActive, formatFullDate, formatNumber, levelOptions } from '../format'
-import { useUrlFilters } from '../useUrlFilters'
+import { describeLastActive, formatFullDate, levelOptions } from '../utils/format'
+import { useUrlFilters } from '../hooks/useUrlFilters'
 
 const PAGE_SIZE = 10
 const SORTS = [
@@ -22,7 +24,7 @@ const SORTS = [
   { value: 'NAME', label: 'Tên A → Z' },
 ]
 
-/** Scenario 24, steps 1–2 and the "not found" exception: find a learner and open their profile. */
+/** Scenario 25, steps 2–4 and branch 4a: find a learner and open their profile. */
 export function AdminUsersPage() {
   const [filters, setFilters] = useUrlFilters({ q: '', status: '', level: '', sort: 'NEWEST', page: '0' })
   const [term, setTerm] = useState(filters.q)
@@ -42,16 +44,16 @@ export function AdminUsersPage() {
 
   const counts = summary.data
   const statusOptions = [
-    { value: '', label: counts ? `Tất cả (${formatNumber(counts.total)})` : 'Tất cả' },
-    { value: 'ACTIVE', label: counts ? `Đang hoạt động (${formatNumber(counts.active)})` : 'Đang hoạt động' },
-    { value: 'LOCKED', label: counts ? `Đã khóa (${formatNumber(counts.locked)})` : 'Đã khóa' },
+    { value: '', label: counts ? `Tất cả (${formatCount(counts.total)})` : 'Tất cả' },
+    { value: 'ACTIVE', label: counts ? `Đang hoạt động (${formatCount(counts.active)})` : 'Đang hoạt động' },
+    { value: 'LOCKED', label: counts ? `Đã khóa (${formatCount(counts.locked)})` : 'Đã khóa' },
   ]
 
   return (
     <AdminPage
       title="Người dùng"
       section="Hệ thống"
-      summary={counts ? `${formatNumber(counts.total)} người học · ${counts.locked} tài khoản đang bị khóa` : ' '}
+      summary={counts ? `${formatCount(counts.total)} người học · ${counts.locked} tài khoản đang bị khóa` : ' '}
     >
       <div className="flex flex-wrap items-center gap-3">
         <SearchField
@@ -114,7 +116,7 @@ export function AdminUsersPage() {
                         >
                           {getInitials(user.fullName)}
                         </span>
-                        <Link to={`/admin/users/${user.id}`} className={cx('text-sm font-semibold', locked ? 'text-ink-soft' : 'text-ink')}>
+                        <Link to={paths.adminUser(user.id)} className={cx('text-sm font-semibold', locked ? 'text-ink-soft' : 'text-ink')}>
                           <Highlight text={user.fullName} term={filters.q} />
                         </Link>
                       </div>
@@ -131,7 +133,7 @@ export function AdminUsersPage() {
                     <td className={cx(TD, 'text-ink-soft')}>{formatFullDate(user.createdAt)}</td>
                     <td className={cx(TD, 'text-ink-soft')}>{user.lastActiveAt ? describeLastActive(user.lastActiveAt) : 'Chưa hoạt động'}</td>
                     <td className={cx(TD, 'text-right')}>
-                      <Link to={`/admin/users/${user.id}`} aria-label={`Xem ${user.fullName}`} className="inline-block px-2.5 py-1.5 text-label font-bold">
+                      <Link to={paths.adminUser(user.id)} aria-label={`Xem ${user.fullName}`} className="inline-block px-2.5 py-1.5 text-label font-bold">
                         Xem →
                       </Link>
                     </td>

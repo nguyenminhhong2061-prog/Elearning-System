@@ -8,19 +8,21 @@ import { LoadError } from '@/components/ui/LoadError'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Tag } from '@/components/ui/Tag'
 import { useToast } from '@/components/ui/toastContext'
+import { paths } from '@/config/paths'
 import { cx } from '@/lib/cx'
-import { useAdminTest, useAdminTests, useSaveTest } from '../api/adminQueries'
+import { formatCount } from '@/lib/format'
+import { useAdminTest, useAdminTests, useSaveTest } from '../api/testsQueries'
 import { AdminPage } from '../components/AdminPage'
 import { InputField, SelectField } from '../components/fields'
-import { move, removeAt, replaceAt, sameContent, toDraft } from '../editor/draft'
-import { formatNumber, TEST_SKILL_LABELS } from '../format'
-import { DuplicateTestDialog } from '../tests/DuplicateTestDialog'
-import { editableTest, newTest, newTestQuestion, SKILLS, TEMPLATES, testPayload, validateTest, weekAfterLast } from '../tests/testDraft'
-import { TestQuestion } from '../tests/TestQuestion'
+import { move, removeAt, replaceAt, sameContent, toDraft } from '../utils/draft'
+import { TEST_SKILL_LABELS } from '../constants'
+import { DuplicateTestDialog } from '../components/tests/DuplicateTestDialog'
+import { editableTest, newTest, newTestQuestion, SKILLS, TEMPLATES, testPayload, validateTest, weekAfterLast } from '../utils/testDraft'
+import { TestQuestion } from '../components/tests/TestQuestion'
 
 const STATUS_TAGS = { DRAFT: ['warning', 'Nháp'], UPCOMING: ['brand', 'Sắp mở'], OPEN: ['success', 'Đang mở'], CLOSED: ['neutral', 'Đã đóng'] }
 
-/** Scenario 23, steps 2–3: edit a test (a duplicated draft, or the wording of one with submissions) or create one. */
+/** Scenario 24, steps 3–10 and branches 2a, 2c: edit a test (a duplicated draft, or the wording of one with submissions) or create one. */
 export function AdminTestEditorPage() {
   const { testId } = useParams()
   const [searchParams] = useSearchParams()
@@ -45,7 +47,7 @@ export function AdminTestEditorPage() {
   if (error) {
     const missing = error.status === 404
     return (
-      <AdminPage title={missing ? 'Không tìm thấy đề' : 'Đề kiểm tra'} breadcrumb={[{ label: 'Đề kiểm tra', to: '/admin/tests' }]}>
+      <AdminPage title={missing ? 'Không tìm thấy đề' : 'Đề kiểm tra'} breadcrumb={[{ label: 'Đề kiểm tra', to: paths.adminTests }]}>
         {missing ? <Alert variant="error">Đề này không tồn tại hoặc đã bị xóa.</Alert> : <LoadError error={error} onRetry={test.refetch} message="Không tải được đề. Vui lòng thử lại." />}
       </AdminPage>
     )
@@ -107,7 +109,7 @@ function TestEditor({ source, isNew }) {
         onSuccess: (saved) => {
           toast('Đã lưu', saved.status === 'DRAFT' ? `“${saved.title}” là bản nháp, người học chưa thấy.` : `“${saved.title}” sẽ mở theo lịch.`)
           if (isNew) {
-            navigate(`/admin/tests/${saved.id}`, { replace: true })
+            navigate(paths.adminTest(saved.id), { replace: true })
             return
           }
           const next = toDraft(editableTest(saved))
@@ -133,7 +135,7 @@ function TestEditor({ source, isNew }) {
   return (
     <AdminPage
       title={isNew ? 'Đề kiểm tra mới' : original.title}
-      breadcrumb={[{ label: 'Đề kiểm tra', to: '/admin/tests' }]}
+      breadcrumb={[{ label: 'Đề kiểm tra', to: paths.adminTests }]}
       crumb={draft.type === 'PERIODIC' ? 'Định kỳ' : 'Tổng hợp'}
       titleAddon={<Tag variant={statusVariant}>{statusLabel}</Tag>}
       summary={
@@ -141,12 +143,12 @@ function TestEditor({ source, isNew }) {
           ? `Nhân bản từ “${original.duplicatedFrom.title}”${original.draft ? ' · người học chưa thấy đề này' : ''}`
           : isNew
             ? 'Đề mới lưu ở dạng nháp cho tới khi bạn chọn “Mở theo lịch”.'
-            : `${formatNumber(original.submissions)} bài đã nộp${original.averageScore !== null ? ` · điểm TB ${original.averageScore}` : ''}`
+            : `${formatCount(original.submissions)} bài đã nộp${original.averageScore !== null ? ` · điểm TB ${original.averageScore}` : ''}`
       }
       actions={
         <>
           {dirty && !isNew && <span className="text-label text-muted-strong">Có thay đổi chưa lưu</span>}
-          <Button variant="outline" size="xs" onClick={() => (dirty ? setLeaving(true) : navigate('/admin/tests'))}>
+          <Button variant="outline" size="xs" onClick={() => (dirty ? setLeaving(true) : navigate(paths.adminTests))}>
             Hủy
           </Button>
           <Button variant="strong" size="xs" loading={save.isPending} disabled={!dirty} onClick={submit}>
@@ -163,7 +165,7 @@ function TestEditor({ source, isNew }) {
       {locked && (
         <div role="note" className="flex flex-wrap items-center gap-3 rounded-[10px] border border-warning-solid/40 bg-warning-bg px-4 py-3 text-warning">
           <p className="min-w-60 flex-1 text-label leading-5">
-            <strong>Đề đã có {formatNumber(original.submissions)} bài nộp:</strong> chỉ sửa được tên đề, ngày đóng và lời văn câu hỏi. Muốn đổi đáp án hoặc điểm thì nhân bản thành đề mới.
+            <strong>Đề đã có {formatCount(original.submissions)} bài nộp:</strong> chỉ sửa được tên đề, ngày đóng và lời văn câu hỏi. Muốn đổi đáp án hoặc điểm thì nhân bản thành đề mới.
           </p>
           <Button variant="outline" size="xs" onClick={() => setDuplicating(true)}>
             Nhân bản đề này
@@ -285,7 +287,7 @@ function TestEditor({ source, isNew }) {
           <Button variant="outline" size="xs" onClick={() => setLeaving(false)}>
             Tiếp tục sửa
           </Button>
-          <Button variant="danger" size="xs" onClick={() => navigate('/admin/tests')}>
+          <Button variant="danger" size="xs" onClick={() => navigate(paths.adminTests)}>
             Bỏ thay đổi
           </Button>
         </div>

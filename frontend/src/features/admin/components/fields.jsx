@@ -3,7 +3,7 @@ import { CEFR_LEVELS } from '@/api/constants'
 import { describeApiError } from '@/api/errorMessages'
 import { Spinner } from '@/components/ui/Spinner'
 import { cx } from '@/lib/cx'
-import { useUploadMedia } from '../api/adminQueries'
+import { useUploadMedia } from '../api/vocabularyQueries'
 
 // Form fields of the admin editors, in the style of TextField (label above, 15px text, red border and message when
 // invalid). They work with react-hook-form: spread register('name') onto them.

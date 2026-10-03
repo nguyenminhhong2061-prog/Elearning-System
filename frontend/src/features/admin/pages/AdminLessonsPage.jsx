@@ -6,13 +6,16 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { TabLinks } from '@/components/ui/TabLinks'
 import { Tag } from '@/components/ui/Tag'
 import { CEFR_LEVELS } from '@/api/constants'
+import { paths } from '@/config/paths'
 import { matchesSearch } from '@/lib/searchText'
 import { cx } from '@/lib/cx'
-import { useAdminLessons } from '../api/adminQueries'
+import { formatCount } from '@/lib/format'
+import { useAdminLessons } from '../api/lessonsQueries'
 import { AdminPage } from '../components/AdminPage'
 import { InlineSelect, LevelTag, Segmented, TABLE, TableCard, TD, TH } from '../components/controls'
-import { DIFFICULTY_LABELS, formatFullDate, formatNumber, levelOptions, SKILL_LABELS } from '../format'
-import { useUrlFilters } from '../useUrlFilters'
+import { DIFFICULTY_LABELS, SKILL_LABELS } from '../constants'
+import { formatFullDate, levelOptions } from '../utils/format'
+import { useUrlFilters } from '../hooks/useUrlFilters'
 
 const SKILLS = ['GRAMMAR', 'LISTENING', 'PRONUNCIATION']
 const STATUS = {
@@ -35,7 +38,7 @@ function contentOf(lesson) {
   return parts.join(' · ')
 }
 
-/** Scenario 22, step 1: every lesson of module B, filtered on the page (the list is small). */
+/** Scenario 23, step 2: every lesson of module B, filtered on the page (the list is small). */
 export function AdminLessonsPage() {
   const [filters, setFilters] = useUrlFilters({ skill: '', status: '', level: '', q: '' })
   const lessons = useAdminLessons()
@@ -53,7 +56,7 @@ export function AdminLessonsPage() {
     if (skill) params.set('skill', skill)
     for (const key of ['status', 'level', 'q']) if (filters[key]) params.set(key, filters[key])
     const query = params.toString()
-    return query ? `?${query}` : '/admin/lessons'
+    return query ? `?${query}` : paths.adminLessons
   }
 
   return (
@@ -62,7 +65,7 @@ export function AdminLessonsPage() {
       section="Nội dung học"
       summary={lessons.data ? `${published} bài đã xuất bản · ${drafts} bản nháp` : ' '}
       actions={
-        <ButtonLink to={`/admin/lessons/new?skill=${filters.skill || 'GRAMMAR'}`} variant="strong" size="xs">
+        <ButtonLink to={paths.adminNewLesson(filters.skill || 'GRAMMAR')} variant="strong" size="xs">
           + Tạo bài tập
         </ButtonLink>
       }
@@ -122,7 +125,7 @@ export function AdminLessonsPage() {
                 <tr key={lesson.id}>
                   <td className={cx(TD, 'py-3')}>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Link to={`/admin/lessons/${lesson.id}`} className="text-sm font-semibold">
+                      <Link to={paths.adminLesson(lesson.id)} className="text-sm font-semibold">
                         {lesson.title}
                       </Link>
                       {lesson.issues.map((issue) => (
@@ -141,10 +144,10 @@ export function AdminLessonsPage() {
                   <td className={TD}>
                     <Tag variant={STATUS[lesson.status].variant}>{STATUS[lesson.status].label}</Tag>
                   </td>
-                  <td className={cx(TD, 'text-right')}>{formatNumber(lesson.attempts)}</td>
+                  <td className={cx(TD, 'text-right')}>{formatCount(lesson.attempts)}</td>
                   <td className={cx(TD, 'text-muted-strong')}>{lesson.updatedAt ? formatFullDate(lesson.updatedAt) : '—'}</td>
                   <td className={cx(TD, 'text-right')}>
-                    <Link to={`/admin/lessons/${lesson.id}`} aria-label={`Sửa bài ${lesson.title}`} className="inline-block px-2.5 py-1.5 text-label font-bold">
+                    <Link to={paths.adminLesson(lesson.id)} aria-label={`Sửa bài ${lesson.title}`} className="inline-block px-2.5 py-1.5 text-label font-bold">
                       Sửa
                     </Link>
                   </td>

@@ -9,10 +9,9 @@ import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { Drawer } from '@/components/ui/Drawer'
 import { useToast } from '@/components/ui/toastContext'
-import { getWords } from '../api/adminApi'
-import { useSaveWord } from '../api/adminQueries'
-import { InputField, LevelRadios, MediaPicker, SelectField, TextAreaField } from '../components/fields'
-import { formatFullDate } from '../format'
+import { useSaveWord, useWordLookup } from '../../api/vocabularyQueries'
+import { formatFullDate } from '../../utils/format'
+import { InputField, LevelRadios, MediaPicker, SelectField, TextAreaField } from '../fields'
 
 const FORM_ID = 'admin-word-form'
 const MAX_AUDIO_BYTES = 1024 * 1024
@@ -64,25 +63,26 @@ function listFields(keys) {
 
 const capitalize = (text) => text.charAt(0).toLocaleUpperCase('vi') + text.slice(1)
 
-/** Another live system word with the same spelling in the topic, if any (scenario 18, step 5). */
-async function findDuplicate({ word, topicId, exceptId }) {
+/** Another live system word with the same spelling in the topic, if any (scenario 19, step 12). */
+async function findDuplicate(lookUpWords, { word, topicId, exceptId }) {
   const spelling = word.trim().toLocaleLowerCase('vi')
-  const page = await getWords({ topicId, q: word.trim(), size: 50 })
+  const page = await lookUpWords({ topicId, q: word.trim(), size: 50 })
   return page.items.find((item) => item.id !== exceptId && item.word.trim().toLocaleLowerCase('vi') === spelling) ?? null
 }
 
 /**
- * Side panel to edit a word (scenario 18) or add words (scenario 19).
+ * Side panel to edit a word (scenario 19) or add words (scenario 20).
  *
  * @param {object} props
- * @param {{ mode: 'edit', word: import('../types').AdminWord } | { mode: 'add', topicId: number | null } | null} props.target
- * @param {import('../types').AdminTopic[]} props.topics
+ * @param {{ mode: 'edit', word: import('../../types').AdminWord } | { mode: 'add', topicId: number | null } | null} props.target
+ * @param {import('../../types').AdminTopic[]} props.topics
  * @param {() => void} props.onClose
- * @param {(word: import('../types').AdminWord) => void} props.onOpenWord switches the panel to another word
+ * @param {(word: import('../../types').AdminWord) => void} props.onOpenWord switches the panel to another word
  */
 export function WordDrawer({ target, topics, onClose, onOpenWord }) {
   const editing = target?.mode === 'edit' ? target.word : null
   const save = useSaveWord()
+  const lookUpWords = useWordLookup()
   const toast = useToast()
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   // Save problems belong to the word they were found for: opening another word starts without them.
@@ -131,7 +131,7 @@ export function WordDrawer({ target, topics, onClose, onOpenWord }) {
 
     try {
       // Checked before saving so the admin sees the existing word instead of a second copy; the server checks again.
-      const existing = await findDuplicate({ word: values.word, topicId, exceptId: editing?.id })
+      const existing = await findDuplicate(lookUpWords, { word: values.word, topicId, exceptId: editing?.id })
       if (existing) {
         setDuplicate(existing)
         setFocus('word')
@@ -152,7 +152,7 @@ export function WordDrawer({ target, topics, onClose, onOpenWord }) {
       }
     } catch (error) {
       if (error?.status === 409) {
-        const existing = await findDuplicate({ word: values.word, topicId, exceptId: editing?.id }).catch(() => null)
+        const existing = await findDuplicate(lookUpWords, { word: values.word, topicId, exceptId: editing?.id }).catch(() => null)
         setDuplicate(existing ?? { word: values.word, topicId, id: null })
         setFocus('word')
       } else {

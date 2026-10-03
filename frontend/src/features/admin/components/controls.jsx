@@ -1,7 +1,7 @@
 import { useId } from 'react'
 import { Tag } from '@/components/ui/Tag'
 import { cx } from '@/lib/cx'
-import { levelLabel } from '../format'
+import { levelLabel } from '../utils/format'
 
 /**
  * The design's pill group ("7 ngày / 30 ngày / 90 ngày"): toggle buttons of which exactly one is pressed.

@@ -4,15 +4,18 @@ import { Button, ButtonLink } from '@/components/ui/Button'
 import { LoadError } from '@/components/ui/LoadError'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Tag } from '@/components/ui/Tag'
+import { paths } from '@/config/paths'
 import { addDays, formatDayMonth } from '@/lib/dates'
 import { cx } from '@/lib/cx'
-import { useAdminTests } from '../api/adminQueries'
+import { formatCount } from '@/lib/format'
+import { useAdminTests } from '../api/testsQueries'
 import { AdminPage } from '../components/AdminPage'
 import { InlineSelect, RowAction, Segmented, TABLE, TableCard, TD, TH } from '../components/controls'
-import { daysUntil, formatDateRange, formatNumber, isoWeek, TEST_SKILL_LABELS } from '../format'
-import { DuplicateTestDialog } from '../tests/DuplicateTestDialog'
-import { nextWeek } from '../tests/testDraft'
-import { useUrlFilters } from '../useUrlFilters'
+import { TEST_SKILL_LABELS } from '../constants'
+import { daysUntil, formatDateRange, isoWeek } from '../utils/format'
+import { DuplicateTestDialog } from '../components/tests/DuplicateTestDialog'
+import { nextWeek } from '../utils/testDraft'
+import { useUrlFilters } from '../hooks/useUrlFilters'
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả' },
@@ -38,7 +41,7 @@ function statusTag(test) {
   }
 }
 
-/** Scenario 23, step 1: every test, the warning about next week's missing weekly test, and the schedule. */
+/** Scenario 24, step 2: every test, the warning about next week's missing weekly test, and the schedule. */
 export function AdminTestsPage() {
   const [filters, setFilters] = useUrlFilters({ type: '', status: '' })
   const tests = useAdminTests()
@@ -59,7 +62,7 @@ export function AdminTestsPage() {
       section="Nội dung học"
       summary={tests.data ? `${openPeriodic} đề định kỳ đang mở · ${comprehensive} đề tổng hợp` : ' '}
       actions={
-        <ButtonLink to="/admin/tests/new?type=PERIODIC" variant="strong" size="xs">
+        <ButtonLink to={paths.adminNewTest('PERIODIC')} variant="strong" size="xs">
           + Tạo đề
         </ButtonLink>
       }
@@ -86,7 +89,7 @@ export function AdminTestsPage() {
             )}
           </p>
           {weekDraft ? (
-            <ButtonLink to={`/admin/tests/${weekDraft.id}`} variant="outline" size="xs">
+            <ButtonLink to={paths.adminTest(weekDraft.id)} variant="outline" size="xs">
               Tiếp tục soạn →
             </ButtonLink>
           ) : (
@@ -143,7 +146,7 @@ export function AdminTestsPage() {
                 <tr key={test.id}>
                   <td className={cx(TD, 'py-3')}>
                     <div className="flex flex-col gap-0.5">
-                      <Link to={`/admin/tests/${test.id}`} className="text-sm font-semibold">
+                      <Link to={paths.adminTest(test.id)} className="text-sm font-semibold">
                         {test.title}
                       </Link>
                       <span className="text-xs text-muted-strong">{test.type === 'PERIODIC' ? 'Định kỳ' : 'Tổng hợp 4 kỹ năng · đổi trình độ người học'}</span>
@@ -154,11 +157,11 @@ export function AdminTestsPage() {
                   <td className={cx(TD, 'text-ink-soft')}>
                     {test.questionCount} câu{test.skills.length > 0 && ` · ${test.skills.map((skill) => TEST_SKILL_LABELS[skill]).join(', ')}`}
                   </td>
-                  <td className={cx(TD, 'text-right')}>{formatNumber(test.submissions)}</td>
+                  <td className={cx(TD, 'text-right')}>{formatCount(test.submissions)}</td>
                   <td className={cx(TD, 'text-right')}>{test.averageScore ?? '—'}</td>
                   <td className={cx(TD, 'text-right whitespace-nowrap')}>
                     {test.status !== 'CLOSED' && (
-                      <Link to={`/admin/tests/${test.id}`} aria-label={`Sửa ${test.title}`} className="inline-block px-2.5 py-1.5 text-label font-bold">
+                      <Link to={paths.adminTest(test.id)} aria-label={`Sửa ${test.title}`} className="inline-block px-2.5 py-1.5 text-label font-bold">
                         Sửa
                       </Link>
                     )}

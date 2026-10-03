@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { isoWeek, parseTypedDate } from '../format'
-import { validateLesson, newLesson } from '../lessons/lessonDraft'
-import { editableTest, modeOf, testPayload, typeFor, validateTest } from '../tests/testDraft'
+import { isoWeek, parseTypedDate } from './format'
+import { validateLesson, newLesson } from './lessonDraft'
+import { editableTest, modeOf, testPayload, typeFor, validateTest } from './testDraft'
 import { answerErrors, formatClockMs, move, parseClockMs, stripKeys, toDraft } from './draft'
 
 describe('editor drafts', () => {

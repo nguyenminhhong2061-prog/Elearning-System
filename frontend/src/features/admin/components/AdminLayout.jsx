@@ -2,21 +2,22 @@ import { NavLink } from 'react-router'
 import { AppShell } from '@/components/layout/AppShell'
 import { Logo } from '@/components/ui/Logo'
 import { ToastProvider } from '@/components/ui/Toast'
+import { paths } from '@/config/paths'
 import { useAuth } from '@/features/auth/context/useAuth'
 import { cx } from '@/lib/cx'
 
 // Sidebar of the admin area, in the order of the design: one section per group, "Tổng quan" on its own.
 const SECTIONS = [
-  { items: [{ label: 'Tổng quan', to: '/admin', end: true }] },
+  { items: [{ label: 'Tổng quan', to: paths.admin, end: true }] },
   {
     title: 'Nội dung học',
     items: [
-      { label: 'Từ vựng', to: '/admin/vocabulary' },
-      { label: 'Bài tập', to: '/admin/lessons' },
-      { label: 'Đề kiểm tra', to: '/admin/tests' },
+      { label: 'Từ vựng', to: paths.adminVocabulary },
+      { label: 'Bài tập', to: paths.adminLessons },
+      { label: 'Đề kiểm tra', to: paths.adminTests },
     ],
   },
-  { title: 'Hệ thống', items: [{ label: 'Người dùng', to: '/admin/users' }] },
+  { title: 'Hệ thống', items: [{ label: 'Người dùng', to: paths.adminUsers }] },
 ]
 
 const ROW = 'flex items-center gap-3 rounded-lg px-3 py-2.75 transition-colors focus-visible:outline-2 focus-visible:outline-brand'
@@ -76,7 +77,7 @@ function AdminSidebar({ onNavigate }) {
         </div>
         <div className="flex flex-col gap-1">
           <NavLink
-            to="/admin/account/change-password"
+            to={paths.adminChangePassword}
             onClick={onNavigate}
             className={({ isActive }) => cx(ROW, SECONDARY_ROW, isActive && 'bg-sidebar-raised text-white')}
           >

@@ -8,7 +8,7 @@ import { addDays, todayInVietnam } from '@/lib/dates'
 import { admin, installFakeBackend } from '@/test/fakeBackend'
 import '@/test/preloadPages'
 
-// Data shaped as docs/api/admin.md describes it, following scenarios 18–25 of Scenarios-he-thong.md.
+// Data shaped as docs/api/admin.md describes it, following scenarios 19–26 of Analysis/Scenarios.md (docs/English Learning System).
 
 const today = todayInVietnam()
 
@@ -111,7 +111,7 @@ const callsTo = (key) => backend.calls.filter((call) => call.key === key)
 const location = () => screen.getByTestId('location').textContent
 
 describe('admin area', () => {
-  it('sends an admin opening the learner home page to the overview (scenario 25)', async () => {
+  it('sends an admin opening the learner home page to the overview (scenario 26)', async () => {
     renderAdmin('/')
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Tổng quan hệ thống' })).toBeInTheDocument()
@@ -126,7 +126,7 @@ describe('admin area', () => {
     expect(callsTo('GET /api/admin/stats')[0].params).toEqual({ from: addDays(today, -29), to: today })
   })
 
-  it('asks for another period and rejects a start after the end (scenario 25, step 4)', async () => {
+  it('asks for another period and rejects a start after the end (scenario 26, step 3 and branch 3a)', async () => {
     renderAdmin('/admin')
     const user = userEvent.setup()
     await screen.findByText('+12 người mới trong kỳ')
@@ -153,7 +153,7 @@ describe('admin area', () => {
 })
 
 describe('vocabulary administration', () => {
-  it('edits a word: required fields, unsaved-changes question, then a saved toast (scenario 18)', async () => {
+  it('edits a word: required fields, unsaved-changes question, then a saved toast (scenario 19)', async () => {
     renderAdmin('/admin/vocabulary/topics/2', { 'PUT /api/vocabulary/105': ({ body }) => ({ data: { ...LUGGAGE, ...body } }) })
     const user = userEvent.setup()
 
@@ -187,7 +187,7 @@ describe('vocabulary administration', () => {
     })
   })
 
-  it('adds words and keeps topic and level for the next one; a duplicate opens the existing word (scenario 19)', async () => {
+  it('adds words and keeps topic and level for the next one; a duplicate opens the existing word (scenario 20)', async () => {
     renderAdmin('/admin/vocabulary/topics/2', {
       'GET /api/admin/vocabulary': ({ params }) => ({ data: page(params.q?.toLowerCase() === 'passport' ? [PASSPORT] : params.q ? [] : [PASSPORT, LUGGAGE]) }),
       'POST /api/vocabulary': ({ body }) => ({ status: 201, data: { ...VISA, ...body } }),
@@ -216,7 +216,7 @@ describe('vocabulary administration', () => {
     expect(await screen.findByRole('dialog', { name: 'Sửa từ “passport”' })).toBeInTheDocument()
   })
 
-  it('archives a word people study and deletes an unused one for good (scenario 20)', async () => {
+  it('archives a word people study and deletes an unused one for good (scenario 21)', async () => {
     renderAdmin('/admin/vocabulary/topics/2', {
       'GET /api/admin/vocabulary': () => ({ data: page([PASSPORT, VISA]) }),
       'DELETE /api/vocabulary/104': () => ({ data: { result: 'ARCHIVED' } }),
@@ -238,7 +238,7 @@ describe('vocabulary administration', () => {
     expect(callsTo('DELETE /api/vocabulary/130')).toHaveLength(1)
   })
 
-  it('refuses a duplicate topic name and blocks deleting a topic that still has words (scenario 21)', async () => {
+  it('refuses a duplicate topic name and blocks deleting a topic that still has words (scenario 22)', async () => {
     renderAdmin('/admin/vocabulary', { 'POST /api/topics': ({ body }) => ({ status: 201, data: { id: 9, ...body } }) })
     const user = userEvent.setup()
 
@@ -264,7 +264,7 @@ describe('vocabulary administration', () => {
 })
 
 describe('user administration', () => {
-  it('finds a learner, opens the profile, locks and unlocks the account (scenario 24)', async () => {
+  it('finds a learner, opens the profile, locks and unlocks the account (scenario 25)', async () => {
     let detail = NAM_DETAIL
     renderAdmin('/admin/users', {
       'GET /api/admin/users/summary': () => ({ data: { total: 128, active: 125, locked: 3 } }),
@@ -354,7 +354,7 @@ describe('test administration', () => {
     acceptedAnswers: [],
   }
 
-  it('warns about next week and duplicates the open test into a draft for it (scenario 23)', async () => {
+  it('warns about next week and duplicates the open test into a draft for it (scenario 24)', async () => {
     const copy = { ...week40, id: 101, title: 'Kiểm tra định kỳ — tuần 41', startDate: '2026-10-04', endDate: '2026-10-10', status: 'DRAFT', submissions: 0, averageScore: null, duplicatedFrom: { id: 100, title: week40.title }, questions: [question] }
     renderAdmin('/admin/tests', {
       'GET /api/admin/tests': () => ({ data: [week40] }),
@@ -425,7 +425,7 @@ describe('lesson administration', () => {
     pronunciationItems: [],
   }
 
-  it('lists lessons with their problems and filters by skill (scenario 22, step 1)', async () => {
+  it('lists lessons with their problems and filters by skill (scenario 23, step 2)', async () => {
     renderAdmin('/admin/lessons', {
       'GET /api/admin/lessons': () => ({
         data: [
@@ -444,7 +444,7 @@ describe('lesson administration', () => {
     expect(screen.queryByRole('link', { name: 'Hội thoại tại sân bay' })).not.toBeInTheDocument()
   })
 
-  it('refuses a question without a correct answer, then saves the lesson (scenario 22, steps 2–4)', async () => {
+  it('refuses a question without a correct answer, then saves the lesson (scenario 23, steps 3–12)', async () => {
     renderAdmin('/admin/lessons/1', {
       'GET /api/admin/lessons/1': () => ({ data: lesson }),
       'PUT /api/admin/lessons/1': ({ body }) => ({ data: { ...lesson, ...body, updatedAt: '2026-09-29T08:00:00Z' } }),

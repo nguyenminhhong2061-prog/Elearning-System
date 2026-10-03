@@ -8,12 +8,15 @@ import { LoadError } from '@/components/ui/LoadError'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Tag } from '@/components/ui/Tag'
 import { useToast } from '@/components/ui/toastContext'
-import { useAdminLesson, useDeleteLesson, useSaveLesson } from '../api/adminQueries'
+import { paths } from '@/config/paths'
+import { formatCount } from '@/lib/format'
+import { useAdminLesson, useDeleteLesson, useSaveLesson } from '../api/lessonsQueries'
 import { AdminPage } from '../components/AdminPage'
-import { sameContent, toDraft } from '../editor/draft'
-import { formatFullDate, formatNumber, SKILL_LABELS } from '../format'
-import { editableLesson, lessonPayload, newLesson, validateLesson } from '../lessons/lessonDraft'
-import { LessonInfo, LessonQuestions, ListeningPassage, PronunciationItems } from '../lessons/LessonSections'
+import { sameContent, toDraft } from '../utils/draft'
+import { SKILL_LABELS } from '../constants'
+import { formatFullDate } from '../utils/format'
+import { editableLesson, lessonPayload, newLesson, validateLesson } from '../utils/lessonDraft'
+import { LessonInfo, LessonQuestions, ListeningPassage, PronunciationItems } from '../components/lessons/LessonSections'
 
 const STATUS_TAGS = {
   PUBLISHED: ['success', 'Đã xuất bản'],
@@ -21,7 +24,7 @@ const STATUS_TAGS = {
   ARCHIVED: ['warning', 'Lưu trữ'],
 }
 
-/** Scenario 22, steps 2–4: create or edit a lesson of any of the three skills. */
+/** Scenario 23, steps 3–13 and branch 2a: create or edit a lesson of any skill. */
 export function AdminLessonEditorPage() {
   const { lessonId } = useParams()
   const [searchParams] = useSearchParams()
@@ -44,7 +47,7 @@ export function AdminLessonEditorPage() {
   if (!isNew && lesson.isError) {
     const missing = lesson.error?.status === 404
     return (
-      <AdminPage title={missing ? 'Không tìm thấy bài tập' : 'Bài tập'} breadcrumb={[{ label: 'Bài tập', to: '/admin/lessons' }]}>
+      <AdminPage title={missing ? 'Không tìm thấy bài tập' : 'Bài tập'} breadcrumb={[{ label: 'Bài tập', to: paths.adminLessons }]}>
         {missing ? (
           <Alert variant="error">Bài tập này không tồn tại hoặc đã bị xóa.</Alert>
         ) : (
@@ -104,7 +107,7 @@ function LessonEditor({ source, isNew }) {
         onSuccess: (saved) => {
           toast('Đã lưu', isNew ? `Đã tạo bài “${saved.title}” (bản nháp).` : `Bài “${saved.title}” đã được cập nhật.`)
           if (isNew) {
-            navigate(`/admin/lessons/${saved.id}`, { replace: true })
+            navigate(paths.adminLesson(saved.id), { replace: true })
             return
           }
           const next = toDraft(editableLesson(saved))
@@ -127,15 +130,15 @@ function LessonEditor({ source, isNew }) {
   return (
     <AdminPage
       title={isNew ? 'Bài tập mới' : original.title}
-      breadcrumb={[{ label: 'Bài tập', to: '/admin/lessons' }]}
+      breadcrumb={[{ label: 'Bài tập', to: paths.adminLessons }]}
       crumb={SKILL_LABELS[draft.skill]}
       titleAddon={<Tag variant={statusVariant}>{isNew ? 'Nháp' : statusLabel}</Tag>}
-      summary={isNew ? 'Bài mới luôn lưu ở trạng thái Nháp; xuất bản sau khi đã có câu hỏi.' : `${formatNumber(original.attempts)} lượt làm${original.updatedAt ? ` · sửa lần cuối ${formatFullDate(original.updatedAt)}` : ''}`}
+      summary={isNew ? 'Bài mới luôn lưu ở trạng thái Nháp; xuất bản sau khi đã có câu hỏi.' : `${formatCount(original.attempts)} lượt làm${original.updatedAt ? ` · sửa lần cuối ${formatFullDate(original.updatedAt)}` : ''}`}
       actions={
         <>
           {dirty && !isNew && <span className="text-label text-muted-strong">Có thay đổi chưa lưu</span>}
           {isNew && (
-            <ButtonLink to="/admin/lessons" variant="outline" size="xs">
+            <ButtonLink to={paths.adminLessons} variant="outline" size="xs">
               Hủy
             </ButtonLink>
           )}
@@ -192,7 +195,7 @@ function DeleteLessonDialog({ lesson, onClose }) {
     remove.mutate(lesson.id, {
       onSuccess: ({ result }) => {
         toast(result === 'ARCHIVED' ? 'Đã chuyển vào Lưu trữ' : 'Đã xóa', `Bài “${lesson.title}”.`)
-        navigate('/admin/lessons')
+        navigate(paths.adminLessons)
       },
     })
   }
@@ -202,7 +205,7 @@ function DeleteLessonDialog({ lesson, onClose }) {
       <p className="text-sm leading-5.5 text-ink-soft">
         {used ? (
           <>
-            Bài đã có <strong className="text-ink">{formatNumber(lesson.attempts)} lượt làm</strong> nên sẽ được chuyển sang <strong className="text-ink">Lưu trữ</strong>: người học
+            Bài đã có <strong className="text-ink">{formatCount(lesson.attempts)} lượt làm</strong> nên sẽ được chuyển sang <strong className="text-ink">Lưu trữ</strong>: người học
             không thấy bài nữa, lịch sử và điểm các lượt đã làm được giữ nguyên.
           </>
         ) : (

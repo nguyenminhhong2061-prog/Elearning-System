@@ -1,6 +1,7 @@
 import { addDays, formatDayMonth, todayInVietnam } from '@/lib/dates'
-import { answerErrors, blankOption, newKey, stripKeys } from '../editor/draft'
-import { isoWeek, parseTypedDate, TEST_SKILL_LABELS } from '../format'
+import { answerErrors, blankOption, newKey, stripKeys } from './draft'
+import { TEST_SKILL_LABELS } from '../constants'
+import { isoWeek, parseTypedDate } from './format'
 
 // Test drafts of the admin editor (docs/api/admin.md, "Đề kiểm tra"). A question is graded by its choices, by its
 // accepted answers, or by the AI (speaking and writing only), like TestAttemptService; `mode` records which one the

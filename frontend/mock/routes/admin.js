@@ -56,7 +56,7 @@ function usageOf(word) {
   let learners = 0
   let lists = 0
   if (word.id < 10_000) {
-    // passport and luggage as in scenarios 18 and 20; one word in seven has never been studied.
+    // passport and luggage as in scenarios 19 and 21; one word in seven has never been studied.
     const fixed = { passport: [12, 3], luggage: [14, 2] }[word.word]
     if (fixed) [learners, lists] = fixed
     else if (word.id % 7 !== 0 && word.topicId <= 4) [learners, lists] = [3 + ((word.id * 37) % 40), (word.id * 11) % 4]
@@ -146,7 +146,7 @@ const MISSING = {
 
 function toAdminLesson(lesson) {
   const passage = lesson.passage && {
-    // "Hội thoại tại sân bay" has no audio file, as in the real seed (scenario 22).
+    // "Hội thoại tại sân bay" has no audio file, as in the real seed (scenario 23).
     audioUrl: lesson.id === 11 ? null : listeningAudioUrl(lesson.id),
     durationMs: lesson.passage.durationMs,
     transcript: lesson.passage.segments.map((segment) => segment.transcript).join(' '),
@@ -371,7 +371,7 @@ function readTest(body, s, type) {
   return { title, startDate, endDate, draft: Boolean(body.draft), questions }
 }
 
-/** Only wording may change once learners have submitted: same questions, answers and points (scenario 23). */
+/** Only wording may change once learners have submitted: same questions, answers and points (scenario 24). */
 function sameStructure(before, after) {
   if (after.startDate !== before.startDate || after.questions.length !== before.questions.length) return false
   return before.questions.every((question, index) => {

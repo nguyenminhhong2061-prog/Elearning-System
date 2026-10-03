@@ -1,8 +1,9 @@
 import { Link } from 'react-router'
 import { Tag } from '@/components/ui/Tag'
+import { paths } from '@/config/paths'
 import { cx } from '@/lib/cx'
-import { LevelTag, Pagination, RowAction, TABLE, TableCard, TD, TH } from '../components/controls'
-import { Highlight } from '../components/Highlight'
+import { LevelTag, Pagination, RowAction, TABLE, TableCard, TD, TH } from '../controls'
+import { Highlight } from '../Highlight'
 
 /**
  * Words of the admin area: one topic's words, or search results across the whole bank (`topics` given: a "Chủ đề"
@@ -10,13 +11,13 @@ import { Highlight } from '../components/Highlight'
  *
  * @param {object} props
  * @param {string} props.label
- * @param {import('@/api/types').PageResponse<import('../types').AdminWord>} props.page
+ * @param {import('@/api/types').PageResponse<import('../../types').AdminWord>} props.page
  * @param {boolean} [props.stale] a newer page is loading
  * @param {string} [props.term] search term to highlight
- * @param {import('../types').AdminTopic[]} [props.topics]
+ * @param {import('../../types').AdminTopic[]} [props.topics]
  * @param {(page: number) => void} props.onPageChange
- * @param {(word: import('../types').AdminWord) => void} props.onEdit
- * @param {(word: import('../types').AdminWord) => void} props.onDelete
+ * @param {(word: import('../../types').AdminWord) => void} props.onEdit
+ * @param {(word: import('../../types').AdminWord) => void} props.onDelete
  */
 export function WordTable({ label, page, stale, term, topics, onPageChange, onEdit, onDelete }) {
   const topicOf = (id) => topics?.find((topic) => topic.id === id)
@@ -58,7 +59,7 @@ export function WordTable({ label, page, stale, term, topics, onPageChange, onEd
                 {topics && (
                   <td className={TD}>
                     {topic ? (
-                      <Link to={`/admin/vocabulary/topics/${topic.id}`} className="font-semibold">
+                      <Link to={paths.adminTopic(topic.id)} className="font-semibold">
                         {topic.name}
                       </Link>
                     ) : (

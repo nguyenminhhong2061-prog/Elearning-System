@@ -2,13 +2,18 @@
 
 > Trạng thái: **đề xuất.** Giao diện khu quản trị (`/admin/*`) do Hồng làm theo tài liệu này và theo bản thiết kế
 > https://claude.ai/artifact/5j4yHRcqMEqqMHGJdnCTRm, chạy trước với dữ liệu giả (`npm run dev:mock`). Kịch bản nghiệp vụ
-> là mục VI (kịch bản 18–25) của `Scenarios-he-thong.md`. Nhóm đã chốt demo không cần Admin, nên backend làm sau demo.
+> là mục VI (kịch bản 19–26) của `docs/English Learning System/Analysis/Scenarios.md`. Nhóm đã chốt demo không cần Admin,
+> nên backend làm sau demo.
+>
+> **Đã bỏ (03/10/2026):** trang và API quản lý trò chơi (`/api/admin/games`). Business model ghi admin không cần quản lý
+> trò chơi, quy tắc 6 của kịch bản cố định tham số ván chơi, và từ bản 2 của `games.md` ván chơi lấy thẳng từ vựng của chủ
+> đề, không còn ngân hàng câu hỏi để đồng bộ.
 >
 > Backend chia theo module sở hữu dữ liệu:
 >
 > | Phần | Backend | Tình trạng |
 > |---|---|---|
-> | Chủ đề, từ vựng, trò chơi | Hồng (module A `vocabulary`) | Thêm/sửa/xóa chủ đề và từ **đã có**; các endpoint `/api/admin/topics`, `/api/admin/vocabulary`, `/api/admin/media`, `/api/admin/games` và luật mới là đề xuất |
+> | Chủ đề, từ vựng | Hồng (module A `vocabulary`) | Thêm/sửa/xóa chủ đề và từ **đã có**; các endpoint `/api/admin/topics`, `/api/admin/vocabulary`, `/api/admin/media` và luật mới là đề xuất |
 > | Người dùng | Hồng (module `user`) | Đề xuất |
 > | Bài tập | Đạt (module B `exercise`) | Đề xuất |
 > | Đề kiểm tra | Nhân (module C `test`) | Đề xuất |
@@ -24,14 +29,13 @@ Việt Nam, thời điểm dạng ISO-8601 UTC. Danh sách phân trang dùng `Pa
 
 | Kịch bản | Màn hình (`/admin/...`) | API |
 |---|---|---|
-| 25 Xem thống kê | `/admin` Tổng quan | `GET /api/admin/stats` |
-| 18 Sửa từ, 19 Thêm từ | `/admin/vocabulary`, `/admin/vocabulary/topics/{id}` (ngăn kéo sửa/thêm) | `GET /api/admin/topics`, `GET /api/admin/vocabulary`, `POST`/`PUT /api/vocabulary`, `POST /api/admin/media` |
-| 20 Xóa từ | Hộp thoại xóa trong bảng từ | `DELETE /api/vocabulary/{id}` |
-| 21 Quản lý chủ đề | Hộp thoại chủ đề, chặn xóa chủ đề còn từ | `POST`/`PUT`/`DELETE /api/topics` |
-| 19 bước 2 Đồng bộ trò chơi | `/admin/games` | `GET /api/admin/games`, `PUT /api/admin/games/{id}`, `POST /api/admin/games/sync` |
-| 22 Quản lý bài tập | `/admin/lessons`, `/admin/lessons/{id}`, `/admin/lessons/new` | `/api/admin/lessons` |
-| 23 Quản lý đề kiểm tra | `/admin/tests`, `/admin/tests/{id}` | `/api/admin/tests` |
-| 24 Quản lý người dùng | `/admin/users`, `/admin/users/{id}` | `/api/admin/users` |
+| 26 Xem thống kê | `/admin` Tổng quan | `GET /api/admin/stats` |
+| 19 Sửa từ, 20 Thêm từ | `/admin/vocabulary`, `/admin/vocabulary/topics/{id}` (ngăn kéo sửa/thêm) | `GET /api/admin/topics`, `GET /api/admin/vocabulary`, `POST`/`PUT /api/vocabulary`, `POST /api/admin/media` |
+| 21 Xóa từ | Hộp thoại xóa trong bảng từ | `DELETE /api/vocabulary/{id}` |
+| 22 Quản lý chủ đề | Hộp thoại chủ đề, chặn xóa chủ đề còn từ | `POST`/`PUT`/`DELETE /api/topics` |
+| 23 Quản lý bài tập | `/admin/lessons`, `/admin/lessons/{id}`, `/admin/lessons/new` | `/api/admin/lessons` |
+| 24 Quản lý đề kiểm tra | `/admin/tests`, `/admin/tests/{id}` | `/api/admin/tests` |
+| 25 Quản lý người dùng | `/admin/users`, `/admin/users/{id}` | `/api/admin/users` |
 
 ## Tổng quan
 
@@ -141,32 +145,6 @@ trong phiên học, trò chơi, tìm kiếm và danh sách admin, tiến độ c
 Tải file audio hoặc ảnh cho từ, chủ đề, bài nghe. Thân là **nguyên file** (không multipart), `Content-Type` là loại file
 (`audio/mpeg`, `audio/wav`, `image/png`, `image/jpeg`, `image/webp`). Audio tối đa 10 MB, ảnh tối đa 2 MB; sai loại hoặc
 quá lớn → `400`. Trả `201` `{ "url": "/media/uploads/5f1c….mp3" }`; đường dẫn này `permitAll` như `/media/**` hiện có.
-
-## Trò chơi (module A, Hồng)
-
-### `GET /api/admin/games`
-
-```json
-{
-  "bank": { "systemWordCount": 180, "coveredWordCount": 180, "lastSyncedAt": "2026-09-25T03:00:00Z" },
-  "games": [{
-    "id": 1, "name": "Đoán nghĩa", "gameType": "GUESS_MEANING", "questionsPerRound": 10,
-    "timeLimitSeconds": 90, "enabled": true, "bankSize": 180, "sessionsLast30Days": 412
-  }]
-}
-```
-
-`coveredWordCount` là số từ hệ thống đã có câu hỏi trong ngân hàng của **mọi** trò chơi.
-
-### `PUT /api/admin/games/{id}`
-
-Thân `{ "enabled": true, "timeLimitSeconds": 90 }`; thời gian 30–600 giây. Cần cột mới `games.enabled`. Trả game như
-trên.
-
-### `POST /api/admin/games/sync`
-
-Tạo câu hỏi cho các từ hệ thống chưa có trong ngân hàng (cùng cách sinh như migration seed: 3 đáp án nhiễu cùng chủ
-đề). Trả `{ "addedWords": 1, "bank": { … } }`.
 
 ## Bài tập (module B, Đạt)
 
@@ -325,10 +303,9 @@ hoặc lưu thời điểm khóa và từ chối token cấp trước đó); đ�
 
 | Bảng | Thay đổi | Dùng cho |
 |---|---|---|
-| `vocabulary` | `archived_at TIMESTAMPTZ NULL` | Lưu trữ thay cho xóa (kịch bản 20) |
+| `vocabulary` | `archived_at TIMESTAMPTZ NULL` | Lưu trữ thay cho xóa (kịch bản 21) |
 | `topics` | `updated_at TIMESTAMPTZ NULL` | Cột "Cập nhật" |
-| `games` | `enabled BOOLEAN NOT NULL DEFAULT TRUE` | Bật/tắt trò chơi |
-| `tests` | `draft BOOLEAN NOT NULL DEFAULT FALSE` | Đề nháp (kịch bản 23) |
+| `tests` | `draft BOOLEAN NOT NULL DEFAULT FALSE` | Đề nháp (kịch bản 24) |
 | `users` | `last_active_at TIMESTAMPTZ NULL` | "Hoạt động gần nhất" |
 
 ## Câu hỏi mở

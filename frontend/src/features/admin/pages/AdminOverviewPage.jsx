@@ -4,13 +4,16 @@ import { CEFR_LEVELS } from '@/api/constants'
 import { Button } from '@/components/ui/Button'
 import { LoadError } from '@/components/ui/LoadError'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { paths } from '@/config/paths'
 import { addDays, formatDayMonth, todayInVietnam } from '@/lib/dates'
 import { cx } from '@/lib/cx'
-import { useStats } from '../api/adminQueries'
+import { formatCount } from '@/lib/format'
+import { useStats } from '../api/overviewQueries'
 import { AdminPage } from '../components/AdminPage'
 import { Segmented } from '../components/controls'
-import { formatClock, formatDateRange, formatNumber, isoWeek, parseTypedDate, SKILL_LABELS } from '../format'
-import { useUrlFilters } from '../useUrlFilters'
+import { SKILL_LABELS } from '../constants'
+import { formatClock, formatDateRange, isoWeek, parseTypedDate } from '../utils/format'
+import { useUrlFilters } from '../hooks/useUrlFilters'
 
 const PERIODS = [
   { value: '7', label: '7 ngày' },
@@ -27,7 +30,7 @@ function periodOf(filters, today) {
   return { from: addDays(today, -(days - 1)), to: today }
 }
 
-/** Scenario 25: the admin area's home page. */
+/** Scenario 26: the admin area's home page. */
 export function AdminOverviewPage() {
   const today = todayInVietnam()
   const [filters, setFilters] = useUrlFilters({ period: '30', from: '', to: '' })
@@ -143,11 +146,11 @@ function CustomPeriod({ initial, today, onApply, onCancel }) {
 function Overview({ stats, today }) {
   const learnersShare = stats.learners.total > 0 ? Math.round((stats.activeToday / stats.learners.total) * 100) : 0
   const cards = [
-    ['Người học', formatNumber(stats.learners.total), `+${formatNumber(stats.learners.newInPeriod)} người mới trong kỳ`, true],
-    ['Hoạt động hôm nay', formatNumber(stats.activeToday), `${learnersShare}% người học`],
-    ['Lượt ôn từ vựng', formatNumber(stats.reviews), 'thẻ flashcard đã đánh giá'],
-    ['Bài tập hoàn thành', formatNumber(stats.exercisesCompleted), 'ngữ pháp, nghe, phát âm'],
-    ['Bài kiểm tra đã nộp', formatNumber(stats.testsSubmitted), 'định kỳ và tổng hợp'],
+    ['Người học', formatCount(stats.learners.total), `+${formatCount(stats.learners.newInPeriod)} người mới trong kỳ`, true],
+    ['Hoạt động hôm nay', formatCount(stats.activeToday), `${learnersShare}% người học`],
+    ['Lượt ôn từ vựng', formatCount(stats.reviews), 'thẻ flashcard đã đánh giá'],
+    ['Bài tập hoàn thành', formatCount(stats.exercisesCompleted), 'ngữ pháp, nghe, phát âm'],
+    ['Bài kiểm tra đã nộp', formatCount(stats.testsSubmitted), 'định kỳ và tổng hợp'],
   ]
 
   return (
@@ -199,7 +202,7 @@ function DailyActiveChart({ days, today }) {
         <h2 id="daily-title" className="text-base font-bold text-ink">
           Người học hoạt động mỗi ngày
         </h2>
-        {total > 0 && <span className="text-label text-muted-strong">Trung bình {formatNumber(average)} người/ngày</span>}
+        {total > 0 && <span className="text-label text-muted-strong">Trung bình {formatCount(average)} người/ngày</span>}
       </div>
       {total === 0 ? (
         <p role="status" className="flex h-50 items-center justify-center rounded-[10px] bg-surface-alt text-sm text-ink-soft">
@@ -260,7 +263,7 @@ function LevelBreakdown({ levels }) {
         <h2 id="levels-title" className="text-base font-bold text-ink">
           Trình độ người học
         </h2>
-        <span className="text-label text-muted-strong">{formatNumber(total)} người</span>
+        <span className="text-label text-muted-strong">{formatCount(total)} người</span>
       </div>
       <ul className="flex flex-col gap-2.75">
         {rows.map(([key, label, count]) => (
@@ -292,10 +295,10 @@ function TopTopics({ topics }) {
           {topics.map((topic, index) => (
             <li key={topic.topicId} className="flex flex-col gap-1.5">
               <div className="flex justify-between gap-3 text-label">
-                <Link to={`/admin/vocabulary/topics/${topic.topicId}`} className="font-semibold text-ink">
+                <Link to={paths.adminTopic(topic.topicId)} className="font-semibold text-ink">
                   {index + 1}. {topic.name}
                 </Link>
-                <span className="text-ink-soft">{formatNumber(topic.reviews)} lượt</span>
+                <span className="text-ink-soft">{formatCount(topic.reviews)} lượt</span>
               </div>
               <span aria-hidden="true" className="flex h-1.5 rounded-full bg-canvas">
                 <span className="rounded-full bg-brand" style={{ width: `${(topic.reviews / max) * 100}%` }} />
@@ -321,11 +324,11 @@ function TopLessons({ lessons }) {
           {lessons.map((lesson) => (
             <li key={lesson.lessonId} className="flex items-center justify-between gap-3 border-b border-canvas py-3 last:border-b-0">
               <div className="flex min-w-0 flex-col gap-0.75">
-                <Link to={`/admin/lessons/${lesson.lessonId}`} className="text-sm font-semibold text-ink">
+                <Link to={paths.adminLesson(lesson.lessonId)} className="text-sm font-semibold text-ink">
                   {lesson.title}
                 </Link>
                 <span className="text-xs text-muted-strong">
-                  {SKILL_LABELS[lesson.skill]} · {lesson.cefrLevel} · {formatNumber(lesson.attempts)} lượt
+                  {SKILL_LABELS[lesson.skill]} · {lesson.cefrLevel} · {formatCount(lesson.attempts)} lượt
                 </span>
               </div>
               <span className={cx('flex-none text-label font-bold', lesson.averageScore >= 80 ? 'text-success' : 'text-ink-soft')}>TB {lesson.averageScore}%</span>
@@ -345,19 +348,19 @@ const TONES = {
 
 function Attention({ attention }) {
   const items = [
-    attention.wordsMissingAudio > 0 && ['warning', `${formatNumber(attention.wordsMissingAudio)} từ chưa có audio phát âm`, '/admin/vocabulary?missing=AUDIO'],
-    attention.wordsMissingExample > 0 && ['warning', `${formatNumber(attention.wordsMissingExample)} từ chưa có câu ví dụ`, '/admin/vocabulary?missing=EXAMPLE'],
+    attention.wordsMissingAudio > 0 && ['warning', `${formatCount(attention.wordsMissingAudio)} từ chưa có audio phát âm`, paths.adminMissingWords('AUDIO')],
+    attention.wordsMissingExample > 0 && ['warning', `${formatCount(attention.wordsMissingExample)} từ chưa có câu ví dụ`, paths.adminMissingWords('EXAMPLE')],
     ...attention.lessonsWithIssues.map((lesson) => [
       'danger',
       lesson.issue === 'MISSING_AUDIO' ? `Bài nghe “${lesson.title}” thiếu file audio` : `Bài “${lesson.title}” chưa có câu hỏi`,
-      `/admin/lessons/${lesson.lessonId}`,
+      paths.adminLesson(lesson.lessonId),
     ]),
     attention.periodicTestGap && [
       'danger',
       `Chưa có đề định kỳ tuần ${isoWeek(attention.periodicTestGap.weekEnd)} (đề hiện tại đóng ${formatDayMonth(addDays(attention.periodicTestGap.weekStart, -1))})`,
-      '/admin/tests',
+      paths.adminTests,
     ],
-    attention.lockedUsers > 0 && ['neutral', `${attention.lockedUsers} tài khoản đang bị khóa`, '/admin/users?status=LOCKED'],
+    attention.lockedUsers > 0 && ['neutral', `${attention.lockedUsers} tài khoản đang bị khóa`, paths.adminLockedUsers],
   ].filter(Boolean)
 
   return (

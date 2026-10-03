@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { cx } from '@/lib/cx'
-import { Segmented } from '../components/controls'
-import { InputField, MediaPicker, SelectField, TextAreaField } from '../components/fields'
-import { answerSummary, blankOption, formatClockMs, move, parseClockMs, removeAt, replaceAt } from '../editor/draft'
+import { Segmented } from '../controls'
+import { InputField, MediaPicker, SelectField, TextAreaField } from '../fields'
+import { answerSummary, blankOption, formatClockMs, move, parseClockMs, removeAt, replaceAt } from '../../utils/draft'
 import { AcceptedAnswersEditor, OptionsEditor, QuestionFrame, QuestionPreview } from '../editor/questionParts'
-import { SKILL_LABELS } from '../format'
-import { newItem, newQuestion, newSegment } from './lessonDraft'
+import { SKILL_LABELS } from '../../constants'
+import { newItem, newQuestion, newSegment } from '../../utils/lessonDraft'
 
 const CARD = 'flex flex-col gap-4 rounded-xl border border-line bg-white px-5.5 py-5'
 const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']

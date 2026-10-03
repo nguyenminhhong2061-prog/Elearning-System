@@ -2,7 +2,7 @@ import { addDays } from '../src/lib/dates.js'
 
 // Sample data of the admin area for `npm run dev:mock` (docs/api/admin.md): the learners of the users page and the
 // tests of the tests page. Everything is dated relative to today, so the pages look the same whenever they are opened
-// (on 29/09/2026 they match the design and scenarios 23–24 of Scenarios-he-thong.md).
+// (on 29/09/2026 they match the design and scenarios 24–25 of Analysis/Scenarios.md).
 
 const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
 
@@ -84,7 +84,7 @@ export function buildLearners(today) {
 
 export { LEVELS, TOTAL_LEARNERS }
 
-/** Details of Phạm Văn Nam as in scenario 24; other learners get numbers derived from their id. */
+/** Details of Phạm Văn Nam as in scenario 25; other learners get numbers derived from their id. */
 export function learnerDetail(learner, today) {
   if (learner.email === 'nam.pv@gmail.com') {
     return {

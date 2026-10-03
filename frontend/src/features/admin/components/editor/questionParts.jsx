@@ -1,6 +1,6 @@
 import { useId } from 'react'
 import { cx } from '@/lib/cx'
-import { blankOption, removeAt, replaceAt } from './draft'
+import { blankOption, removeAt, replaceAt } from '../../utils/draft'
 
 const LETTERS = 'ABCDEF'
 const MAX_OPTIONS = 6

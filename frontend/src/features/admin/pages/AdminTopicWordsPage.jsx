@@ -5,15 +5,16 @@ import { Button } from '@/components/ui/Button'
 import { LoadError } from '@/components/ui/LoadError'
 import { SearchField } from '@/components/ui/SearchField'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { paths } from '@/config/paths'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
-import { useAdminTopics, useAdminWords } from '../api/adminQueries'
+import { useAdminTopics, useAdminWords } from '../api/vocabularyQueries'
 import { AdminPage } from '../components/AdminPage'
 import { InlineSelect } from '../components/controls'
-import { levelOptions } from '../format'
-import { useClampPage, useUrlFilters } from '../useUrlFilters'
-import { DeleteWordDialog, TopicDialog } from '../vocabulary/vocabularyDialogs'
-import { WordDrawer } from '../vocabulary/WordDrawer'
-import { WordTable } from '../vocabulary/WordTable'
+import { levelOptions } from '../utils/format'
+import { useClampPage, useUrlFilters } from '../hooks/useUrlFilters'
+import { DeleteWordDialog, TopicDialog } from '../components/vocabulary/vocabularyDialogs'
+import { WordDrawer } from '../components/vocabulary/WordDrawer'
+import { WordTable } from '../components/vocabulary/WordTable'
 
 const PAGE_SIZE = 10
 const MISSING_OPTIONS = [
@@ -23,7 +24,7 @@ const MISSING_OPTIONS = [
   { value: 'IMAGE', label: 'Thiếu ảnh' },
 ]
 
-/** Scenarios 18–20: the words of one topic, with the edit/add panel and the delete dialog. */
+/** Scenarios 19–21: the words of one topic, with the edit/add panel and the delete dialog. */
 export function AdminTopicWordsPage() {
   const topicId = Number(useParams().topicId)
   const [filters, setFilters] = useUrlFilters({ q: '', level: '', missing: '', page: '0' })
@@ -53,7 +54,7 @@ export function AdminTopicWordsPage() {
   }
   if (!topic) {
     return (
-      <AdminPage title="Không tìm thấy chủ đề" breadcrumb={[{ label: 'Từ vựng', to: '/admin/vocabulary' }]}>
+      <AdminPage title="Không tìm thấy chủ đề" breadcrumb={[{ label: 'Từ vựng', to: paths.adminVocabulary }]}>
         <Alert variant="error">Chủ đề này không tồn tại hoặc đã bị xóa.</Alert>
       </AdminPage>
     )
@@ -63,7 +64,7 @@ export function AdminTopicWordsPage() {
   return (
     <AdminPage
       title={topic.name}
-      breadcrumb={[{ label: 'Từ vựng', to: '/admin/vocabulary' }]}
+      breadcrumb={[{ label: 'Từ vựng', to: paths.adminVocabulary }]}
       summary={[topic.description, `${topic.wordCount} từ`, levelRange].filter(Boolean).join(' · ')}
       actions={
         <>

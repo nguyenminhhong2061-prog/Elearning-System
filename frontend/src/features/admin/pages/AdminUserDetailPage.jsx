@@ -8,17 +8,18 @@ import { LoadError } from '@/components/ui/LoadError'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Tag } from '@/components/ui/Tag'
 import { useToast } from '@/components/ui/toastContext'
+import { paths } from '@/config/paths'
 import { formatDayMonth } from '@/lib/dates'
 import { getInitials } from '@/lib/personName'
 import { cx } from '@/lib/cx'
-import { useAdminUser, useSetUserStatus } from '../api/adminQueries'
+import { useAdminUser, useSetUserStatus } from '../api/usersQueries'
 import { AdminPage } from '../components/AdminPage'
 import { LevelTag } from '../components/controls'
-import { describeActivityTime, describeLastActive, formatFullDate, levelLabel } from '../format'
+import { describeActivityTime, describeLastActive, formatFullDate, levelLabel } from '../utils/format'
 
 const CARD = 'flex flex-col gap-3.5 rounded-xl border border-line bg-white px-5.5 py-5'
 
-/** Scenario 24, steps 2–5: a learner's profile, lock and unlock. */
+/** Scenario 25, steps 5–10 and branch 7a: a learner's profile, lock and unlock. */
 export function AdminUserDetailPage() {
   const userId = Number(useParams().userId)
   const user = useAdminUser(userId)
@@ -28,7 +29,7 @@ export function AdminUserDetailPage() {
   if (user.isError) {
     const notFound = user.error?.status === 404
     return (
-      <AdminPage title={notFound ? 'Không tìm thấy người dùng' : 'Người dùng'} breadcrumb={[{ label: 'Người dùng', to: '/admin/users' }]}>
+      <AdminPage title={notFound ? 'Không tìm thấy người dùng' : 'Người dùng'} breadcrumb={[{ label: 'Người dùng', to: paths.adminUsers }]}>
         {notFound ? (
           <Alert variant="error">Người dùng này không tồn tại hoặc không phải tài khoản người học.</Alert>
         ) : (
@@ -42,7 +43,7 @@ export function AdminUserDetailPage() {
   const locked = learner.status === 'LOCKED'
 
   return (
-    <AdminPage title={learner.fullName} breadcrumb={[{ label: 'Người dùng', to: '/admin/users' }]} titleInContent>
+    <AdminPage title={learner.fullName} breadcrumb={[{ label: 'Người dùng', to: paths.adminUsers }]} titleInContent>
       <section aria-label="Hồ sơ" className="flex flex-col gap-4 rounded-xl border border-line bg-white p-6">
         <div className="flex flex-wrap items-center gap-5">
           <span

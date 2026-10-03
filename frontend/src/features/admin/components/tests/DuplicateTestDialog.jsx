@@ -5,19 +5,20 @@ import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { useToast } from '@/components/ui/toastContext'
+import { paths } from '@/config/paths'
 import { addDays, formatDayMonth } from '@/lib/dates'
-import { useDuplicateTest } from '../api/adminQueries'
-import { InputField } from '../components/fields'
-import { parseTypedDate } from '../format'
-import { periodicTitle } from './testDraft'
+import { useDuplicateTest } from '../../api/testsQueries'
+import { InputField } from '../fields'
+import { parseTypedDate } from '../../utils/format'
+import { periodicTitle } from '../../utils/testDraft'
 
 const typed = (date) => (date ? `${formatDayMonth(date)}/${date.slice(0, 4)}` : '')
 
 /**
- * Scenario 23, step 2: copies a test into a new draft (same questions) with its own name and dates, then opens it.
+ * Scenario 24, branch 2c: copies a test into a new draft (same questions) with its own name and dates, then opens it.
  * A weekly test is proposed for the week after `week` (or after the copied test).
  *
- * @param {{ source: import('../types').AdminTestSummary | null, week?: { weekStart: string, weekEnd: string } | null, onClose: () => void }} props
+ * @param {{ source: import('../../types').AdminTestSummary | null, week?: { weekStart: string, weekEnd: string } | null, onClose: () => void }} props
  */
 export function DuplicateTestDialog({ source, week, onClose }) {
   return (
@@ -56,7 +57,7 @@ function DuplicateForm({ source, week, onClose }) {
         onSuccess: (copy) => {
           toast('Đã tạo bản nháp', `“${copy.title}” giữ nguyên ${copy.questions.length} câu của đề gốc.`)
           onClose()
-          navigate(`/admin/tests/${copy.id}`)
+          navigate(paths.adminTest(copy.id))
         },
       },
     )

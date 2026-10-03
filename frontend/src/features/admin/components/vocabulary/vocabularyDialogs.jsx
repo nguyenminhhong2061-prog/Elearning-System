@@ -7,8 +7,9 @@ import { Alert } from '@/components/ui/Alert'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { useToast } from '@/components/ui/toastContext'
-import { useDeleteTopic, useDeleteWord, useSaveTopic } from '../api/adminQueries'
-import { InputField, MediaPicker, TextAreaField } from '../components/fields'
+import { paths } from '@/config/paths'
+import { useDeleteTopic, useDeleteWord, useSaveTopic } from '../../api/vocabularyQueries'
+import { InputField, MediaPicker, TextAreaField } from '../fields'
 
 function WarningBox({ children }) {
   return (
@@ -23,10 +24,10 @@ function WarningBox({ children }) {
 }
 
 /**
- * Scenario 20: a word someone studies (or keeps in a list) is archived, an unused one is deleted for good. The
+ * Scenario 21: a word someone studies (or keeps in a list) is archived, an unused one is deleted for good. The
  * server makes the final call; the wording follows the counts the table already shows.
  *
- * @param {{ word: import('../types').AdminWord | null, onClose: () => void }} props
+ * @param {{ word: import('../../types').AdminWord | null, onClose: () => void }} props
  */
 export function DeleteWordDialog({ word, onClose }) {
   const remove = useDeleteWord()
@@ -86,11 +87,11 @@ const topicSchema = z.object({
 })
 
 /**
- * Scenario 21: add or edit a topic. The name must not repeat another topic's (checked here, and by the server: 409).
+ * Scenario 22: add or edit a topic. The name must not repeat another topic's (checked here, and by the server: 409).
  *
  * @param {object} props
- * @param {{ mode: 'add' } | { mode: 'edit', topic: import('../types').AdminTopic } | null} props.target
- * @param {import('../types').AdminTopic[]} props.topics every topic, for the duplicate check
+ * @param {{ mode: 'add' } | { mode: 'edit', topic: import('../../types').AdminTopic } | null} props.target
+ * @param {import('../../types').AdminTopic[]} props.topics every topic, for the duplicate check
  * @param {() => void} props.onClose
  */
 export function TopicDialog({ target, topics, onClose }) {
@@ -174,10 +175,10 @@ export function TopicDialog({ target, topics, onClose }) {
 }
 
 /**
- * Scenario 21: a topic that still has words cannot be deleted (the admin moves or deletes them first); an empty one
+ * Scenario 22: a topic that still has words cannot be deleted (the admin moves or deletes them first); an empty one
  * asks for confirmation.
  *
- * @param {{ topic: import('../types').AdminTopic | null, onClose: () => void }} props
+ * @param {{ topic: import('../../types').AdminTopic | null, onClose: () => void }} props
  */
 export function DeleteTopicDialog({ topic, onClose }) {
   const remove = useDeleteTopic()
@@ -218,7 +219,7 @@ export function DeleteTopicDialog({ topic, onClose }) {
         </Button>
         {blocked ? (
           topic?.wordCount > 0 && (
-            <ButtonLink to={`/admin/vocabulary/topics/${topic.id}`} variant="strong" size="xs" onClick={close}>
+            <ButtonLink to={paths.adminTopic(topic.id)} variant="strong" size="xs" onClick={close}>
               Xem {topic.wordCount} từ →
             </ButtonLink>
           )

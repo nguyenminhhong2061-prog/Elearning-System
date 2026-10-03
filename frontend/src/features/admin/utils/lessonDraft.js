@@ -1,4 +1,4 @@
-import { answerErrors, blankOption, newKey, stripKeys } from '../editor/draft'
+import { answerErrors, blankOption, newKey, stripKeys } from './draft'
 
 // Lesson drafts of the admin editor (docs/api/admin.md, "Bài tập"): an empty lesson, the checks the server makes, and
 // the body sent to it.

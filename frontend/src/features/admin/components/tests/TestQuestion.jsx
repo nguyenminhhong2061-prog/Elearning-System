@@ -1,9 +1,9 @@
-import { Segmented } from '../components/controls'
-import { InputField, MediaPicker, SelectField, TextAreaField } from '../components/fields'
-import { answerSummary, blankOption } from '../editor/draft'
+import { Segmented } from '../controls'
+import { InputField, MediaPicker, SelectField, TextAreaField } from '../fields'
+import { answerSummary, blankOption } from '../../utils/draft'
 import { AcceptedAnswersEditor, OptionsEditor, QuestionFrame, QuestionPreview } from '../editor/questionParts'
-import { TEST_SKILL_LABELS } from '../format'
-import { AI_SKILLS, SKILLS, typeFor } from './testDraft'
+import { TEST_SKILL_LABELS } from '../../constants'
+import { AI_SKILLS, SKILLS, typeFor } from '../../utils/testDraft'
 
 const MODE_LABELS = { CHOICE: 'Trắc nghiệm', TEXT: 'Điền từ', AI: 'Tự luận (AI chấm)' }
 

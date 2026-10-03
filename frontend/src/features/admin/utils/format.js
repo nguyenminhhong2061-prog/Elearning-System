@@ -4,11 +4,7 @@ import { addDays, formatDayMonth, todayInVietnam } from '@/lib/dates'
 // Number and date formats of the admin pages. Instants (ISO-8601 UTC) are shown in Vietnam time, like the rest of the
 // app; plain dates ("YYYY-MM-DD") are calendar days already.
 
-const numbers = new Intl.NumberFormat('vi-VN')
 const clockTime = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Asia/Ho_Chi_Minh' })
-
-/** 4812 -> "4.812". */
-export const formatNumber = (value) => numbers.format(value)
 
 /** "2026-09-15" or an instant -> "15/09/2026". */
 export function formatFullDate(value) {
@@ -66,10 +62,6 @@ export function parseTypedDate(text) {
 
 /** Level names of the admin tables: null is a learner whose level has not been determined yet. */
 export const levelLabel = (level) => level ?? 'Chưa xác định'
-
-export const SKILL_LABELS = { GRAMMAR: 'Ngữ pháp', LISTENING: 'Nghe hiểu', PRONUNCIATION: 'Phát âm' }
-export const TEST_SKILL_LABELS = { LISTENING: 'Nghe', SPEAKING: 'Nói', READING: 'Đọc', WRITING: 'Viết' }
-export const DIFFICULTY_LABELS = { EASY: 'Dễ', MEDIUM: 'Vừa', HARD: 'Khó' }
 
 /** Options of a level filter: every level, optionally "Chưa xác định" (value NONE) for learners. */
 export function levelOptions({ withNone = false } = {}) {
