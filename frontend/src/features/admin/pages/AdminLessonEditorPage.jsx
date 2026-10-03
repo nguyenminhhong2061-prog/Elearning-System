@@ -3,20 +3,24 @@ import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { describeApiError } from '@/api/errorMessages'
 import { Alert } from '@/components/ui/Alert'
 import { Button, ButtonLink } from '@/components/ui/Button'
-import { Dialog } from '@/components/ui/Dialog'
 import { LoadError } from '@/components/ui/LoadError'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Tag } from '@/components/ui/Tag'
 import { useToast } from '@/components/ui/toastContext'
 import { paths } from '@/config/paths'
 import { formatCount } from '@/lib/format'
-import { useAdminLesson, useDeleteLesson, useSaveLesson } from '../api/lessonsQueries'
+import { useAdminLesson, useSaveLesson } from '../api/lessonsQueries'
 import { AdminPage } from '../components/AdminPage'
+import { DeleteLessonDialog } from '../components/lessons/DeleteLessonDialog'
+import { LessonInfo } from '../components/lessons/LessonInfo'
+import { LessonQuestions } from '../components/lessons/LessonQuestions'
+import { ListeningPassage } from '../components/lessons/ListeningPassage'
+import { PronunciationItems } from '../components/lessons/PronunciationItems'
+import { ReadingPassages } from '../components/lessons/ReadingPassages'
+import { LESSON_SKILLS, SKILL_LABELS } from '../constants'
 import { sameContent, toDraft } from '../utils/draft'
-import { SKILL_LABELS } from '../constants'
 import { formatFullDate } from '../utils/format'
 import { editableLesson, lessonPayload, newLesson, validateLesson } from '../utils/lessonDraft'
-import { LessonInfo, LessonQuestions, ListeningPassage, PronunciationItems } from '../components/lessons/LessonSections'
 
 const STATUS_TAGS = {
   PUBLISHED: ['success', 'Đã xuất bản'],
@@ -24,14 +28,14 @@ const STATUS_TAGS = {
   HIDDEN: ['warning', 'Lưu trữ'],
 }
 
-/** Scenario 23, steps 3–13 and branch 2a: create or edit a lesson of any skill. */
+/** Scenario 23, steps 3–13 and branches 2a, 3a–3c: create or edit a lesson of any skill. */
 export function AdminLessonEditorPage() {
   const { lessonId } = useParams()
   const [searchParams] = useSearchParams()
   const isNew = lessonId === undefined
   const id = isNew ? null : Number(lessonId)
   const lesson = useAdminLesson(id)
-  const skill = ['GRAMMAR', 'LISTENING', 'PRONUNCIATION'].includes(searchParams.get('skill')) ? searchParams.get('skill') : 'GRAMMAR'
+  const skill = LESSON_SKILLS.includes(searchParams.get('skill')) ? searchParams.get('skill') : 'READING'
 
   if (!isNew && lesson.isPending) {
     return (
@@ -61,21 +65,23 @@ export function AdminLessonEditorPage() {
   return <LessonEditor key={isNew ? `new-${skill}` : id} source={isNew ? newLesson(skill) : editableLesson(lesson.data)} isNew={isNew} />
 }
 
+const openFirst = (draft) => new Set(draft.questions.slice(0, 1).map((question) => question.key))
+
 function LessonEditor({ source, isNew }) {
   const navigate = useNavigate()
   const toast = useToast()
   const save = useSaveLesson()
   const [original, setOriginal] = useState(() => toDraft(source))
   const [draft, setDraft] = useState(original)
-  const [openKeys, setOpenKeys] = useState(() => new Set(original.questions.slice(0, 1).map((question) => question.key)))
+  const [openKeys, setOpenKeys] = useState(() => openFirst(original))
   const [showErrors, setShowErrors] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
   const dirty = isNew || !sameContent(draft, original)
   const validation = validateLesson(draft)
   const errors = showErrors
-    ? { ...validation.fields, questions: validation.questions, segments: validation.segments, itemErrors: validation.items }
-    : { questions: {}, segments: {}, itemErrors: {} }
+    ? { ...validation.fields, passages: validation.passages, questions: validation.questions, segments: validation.segments, itemErrors: validation.items }
+    : { passages: {}, questions: {}, segments: {}, itemErrors: {} }
 
   // Leaving the page (reload, closing the tab) with unsaved changes asks the browser's confirmation.
   useEffect(() => {
@@ -94,6 +100,14 @@ function LessonEditor({ source, isNew }) {
     })
   }
 
+  // A new lesson may still change skill: its content starts over, the information fields stay.
+  function changeSkill(skill) {
+    const { title, description, topic, cefrLevel, difficulty, estimatedMinutes, status } = draft
+    const fresh = toDraft(newLesson(skill))
+    setDraft({ ...fresh, title, description, topic, cefrLevel, difficulty, estimatedMinutes, status })
+    setOpenKeys(openFirst(fresh))
+  }
+
   function submit() {
     setShowErrors(true)
     if (validation.count > 0) {
@@ -105,7 +119,7 @@ function LessonEditor({ source, isNew }) {
       { id: isNew ? undefined : draft.id, ...lessonPayload(draft) },
       {
         onSuccess: (saved) => {
-          toast('Đã lưu', isNew ? `Đã tạo bài “${saved.title}” (bản nháp).` : `Bài “${saved.title}” đã được cập nhật.`)
+          toast('Đã lưu', isNew ? `Đã tạo bài “${saved.title}”.` : `Bài “${saved.title}” đã được cập nhật.`)
           if (isNew) {
             navigate(paths.adminLesson(saved.id), { replace: true })
             return
@@ -132,8 +146,12 @@ function LessonEditor({ source, isNew }) {
       title={isNew ? 'Bài tập mới' : original.title}
       breadcrumb={[{ label: 'Bài tập', to: paths.adminLessons }]}
       crumb={SKILL_LABELS[draft.skill]}
-      titleAddon={<Tag variant={statusVariant}>{isNew ? 'Nháp' : statusLabel}</Tag>}
-      summary={isNew ? 'Bài mới luôn lưu ở trạng thái Nháp; xuất bản sau khi đã có câu hỏi.' : `${formatCount(original.attempts)} lượt làm${original.updatedAt ? ` · sửa lần cuối ${formatFullDate(original.updatedAt)}` : ''}`}
+      titleAddon={!isNew && <Tag variant={statusVariant}>{statusLabel}</Tag>}
+      summary={
+        isNew
+          ? 'Chọn “Đã xuất bản” để người học thấy bài ngay sau khi tạo, hoặc lưu Nháp để soạn tiếp.'
+          : `${formatCount(original.attempts)} lượt làm${original.updatedAt ? ` · sửa lần cuối ${formatFullDate(original.updatedAt)}` : ''}`
+      }
       actions={
         <>
           {dirty && !isNew && <span className="text-label text-muted-strong">Có thay đổi chưa lưu</span>}
@@ -153,19 +171,16 @@ function LessonEditor({ source, isNew }) {
           Bài đang xuất bản: thay đổi áp dụng cho các lượt làm mới; lượt đã nộp giữ nguyên điểm.
         </p>
       )}
-      {audioMissing && (
-        <Alert variant="error">
-          Chưa có file âm thanh. Người học không nghe được bài này. Tải file lên ở khung “Bài nghe”.
-        </Alert>
-      )}
+      {audioMissing && <Alert variant="error">Chưa có file âm thanh. Người học không nghe được bài này. Tải file lên ở khung “Bài nghe”.</Alert>}
       {showErrors && validation.count > 0 && (
         <Alert variant="error">Chưa lưu được: còn {validation.count} chỗ cần sửa (tô đỏ bên dưới). Các nội dung khác vẫn được giữ.</Alert>
       )}
       {serverProblem && <Alert variant="error">{serverProblem}</Alert>}
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(300px,380px)_minmax(0,1fr)]">
-        <LessonInfo draft={draft} errors={errors} isNew={isNew} onChange={setDraft} onDelete={() => setDeleting(true)} />
+        <LessonInfo draft={draft} errors={errors} isNew={isNew} onChange={setDraft} onChangeSkill={changeSkill} onDelete={() => setDeleting(true)} />
         <div className="flex min-w-0 flex-col gap-4">
+          {draft.skill === 'READING' && <ReadingPassages draft={draft} errors={errors.passages} onChange={setDraft} />}
           {draft.skill === 'LISTENING' && <ListeningPassage draft={draft} errors={errors} onChange={setDraft} />}
           {draft.skill === 'PRONUNCIATION' ? (
             <PronunciationItems draft={draft} errors={errors} onChange={setDraft} />
@@ -175,52 +190,7 @@ function LessonEditor({ source, isNew }) {
         </div>
       </div>
 
-      {!isNew && <DeleteLessonDialog lesson={deleting ? original : null} onClose={() => setDeleting(false)} />}
+      {!isNew && <DeleteLessonDialog lesson={deleting ? original : null} onClose={() => setDeleting(false)} onDeleted={() => navigate(paths.adminLessons)} />}
     </AdminPage>
-  )
-}
-
-function DeleteLessonDialog({ lesson, onClose }) {
-  const remove = useDeleteLesson()
-  const navigate = useNavigate()
-  const toast = useToast()
-  const used = lesson ? lesson.attempts > 0 : false
-
-  function close() {
-    remove.reset()
-    onClose()
-  }
-
-  function confirm() {
-    remove.mutate(lesson.id, {
-      onSuccess: ({ result }) => {
-        toast(result === 'HIDDEN' ? 'Đã chuyển vào Lưu trữ' : 'Đã xóa', `Bài “${lesson.title}”.`)
-        navigate(paths.adminLessons)
-      },
-    })
-  }
-
-  return (
-    <Dialog open={lesson !== null} onClose={close} title={lesson ? (used ? `Xóa bài “${lesson.title}”?` : `Xóa vĩnh viễn bài “${lesson.title}”?`) : ''}>
-      <p className="text-sm leading-5.5 text-ink-soft">
-        {used ? (
-          <>
-            Bài đã có <strong className="text-ink">{formatCount(lesson.attempts)} lượt làm</strong> nên sẽ được chuyển sang <strong className="text-ink">Lưu trữ</strong>: người học
-            không thấy bài nữa, lịch sử và điểm các lượt đã làm được giữ nguyên.
-          </>
-        ) : (
-          'Chưa có ai làm bài này. Bài sẽ bị xóa khỏi hệ thống và không khôi phục được.'
-        )}
-      </p>
-      {remove.isError && <Alert variant="error">{describeApiError(remove.error, 'Chưa xóa được bài. Vui lòng thử lại.')}</Alert>}
-      <div className="flex flex-wrap justify-end gap-2.5">
-        <Button variant="outline" size="xs" onClick={close}>
-          Hủy
-        </Button>
-        <Button variant="danger" size="xs" loading={remove.isPending} onClick={confirm}>
-          {used ? 'Chuyển vào Lưu trữ' : 'Xóa vĩnh viễn'}
-        </Button>
-      </div>
-    </Dialog>
   )
 }

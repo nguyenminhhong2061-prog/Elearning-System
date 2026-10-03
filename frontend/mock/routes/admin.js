@@ -3,7 +3,7 @@ import { addDays } from '../../src/lib/dates.js'
 import { buildLearners, buildTests, learnerDetail } from '../adminFixtures.js'
 import { MOCK_LESSONS } from '../exerciseFixtures.js'
 import { HttpError, paginate } from '../http.js'
-import { listeningAudioUrl } from '../media.js'
+import { listeningAudioUrl, pronunciationAudioUrl } from '../media.js'
 import { allUsers, byLevel, SYSTEM_WORDS, topics } from '../store.js'
 
 // docs/api/admin.md (module E). Only admin tokens get through (403 otherwise), like the real API will.
@@ -184,6 +184,7 @@ function toAdminLesson(lesson) {
     status: lesson.id === 99 ? 'DRAFT' : 'PUBLISHED',
     attempts: lesson.id === 99 ? 0 : { 1: 168, 11: 112, 24: 76 }[lesson.id] ?? 12 + ((lesson.id * 29) % 90),
     updatedAt: `2026-09-${String(20 + (lesson.id % 8)).padStart(2, '0')}T0${lesson.id % 10}:15:00Z`,
+    readingPassages: lesson.readingPassages.map(({ id, title, content }) => ({ id, title, content })),
     questions: lesson.questions.map((question) => ({
       id: question.id,
       type: question.type,
@@ -193,15 +194,20 @@ function toAdminLesson(lesson) {
       points: question.points,
       options: question.options.map((option) => ({ id: option.id, text: option.text, correct: option.id === question.correctOptionId })),
       acceptedAnswers: [...question.accepted],
+      passageId: question.passageId,
+      starter: question.starter,
+      sampleAnswers: [...question.sampleAnswers],
     })),
     passage,
-    pronunciationItems: lesson.pronunciationItems.map(({ id, text, ipa, audioUrl, notes }) => ({ id, text, ipa, audioUrl, notes })),
+    // The fixtures have no model recordings; the mock makes a tone for every item that has its IPA.
+    pronunciationItems: lesson.pronunciationItems.map(({ id, text, ipa, notes }) => ({ id, text, ipa, audioUrl: ipa ? pronunciationAudioUrl(id) : null, notes })),
   }
 }
 
 function lessonIssues(lesson) {
   const issues = []
   if (lesson.skill === 'LISTENING' && !lesson.passage?.audioUrl) issues.push('MISSING_AUDIO')
+  if (lesson.skill === 'PRONUNCIATION' && lesson.pronunciationItems.some((item) => !item.ipa || !item.audioUrl)) issues.push('INCOMPLETE_ITEMS')
   const count = lesson.skill === 'PRONUNCIATION' ? lesson.pronunciationItems.length : lesson.questions.length
   if (count === 0) issues.push('NO_QUESTIONS')
   return issues
@@ -222,6 +228,7 @@ function lessonSummary(lesson) {
     difficulty: lesson.difficulty,
     status: lesson.status,
     questionCount: lesson.questions.length,
+    passageCount: lesson.readingPassages.length,
     segmentCount: lesson.passage?.segments.length ?? 0,
     itemCount: lesson.pronunciationItems.length,
     attempts: lesson.attempts,
@@ -242,16 +249,26 @@ function checkChoiceQuestion(question, index) {
   }
 }
 
-function readLesson(body, s, existing) {
-  const title = clean(body.title)
-  if (!title || title.length > 150) throw new HttpError(400, 'title must be 1-150 characters')
-  if (!CEFR_LEVELS.includes(body.cefrLevel)) throw new HttpError(400, 'cefrLevel must be one of A1..C2')
-  const skill = existing?.skill ?? body.skill
-  if (!['GRAMMAR', 'READING', 'WRITING', 'LISTENING', 'PRONUNCIATION'].includes(skill)) throw new HttpError(400, 'skill is not valid')
-  const questions = (body.questions ?? []).map((question, index) => {
+const LESSON_SKILLS = ['READING', 'WRITING', 'LISTENING', 'PRONUNCIATION']
+const CHOICE_TYPES = ['MULTIPLE_CHOICE', 'FILL_BLANK']
+const WRITING_TYPES = ['TRANSLATION', 'REWRITE', 'KEYWORD_SENTENCE']
+
+/** Questions of a reading, writing or listening lesson (scenario 23, step 12 and branches 3a, 3b). */
+function readLessonQuestions(body, s, skill, passageIds) {
+  return (body.questions ?? []).map((question, index) => {
+    const label = `question ${index + 1}`
+    const allowed = skill === 'WRITING' ? WRITING_TYPES : CHOICE_TYPES
+    if (!allowed.includes(question.type)) throw new HttpError(400, `${label}: type must be one of ${allowed.join(', ')}`)
     checkChoiceQuestion(question, index)
-    if (question.type === 'MULTIPLE_CHOICE' && (question.options ?? []).length === 0) throw new HttpError(400, `question ${index + 1}: options are required`)
-    if (question.type === 'FILL_BLANK' && !(question.acceptedAnswers ?? []).some(clean)) throw new HttpError(400, `question ${index + 1}: an accepted answer is required`)
+    if (question.type === 'MULTIPLE_CHOICE' && (question.options ?? []).length === 0) throw new HttpError(400, `${label}: options are required`)
+    if (question.type === 'FILL_BLANK' && !(question.acceptedAnswers ?? []).some(clean)) throw new HttpError(400, `${label}: an accepted answer is required`)
+    const sampleAnswers = (question.sampleAnswers ?? []).map(clean).filter(Boolean)
+    if (skill === 'WRITING' && sampleAnswers.length === 0) throw new HttpError(400, `${label}: a writing question needs a sample answer`)
+    // New passages have no id yet, so a question points at one by its place in this request's readingPassages.
+    const passageIndex = question.passageIndex ?? null
+    if (passageIndex !== null && (skill !== 'READING' || passageIds[passageIndex] === undefined)) {
+      throw new HttpError(400, `${label}: passageIndex must point at a passage of this lesson`)
+    }
     return {
       id: question.id ?? (s.nextId += 1),
       type: question.type,
@@ -259,10 +276,32 @@ function readLesson(body, s, existing) {
       hint: clean(question.hint),
       explanation: clean(question.explanation),
       points: question.points,
-      options: question.type === 'MULTIPLE_CHOICE' ? question.options.map((option) => ({ id: option.id ?? (s.nextId += 1), text: option.text.trim(), correct: Boolean(option.correct) })) : [],
+      options:
+        question.type === 'MULTIPLE_CHOICE'
+          ? question.options.map((option) => ({ id: option.id ?? (s.nextId += 1), text: option.text.trim(), correct: Boolean(option.correct) }))
+          : [],
       acceptedAnswers: question.type === 'FILL_BLANK' ? question.acceptedAnswers.map((answer) => answer.trim()).filter(Boolean) : [],
+      passageId: passageIndex === null ? null : passageIds[passageIndex],
+      starter: question.type === 'REWRITE' ? clean(question.starter) : null,
+      sampleAnswers: skill === 'WRITING' ? sampleAnswers : [],
     }
   })
+}
+
+function readLesson(body, s, existing) {
+  const title = clean(body.title)
+  if (!title || title.length > 150) throw new HttpError(400, 'title must be 1-150 characters')
+  if (!CEFR_LEVELS.includes(body.cefrLevel)) throw new HttpError(400, 'cefrLevel must be one of A1..C2')
+  const skill = existing?.skill ?? body.skill
+  if (!LESSON_SKILLS.includes(skill)) throw new HttpError(400, 'skill must be READING, WRITING, LISTENING or PRONUNCIATION')
+  const readingPassages =
+    skill === 'READING'
+      ? (body.readingPassages ?? []).map((passage, index) => {
+          if (!clean(passage.title) || !clean(passage.content)) throw new HttpError(400, `passage ${index + 1}: title and content are required`)
+          return { id: passage.id ?? (s.nextId += 1), title: passage.title.trim(), content: passage.content.trim() }
+        })
+      : []
+  const questions = skill === 'PRONUNCIATION' ? [] : readLessonQuestions(body, s, skill, readingPassages.map((passage) => passage.id))
   const passage =
     skill === 'LISTENING'
       ? {
@@ -277,12 +316,16 @@ function readLesson(body, s, existing) {
           }),
         }
       : null
-  const pronunciationItems = (body.pronunciationItems ?? []).map((item, index) => {
-    if (!clean(item.text)) throw new HttpError(400, `item ${index + 1}: the sentence is empty`)
-    return { id: item.id ?? (s.nextId += 1), text: item.text.trim(), ipa: clean(item.ipa), audioUrl: clean(item.audioUrl), notes: clean(item.notes) }
-  })
-  const status = existing ? body.status : 'DRAFT'
-  if (!['DRAFT', 'PUBLISHED', 'HIDDEN'].includes(status)) throw new HttpError(400, 'status is not valid')
+  const pronunciationItems =
+    skill === 'PRONUNCIATION'
+      ? (body.pronunciationItems ?? []).map((item, index) => {
+          if (!clean(item.text) || !clean(item.ipa) || !clean(item.audioUrl)) throw new HttpError(400, `item ${index + 1}: text, IPA and model audio are required`)
+          return { id: item.id ?? (s.nextId += 1), text: item.text.trim(), ipa: clean(item.ipa), audioUrl: clean(item.audioUrl), notes: clean(item.notes) }
+        })
+      : []
+  // A new lesson may be published at once (scenario 23, step 11); hiding is what deleting a used lesson does.
+  const status = body.status ?? 'DRAFT'
+  if (!(existing ? ['DRAFT', 'PUBLISHED', 'HIDDEN'] : ['DRAFT', 'PUBLISHED']).includes(status)) throw new HttpError(400, 'status is not valid')
   const lesson = {
     id: existing?.id ?? (s.nextId += 1),
     title,
@@ -295,6 +338,7 @@ function readLesson(body, s, existing) {
     status,
     attempts: existing?.attempts ?? 0,
     updatedAt: nowIso(),
+    readingPassages,
     questions,
     passage,
     pronunciationItems,
@@ -526,7 +570,7 @@ function stats(s, today, from, to) {
       wordsMissingExample: liveWords().filter(MISSING.EXAMPLE).length,
       lessonsWithIssues: s.lessons
         .filter((lesson) => lesson.status === 'PUBLISHED')
-        .flatMap((lesson) => lessonIssues(lesson).map((issue) => ({ lessonId: lesson.id, title: lesson.title, issue }))),
+        .flatMap((lesson) => lessonIssues(lesson).map((issue) => ({ lessonId: lesson.id, title: lesson.title, skill: lesson.skill, issue }))),
       periodicTestGap: periodicTestGap(s.tests, today),
       lockedUsers: s.learners.filter((learner) => learner.status === 'LOCKED').length,
     },

@@ -2,7 +2,7 @@
 
 /**
  * @typedef {'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2'} CefrLevel
- * @typedef {'GRAMMAR' | 'READING' | 'WRITING' | 'LISTENING' | 'PRONUNCIATION'} LessonSkill
+ * @typedef {'READING' | 'WRITING' | 'LISTENING' | 'PRONUNCIATION'} LessonSkill
  * @typedef {'DRAFT' | 'PUBLISHED' | 'HIDDEN'} LessonStatus
  * @typedef {'LISTENING' | 'READING' | 'WRITING' | 'SPEAKING'} TestSkill
  */
@@ -80,23 +80,32 @@
  * @property {'EASY' | 'MEDIUM' | 'HARD'} difficulty
  * @property {LessonStatus} status
  * @property {number} questionCount
+ * @property {number} passageCount reading passages
  * @property {number} segmentCount
  * @property {number} itemCount
  * @property {number} attempts
  * @property {string | null} updatedAt
- * @property {('MISSING_AUDIO' | 'NO_QUESTIONS')[]} issues
+ * @property {('MISSING_AUDIO' | 'INCOMPLETE_ITEMS' | 'NO_QUESTIONS')[]} issues
  */
 
 /**
+ * A question of a lesson. Reading and listening ones are multiple choice or fill-in; writing ones are graded by the AI
+ * against `sampleAnswers`. In GET it points at its reading passage by `passageId`; in POST/PUT by `passageIndex`, the
+ * passage's place in `readingPassages` of the same body (a new passage has no id yet).
+ *
  * @typedef {object} EditableQuestion
  * @property {number} [id] absent for a new question
- * @property {'MULTIPLE_CHOICE' | 'FILL_BLANK'} type
+ * @property {'MULTIPLE_CHOICE' | 'FILL_BLANK' | 'TRANSLATION' | 'REWRITE' | 'KEYWORD_SENTENCE'} type
  * @property {string} prompt
  * @property {string | null} hint
  * @property {string | null} explanation
  * @property {number} points
  * @property {{ id?: number, text: string, correct: boolean }[]} options
  * @property {string[]} acceptedAnswers
+ * @property {number | null} [passageId]
+ * @property {number | null} [passageIndex]
+ * @property {string | null} starter given start of a REWRITE answer
+ * @property {string[]} sampleAnswers
  */
 
 /**
@@ -113,6 +122,7 @@
  * @property {number} attempts
  * @property {string | null} updatedAt
  * @property {string[]} issues
+ * @property {{ id?: number, title: string, content: string }[]} readingPassages
  * @property {EditableQuestion[]} questions
  * @property {{ audioUrl: string | null, audioMissing: boolean, durationMs: number | null, transcript: string, translation: string, segments: { id?: number, startMs: number, endMs: number, speaker: string | null, text: string, translation: string | null }[] } | null} passage
  * @property {{ id?: number, text: string, ipa: string | null, audioUrl: string | null, notes: string | null }[]} pronunciationItems

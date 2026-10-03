@@ -12,16 +12,18 @@ const TONES = {
   neutral: 'bg-canvas text-ink-soft hover:text-ink',
 }
 
+const LESSON_ISSUES = {
+  MISSING_AUDIO: (title) => `Bài nghe “${title}” thiếu file audio`,
+  INCOMPLETE_ITEMS: (title) => `Bài phát âm “${title}” có câu mẫu thiếu IPA hoặc âm thanh`,
+  NO_QUESTIONS: (title) => `Bài “${title}” chưa có câu hỏi`,
+}
+
 /** [tone, text, link] of each thing to fix, most urgent kinds last as in the design. */
 function itemsOf(attention) {
   return [
     attention.wordsMissingAudio > 0 && ['warning', `${formatCount(attention.wordsMissingAudio)} từ chưa có audio phát âm`, paths.adminMissingWords('AUDIO')],
     attention.wordsMissingExample > 0 && ['warning', `${formatCount(attention.wordsMissingExample)} từ chưa có câu ví dụ`, paths.adminMissingWords('EXAMPLE')],
-    ...attention.lessonsWithIssues.map((lesson) => [
-      'danger',
-      lesson.issue === 'MISSING_AUDIO' ? `Bài nghe “${lesson.title}” thiếu file audio` : `Bài “${lesson.title}” chưa có câu hỏi`,
-      paths.adminLesson(lesson.lessonId),
-    ]),
+    ...attention.lessonsWithIssues.map((lesson) => ['danger', LESSON_ISSUES[lesson.issue](lesson.title), paths.adminLesson(lesson.lessonId)]),
     attention.periodicTestGap && [
       'danger',
       `Chưa có đề định kỳ tuần ${isoWeek(attention.periodicTestGap.weekEnd)} (đề hiện tại đóng ${formatDayMonth(addDays(attention.periodicTestGap.weekStart, -1))})`,

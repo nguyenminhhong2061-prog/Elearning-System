@@ -1,25 +1,32 @@
 import { answerErrors, blankOption, newKey, stripKeys } from './draft'
 
 // Lesson drafts of the admin editor (docs/api/admin.md, "Bài tập"): an empty lesson, the checks the server makes, and
-// the body sent to it.
+// the body sent to it. A question about a reading passage holds the passage's draft key (`passageKey`); the body turns
+// it into the passage's place in the list (`passageIndex`), since a new passage has no id yet.
 
-export function newQuestion(type = 'MULTIPLE_CHOICE') {
+/** An empty question: a writing one for a writing lesson, else multiple choice. */
+export function newQuestion(skill) {
+  const writing = skill === 'WRITING'
   return {
     key: newKey(),
-    type,
+    type: writing ? 'TRANSLATION' : 'MULTIPLE_CHOICE',
     prompt: '',
     hint: '',
     explanation: '',
-    points: 1,
-    options: type === 'MULTIPLE_CHOICE' ? [blankOption(), blankOption(), blankOption()] : [],
-    acceptedAnswers: type === 'FILL_BLANK' ? [''] : [],
+    points: writing ? 2 : 1,
+    options: writing ? [] : [blankOption(), blankOption(), blankOption()],
+    acceptedAnswers: [],
+    passageKey: null,
+    starter: '',
+    sampleAnswers: writing ? [''] : [],
   }
 }
 
+export const newPassage = () => ({ key: newKey(), title: '', content: '' })
 export const newSegment = (startMs = 0) => ({ key: newKey(), startMs, endMs: startMs + 5000, speaker: '', text: '', translation: '' })
 export const newItem = () => ({ key: newKey(), text: '', ipa: '', audioUrl: '', notes: '' })
 
-/** An empty draft lesson of a skill. */
+/** An empty lesson of a skill (scenario 23, step 4). */
 export function newLesson(skill) {
   return {
     id: null,
@@ -34,20 +41,37 @@ export function newLesson(skill) {
     attempts: 0,
     updatedAt: null,
     issues: [],
-    questions: skill === 'PRONUNCIATION' ? [] : [newQuestion()],
+    readingPassages: [],
+    questions: skill === 'PRONUNCIATION' ? [] : [newQuestion(skill)],
     passage: skill === 'LISTENING' ? { audioUrl: '', audioMissing: true, durationMs: null, transcript: '', translation: '', segments: [newSegment()] } : null,
     pronunciationItems: skill === 'PRONUNCIATION' ? [newItem()] : [],
   }
 }
 
 const itemCount = (draft) => (draft.skill === 'PRONUNCIATION' ? draft.pronunciationItems.length : draft.questions.length)
+const filled = (list) => list.some((text) => text.trim())
+
+/** Problems of one question (scenario 23, step 12 and branch 8a). */
+function questionErrors(question, skill) {
+  const errors = {}
+  if (!question.prompt.trim()) errors.prompt = skill === 'WRITING' ? 'Vui lòng nhập nội dung câu.' : 'Vui lòng nhập đề bài.'
+  if (!Number.isInteger(question.points) || question.points < 1) errors.points = 'Điểm là số nguyên từ 1.'
+  if (skill === 'WRITING') {
+    // The AI grades a writing answer against the prompt and these samples.
+    if (!filled(question.sampleAnswers)) errors.sampleAnswers = 'Câu viết cần ít nhất một câu trả lời mẫu.'
+  } else {
+    Object.assign(errors, answerErrors(question, question.type === 'MULTIPLE_CHOICE' ? 'CHOICE' : 'TEXT'))
+  }
+  return errors
+}
 
 /**
  * Everything wrong with a draft, before sending it (the server checks the same rules).
- * @returns {{ fields: Record<string, string>, questions: Record<string, Record<string, string>>, segments: Record<string, Record<string, string>>, items: Record<string, Record<string, string>>, count: number }}
+ * @returns {{ fields: Record<string, string>, passages: Record<string, Record<string, string>>, questions: Record<string, Record<string, string>>, segments: Record<string, Record<string, string>>, items: Record<string, Record<string, string>>, count: number }}
  */
 export function validateLesson(draft) {
   const fields = {}
+  const passages = {}
   const questions = {}
   const segments = {}
   const items = {}
@@ -64,11 +88,15 @@ export function validateLesson(draft) {
     fields.items = draft.skill === 'PRONUNCIATION' ? 'Bài xuất bản phải có ít nhất một câu mẫu.' : 'Bài xuất bản phải có ít nhất một câu hỏi.'
   }
 
-  draft.questions.forEach((question) => {
+  draft.readingPassages.forEach((passage) => {
     const errors = {}
-    if (!question.prompt.trim()) errors.prompt = 'Vui lòng nhập đề bài.'
-    if (!Number.isInteger(question.points) || question.points < 1) errors.points = 'Điểm là số nguyên từ 1.'
-    Object.assign(errors, answerErrors(question, question.type === 'MULTIPLE_CHOICE' ? 'CHOICE' : 'TEXT'))
+    if (!passage.title.trim()) errors.title = 'Vui lòng nhập tiêu đề bài đọc.'
+    if (!passage.content.trim()) errors.content = 'Vui lòng nhập nội dung bài đọc.'
+    if (Object.keys(errors).length > 0) passages[passage.key] = errors
+  })
+
+  draft.questions.forEach((question) => {
+    const errors = questionErrors(question, draft.skill)
     if (Object.keys(errors).length > 0) questions[question.key] = errors
   })
 
@@ -85,22 +113,42 @@ export function validateLesson(draft) {
     })
   }
 
+  // Text, IPA and model audio are all required (scenario 23, branch 3c); the notes are not.
   draft.pronunciationItems.forEach((item) => {
-    if (!item.text.trim()) items[item.key] = { text: 'Vui lòng nhập câu mẫu.' }
+    const errors = {}
+    if (!item.text.trim()) errors.text = 'Vui lòng nhập câu mẫu.'
+    if (!item.ipa.trim()) errors.ipa = 'Vui lòng nhập phiên âm IPA.'
+    if (!item.audioUrl.trim()) errors.audioUrl = 'Vui lòng tải âm thanh mẫu.'
+    if (Object.keys(errors).length > 0) items[item.key] = errors
   })
 
-  const count =
-    Object.keys(fields).length +
-    Object.keys(questions).length +
-    Object.keys(segments).length +
-    Object.keys(items).length
-  return { fields, questions, segments, items, count }
+  const count = [fields, passages, questions, segments, items].reduce((sum, group) => sum + Object.keys(group).length, 0)
+  return { fields, passages, questions, segments, items, count }
 }
 
 const orNull = (text) => (typeof text === 'string' && text.trim() ? text.trim() : null)
 
+function questionPayload(question, skill, passageKeys) {
+  const writing = skill === 'WRITING'
+  const passageIndex = skill === 'READING' && question.passageKey ? passageKeys.indexOf(question.passageKey) : -1
+  return {
+    id: question.id,
+    type: question.type,
+    prompt: question.prompt.trim(),
+    hint: orNull(question.hint),
+    explanation: orNull(question.explanation),
+    points: question.points,
+    options: question.type === 'MULTIPLE_CHOICE' ? question.options.map(({ id, text, correct }) => ({ id, text: text.trim(), correct })) : [],
+    acceptedAnswers: question.type === 'FILL_BLANK' ? question.acceptedAnswers.map((answer) => answer.trim()).filter(Boolean) : [],
+    passageIndex: passageIndex >= 0 ? passageIndex : null,
+    starter: question.type === 'REWRITE' ? orNull(question.starter) : null,
+    sampleAnswers: writing ? question.sampleAnswers.map((answer) => answer.trim()).filter(Boolean) : [],
+  }
+}
+
 /** The body of POST/PUT /api/admin/lessons. */
 export function lessonPayload(draft) {
+  const passageKeys = draft.readingPassages.map((passage) => passage.key)
   const body = {
     title: draft.title.trim(),
     description: orNull(draft.description),
@@ -110,16 +158,8 @@ export function lessonPayload(draft) {
     difficulty: draft.difficulty,
     estimatedMinutes: draft.estimatedMinutes,
     status: draft.status,
-    questions: draft.questions.map((question) => ({
-      id: question.id,
-      type: question.type,
-      prompt: question.prompt.trim(),
-      hint: orNull(question.hint),
-      explanation: orNull(question.explanation),
-      points: question.points,
-      options: question.type === 'MULTIPLE_CHOICE' ? question.options.map(({ id, text, correct }) => ({ id, text: text.trim(), correct })) : [],
-      acceptedAnswers: question.type === 'FILL_BLANK' ? question.acceptedAnswers.map((answer) => answer.trim()).filter(Boolean) : [],
-    })),
+    readingPassages: draft.readingPassages.map(({ id, title, content }) => ({ id, title: title.trim(), content: content.trim() })),
+    questions: draft.questions.map((question) => questionPayload(question, draft.skill, passageKeys)),
     passage: draft.passage && {
       audioUrl: orNull(draft.passage.audioUrl),
       durationMs: draft.passage.durationMs,
@@ -145,16 +185,23 @@ export function lessonPayload(draft) {
   return stripKeys(body)
 }
 
-/** Lesson from the API, with empty strings instead of null so every input is controlled. */
+/**
+ * Lesson from the API, with empty strings instead of null so every input is controlled. A question's passage id
+ * becomes the passage's draft key (toDraft keys a passage with id 71 as "id-71").
+ */
 export function editableLesson(lesson) {
   return {
     ...lesson,
     description: lesson.description ?? '',
     topic: lesson.topic ?? '',
-    questions: lesson.questions.map((question) => ({
+    readingPassages: lesson.readingPassages ?? [],
+    questions: lesson.questions.map(({ passageId, ...question }) => ({
       ...question,
       hint: question.hint ?? '',
       explanation: question.explanation ?? '',
+      passageKey: passageId ? `id-${passageId}` : null,
+      starter: question.starter ?? '',
+      sampleAnswers: question.sampleAnswers ?? [],
     })),
     passage: lesson.passage && {
       ...lesson.passage,

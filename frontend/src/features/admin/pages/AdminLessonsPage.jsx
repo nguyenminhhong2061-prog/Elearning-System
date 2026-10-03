@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router'
 import { ButtonLink } from '@/components/ui/Button'
 import { LoadError } from '@/components/ui/LoadError'
@@ -12,12 +13,12 @@ import { cx } from '@/lib/cx'
 import { formatCount } from '@/lib/format'
 import { useAdminLessons } from '../api/lessonsQueries'
 import { AdminPage } from '../components/AdminPage'
-import { InlineSelect, LevelTag, Segmented, TABLE, TableCard, TD, TH } from '../components/controls'
-import { DIFFICULTY_LABELS, SKILL_LABELS } from '../constants'
+import { InlineSelect, LevelTag, RowAction, Segmented, TABLE, TableCard, TD, TH } from '../components/controls'
+import { DeleteLessonDialog } from '../components/lessons/DeleteLessonDialog'
+import { DIFFICULTY_LABELS, LESSON_SKILLS, SKILL_LABELS } from '../constants'
 import { formatFullDate, levelOptions } from '../utils/format'
 import { useUrlFilters } from '../hooks/useUrlFilters'
 
-const SKILLS = ['GRAMMAR', 'LISTENING', 'PRONUNCIATION']
 const STATUS = {
   PUBLISHED: { label: 'Đã xuất bản', variant: 'success' },
   DRAFT: { label: 'Nháp', variant: 'neutral' },
@@ -29,25 +30,29 @@ const STATUS_OPTIONS = [
   { value: 'DRAFT', label: 'Nháp' },
   { value: 'HIDDEN', label: 'Lưu trữ' },
 ]
-const ISSUES = { MISSING_AUDIO: 'Thiếu file audio', NO_QUESTIONS: 'Chưa có câu hỏi' }
+const ISSUES = { MISSING_AUDIO: 'Thiếu file audio', INCOMPLETE_ITEMS: 'Câu mẫu thiếu IPA hoặc âm thanh', NO_QUESTIONS: 'Chưa có câu hỏi' }
 
+/** "Nội dung" column (scenario 23, step 2): questions, and the passages of a reading lesson. */
 function contentOf(lesson) {
   if (lesson.skill === 'PRONUNCIATION') return `${lesson.itemCount} câu mẫu`
+  if (lesson.skill === 'WRITING') return `${lesson.questionCount} câu viết`
   const parts = [`${lesson.questionCount} câu hỏi`]
+  if (lesson.skill === 'READING') parts.push(`${lesson.passageCount} bài đọc`)
   if (lesson.skill === 'LISTENING') parts.push(`${lesson.segmentCount} đoạn phụ đề`)
   return parts.join(' · ')
 }
 
-/** Scenario 23, step 2: every lesson of module B, filtered on the page (the list is small). */
+/** Scenario 23, step 2 and branch 2b: every lesson of module B, filtered on the page (the list is small). */
 export function AdminLessonsPage() {
   const [filters, setFilters] = useUrlFilters({ skill: '', status: '', level: '', q: '' })
   const lessons = useAdminLessons()
+  const [deleting, setDeleting] = useState(null)
   const all = lessons.data ?? []
 
   const inSkill = all.filter((lesson) => !filters.skill || lesson.skill === filters.skill)
   const shown = inSkill
     .filter((lesson) => (!filters.status || lesson.status === filters.status) && (!filters.level || lesson.cefrLevel === filters.level) && matchesSearch(lesson.title, filters.q))
-    .toSorted((a, b) => SKILLS.indexOf(a.skill) - SKILLS.indexOf(b.skill) || CEFR_LEVELS.indexOf(a.cefrLevel) - CEFR_LEVELS.indexOf(b.cefrLevel) || a.id - b.id)
+    .toSorted((a, b) => LESSON_SKILLS.indexOf(a.skill) - LESSON_SKILLS.indexOf(b.skill) || CEFR_LEVELS.indexOf(a.cefrLevel) - CEFR_LEVELS.indexOf(b.cefrLevel) || a.id - b.id)
 
   const published = all.filter((lesson) => lesson.status === 'PUBLISHED').length
   const drafts = all.filter((lesson) => lesson.status === 'DRAFT').length
@@ -65,7 +70,7 @@ export function AdminLessonsPage() {
       section="Nội dung học"
       summary={lessons.data ? `${published} bài đã xuất bản · ${drafts} bản nháp` : ' '}
       actions={
-        <ButtonLink to={paths.adminNewLesson(filters.skill || 'GRAMMAR')} variant="strong" size="xs">
+        <ButtonLink to={paths.adminNewLesson(filters.skill || 'READING')} variant="strong" size="xs">
           + Tạo bài tập
         </ButtonLink>
       }
@@ -75,7 +80,7 @@ export function AdminLessonsPage() {
         current={filters.skill || 'ALL'}
         tabs={[
           { id: 'ALL', label: `Tất cả (${all.length})`, to: tabTo('') },
-          ...SKILLS.map((skill) => ({ id: skill, label: `${SKILL_LABELS[skill]} (${all.filter((lesson) => lesson.skill === skill).length})`, to: tabTo(skill) })),
+          ...LESSON_SKILLS.map((skill) => ({ id: skill, label: `${SKILL_LABELS[skill]} (${all.filter((lesson) => lesson.skill === skill).length})`, to: tabTo(skill) })),
         ]}
       />
 
@@ -129,7 +134,7 @@ export function AdminLessonsPage() {
                         {lesson.title}
                       </Link>
                       {lesson.issues.map((issue) => (
-                        <Tag key={issue} variant={issue === 'MISSING_AUDIO' ? 'danger' : 'warning'}>
+                        <Tag key={issue} variant={issue === 'NO_QUESTIONS' ? 'warning' : 'danger'}>
                           {ISSUES[issue]}
                         </Tag>
                       ))}
@@ -146,10 +151,13 @@ export function AdminLessonsPage() {
                   </td>
                   <td className={cx(TD, 'text-right')}>{formatCount(lesson.attempts)}</td>
                   <td className={cx(TD, 'text-muted-strong')}>{lesson.updatedAt ? formatFullDate(lesson.updatedAt) : '—'}</td>
-                  <td className={cx(TD, 'text-right')}>
+                  <td className={cx(TD, 'text-right whitespace-nowrap')}>
                     <Link to={paths.adminLesson(lesson.id)} aria-label={`Sửa bài ${lesson.title}`} className="inline-block px-2.5 py-1.5 text-label font-bold">
                       Sửa
                     </Link>
+                    <RowAction tone="danger" onClick={() => setDeleting(lesson)} aria-label={`Xóa bài ${lesson.title}`}>
+                      Xóa
+                    </RowAction>
                   </td>
                 </tr>
               ))}
@@ -157,6 +165,8 @@ export function AdminLessonsPage() {
           </table>
         </TableCard>
       )}
+
+      <DeleteLessonDialog lesson={deleting} onClose={() => setDeleting(null)} />
     </AdminPage>
   )
 }

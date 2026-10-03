@@ -104,6 +104,29 @@ describe('admin mock API', () => {
     expect(week.topContent.map((row) => row.type)).toContain('TEST')
   })
 
+  it('saves reading passages, writing questions and complete pronunciation items (scenario 23)', () => {
+    const choice = { type: 'MULTIPLE_CHOICE', prompt: 'What will Minh do?', points: 1, options: [{ text: 'Camp', correct: false }, { text: 'Watch a film', correct: true }] }
+    const reading = call('POST', '/api/admin/lessons', {
+      body: { title: 'Câu điều kiện loại 1', skill: 'READING', cefrLevel: 'B1', status: 'PUBLISHED', readingPassages: [{ title: 'Plans', content: 'If it rains…' }], questions: [{ ...choice, passageIndex: 0 }] },
+    })
+    expect(reading.status).toBe('PUBLISHED')
+    expect(reading.questions[0].passageId).toBe(reading.readingPassages[0].id)
+    expect(statusOf(() => call('POST', '/api/admin/lessons', { body: { title: 'X', skill: 'READING', cefrLevel: 'B1', questions: [{ ...choice, passageIndex: 1 }] } }))).toBe(400)
+    expect(statusOf(() => call('POST', '/api/admin/lessons', { body: { title: 'X', skill: 'GRAMMAR', cefrLevel: 'B1' } }))).toBe(400)
+
+    const translation = { type: 'TRANSLATION', prompt: 'Chuyến bay bị hoãn.', points: 2, options: [] }
+    const writing = { title: 'Viết', skill: 'WRITING', cefrLevel: 'A2', questions: [translation] }
+    expect(statusOf(() => call('POST', '/api/admin/lessons', { body: writing }))).toBe(400)
+    const saved = call('POST', '/api/admin/lessons', { body: { ...writing, questions: [{ ...translation, sampleAnswers: ['The flight was delayed.'] }] } })
+    expect(saved.questions[0].sampleAnswers).toEqual(['The flight was delayed.'])
+
+    const pronunciation = call('GET', '/api/admin/lessons/22')
+    expect(pronunciation.pronunciationItems.every((item) => item.ipa && item.audioUrl)).toBe(true)
+    const noAudio = pronunciation.pronunciationItems.map((item, index) => (index === 0 ? { ...item, audioUrl: null } : item))
+    expect(statusOf(() => call('PUT', '/api/admin/lessons/22', { body: { ...pronunciation, pronunciationItems: noAudio } }))).toBe(400)
+    expect(call('GET', '/api/admin/lessons/25').issues).toEqual(['INCOMPLETE_ITEMS'])
+  })
+
   it('rejects a period that starts after it ends', () => {
     expect(statusOf(() => call('GET', '/api/admin/stats?from=2026-09-20&to=2026-09-10'))).toBe(400)
   })

@@ -1,5 +1,5 @@
 // Helpers of the lesson and test editors. A draft is the API object plus a `key` on every list entry (questions,
-// options, segments, pronunciation items), so React keeps each row's inputs while rows are added, moved or removed.
+// options, reading passages, segments, pronunciation items), so React keeps each row's inputs while rows are added, moved or removed.
 
 let counter = 0
 export const newKey = () => `new-${(counter += 1)}`
@@ -14,6 +14,7 @@ export function toDraft(source) {
     questions,
     ...(source.passage !== undefined && { passage: source.passage && { ...source.passage, segments: source.passage.segments.map(keyed) } }),
     ...(source.pronunciationItems !== undefined && { pronunciationItems: source.pronunciationItems.map(keyed) }),
+    ...(source.readingPassages !== undefined && { readingPassages: source.readingPassages.map(keyed) }),
   }
 }
 

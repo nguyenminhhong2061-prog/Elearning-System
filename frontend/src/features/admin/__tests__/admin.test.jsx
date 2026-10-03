@@ -114,6 +114,12 @@ function renderAdmin(path, routes = {}) {
 }
 
 const callsTo = (key) => backend.calls.filter((call) => call.key === key)
+
+/** Puts a text in a field at once: user.type presses every key, too slow for long texts when all test files run together. */
+async function fill(user, element, text) {
+  await user.click(element)
+  await user.paste(text)
+}
 const location = () => screen.getByTestId('location').textContent
 
 describe('admin area', () => {
@@ -438,12 +444,26 @@ describe('test administration', () => {
 })
 
 describe('lesson administration', () => {
+  const question = (id, prompt, options, overrides = {}) => ({
+    id,
+    type: 'MULTIPLE_CHOICE',
+    prompt,
+    hint: null,
+    explanation: null,
+    points: 1,
+    options,
+    acceptedAnswers: [],
+    passageId: null,
+    starter: null,
+    sampleAnswers: [],
+    ...overrides,
+  })
   const lesson = {
     id: 1,
     title: 'Thì hiện tại đơn',
     description: null,
     topic: null,
-    skill: 'GRAMMAR',
+    skill: 'READING',
     cefrLevel: 'A1',
     difficulty: 'EASY',
     estimatedMinutes: 5,
@@ -451,33 +471,53 @@ describe('lesson administration', () => {
     attempts: 168,
     updatedAt: '2026-09-27T12:00:00Z',
     issues: [],
+    readingPassages: [],
     questions: [
-      { id: 101, type: 'MULTIPLE_CHOICE', prompt: 'She ___ to school every day.', hint: null, explanation: null, points: 1, options: [{ id: 1011, text: 'go', correct: false }, { id: 1012, text: 'goes', correct: true }], acceptedAnswers: [] },
+      question(101, 'She ___ to school every day.', [
+        { id: 1011, text: 'go', correct: false },
+        { id: 1012, text: 'goes', correct: true },
+      ]),
     ],
     passage: null,
     pronunciationItems: [],
   }
+  const summary = (overrides) => ({ difficulty: 'EASY', status: 'PUBLISHED', questionCount: 2, passageCount: 0, segmentCount: 0, itemCount: 0, attempts: 0, updatedAt: null, issues: [], ...overrides })
 
-  it('lists lessons with their problems and filters by skill (scenario 23, step 2)', async () => {
+  it('lists lessons by skill with their content and problems, and deletes one from its row (scenario 23, step 2 and branch 2b)', async () => {
+    let lessons = [
+      summary({ id: 20, title: 'A trip to Ha Long Bay', skill: 'READING', cefrLevel: 'A2', questionCount: 8, passageCount: 1, attempts: 40 }),
+      summary({ id: 2, title: 'Hội thoại tại sân bay', skill: 'LISTENING', cefrLevel: 'A2', segmentCount: 2, attempts: 112, issues: ['MISSING_AUDIO'] }),
+      summary({ id: 31, title: 'Viết về chuyến đi', skill: 'WRITING', cefrLevel: 'A2', questionCount: 4, status: 'DRAFT' }),
+    ]
     renderAdmin('/admin/lessons', {
-      'GET /api/admin/lessons': () => ({
-        data: [
-          { id: 1, title: 'Thì hiện tại đơn', skill: 'GRAMMAR', cefrLevel: 'A1', difficulty: 'EASY', status: 'PUBLISHED', questionCount: 2, segmentCount: 0, itemCount: 0, attempts: 168, updatedAt: null, issues: [] },
-          { id: 2, title: 'Hội thoại tại sân bay', skill: 'LISTENING', cefrLevel: 'A2', difficulty: 'MEDIUM', status: 'PUBLISHED', questionCount: 2, segmentCount: 2, itemCount: 0, attempts: 112, updatedAt: null, issues: ['MISSING_AUDIO'] },
-        ],
-      }),
+      'GET /api/admin/lessons': () => ({ data: lessons }),
+      'DELETE /api/admin/lessons/31': () => {
+        lessons = lessons.filter((candidate) => candidate.id !== 31)
+        return { data: { result: 'DELETED' } }
+      },
     })
     const user = userEvent.setup()
 
-    const row = (await screen.findByRole('link', { name: 'Hội thoại tại sân bay' })).closest('tr')
-    expect(within(row).getByText('Thiếu file audio')).toBeInTheDocument()
-    expect(within(row).getByText('2 câu hỏi · 2 đoạn phụ đề')).toBeInTheDocument()
+    const tabs = await screen.findByRole('navigation', { name: 'Kỹ năng' })
+    expect(await within(tabs).findByRole('link', { name: 'Đọc hiểu (1)' })).toBeInTheDocument()
+    expect(within(tabs).getAllByRole('link').map((tab) => tab.textContent)).toEqual(['Tất cả (3)', 'Đọc hiểu (1)', 'Viết (1)', 'Nghe hiểu (1)', 'Phát âm (0)'])
+    expect(screen.getByRole('link', { name: '+ Tạo bài tập' })).toHaveAttribute('href', '/admin/lessons/new?skill=READING')
+    const listening = screen.getByRole('link', { name: 'Hội thoại tại sân bay' }).closest('tr')
+    expect(within(listening).getByText('Thiếu file audio')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'A trip to Ha Long Bay' }).closest('tr')).toHaveTextContent('8 câu hỏi · 1 bài đọc')
+    expect(screen.getByRole('link', { name: 'Viết về chuyến đi' }).closest('tr')).toHaveTextContent('4 câu viết')
 
-    await user.click(screen.getByRole('link', { name: 'Ngữ pháp (1)' }))
+    await user.click(screen.getByRole('button', { name: 'Xóa bài Viết về chuyến đi' }))
+    const dialog = screen.getByRole('dialog', { name: 'Xóa vĩnh viễn bài “Viết về chuyến đi”?' })
+    await user.click(within(dialog).getByRole('button', { name: 'Xóa vĩnh viễn' }))
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Viết về chuyến đi' })).not.toBeInTheDocument())
+    expect(location()).toBe('/admin/lessons')
+
+    await user.click(within(tabs).getByRole('link', { name: 'Đọc hiểu (1)' }))
     expect(screen.queryByRole('link', { name: 'Hội thoại tại sân bay' })).not.toBeInTheDocument()
   })
 
-  it('refuses a question without a correct answer, then saves the lesson (scenario 23, steps 3–12)', async () => {
+  it('refuses a question without a correct answer, then saves the lesson (scenario 23, branch 2a)', async () => {
     renderAdmin('/admin/lessons/1', {
       'GET /api/admin/lessons/1': () => ({ data: lesson }),
       'PUT /api/admin/lessons/1': ({ body }) => ({ data: { ...lesson, ...body, updatedAt: '2026-09-29T08:00:00Z' } }),
@@ -513,6 +553,90 @@ describe('lesson administration', () => {
         { text: "doesn't", correct: false },
       ],
       acceptedAnswers: [],
+      passageIndex: null,
+      starter: null,
+      sampleAnswers: [],
     })
+  })
+
+  it('creates a published reading lesson with a passage and a question about it (scenario 23, steps 3–13)', async () => {
+    renderAdmin('/admin/lessons/new?skill=READING', {
+      'POST /api/admin/lessons': ({ body }) => ({ status: 201, data: { ...lesson, ...body, id: 25, attempts: 0, readingPassages: [{ id: 90, ...body.readingPassages[0] }], questions: [] } }),
+      'GET /api/admin/lessons/25': () => ({ data: { ...lesson, id: 25, title: 'Câu điều kiện loại 1', attempts: 0 } }),
+    })
+    const user = userEvent.setup()
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Bài tập mới' })).toBeInTheDocument()
+    await fill(user, screen.getByLabelText('Tiêu đề *'), 'Câu điều kiện loại 1')
+    await user.selectOptions(screen.getByLabelText('Trình độ *'), 'B1')
+    await user.click(screen.getByRole('radio', { name: /Đã xuất bản/ }))
+    expect(screen.queryByRole('radio', { name: /Lưu trữ/ })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '+ Thêm bài đọc' }))
+    const passage = screen.getByRole('article', { name: 'Bài đọc 1' })
+    await fill(user, within(passage).getByLabelText('Tiêu đề bài đọc *'), 'Plans for the weekend')
+    await fill(user, within(passage).getByLabelText('Nội dung *'), 'If the weather is nice on Saturday, Minh will go camping. If it rains, they will watch a film at home instead.')
+
+    const first = screen.getByRole('heading', { name: 'Câu 1' }).closest('article')
+    await user.selectOptions(within(first).getByLabelText('Bài đọc liên quan'), 'Plans for the weekend')
+    await fill(user, within(first).getByLabelText('Đề bài *'), 'What will Minh do if it rains on Saturday?')
+    await fill(user, within(first).getByLabelText('Nội dung lựa chọn A'), 'Go camping')
+    await fill(user, within(first).getByLabelText('Nội dung lựa chọn B'), 'Watch a film at home')
+    await fill(user, within(first).getByLabelText('Nội dung lựa chọn C'), 'Go to school')
+    await user.click(within(first).getByRole('radio', { name: 'B là đáp án đúng' }))
+    await user.click(screen.getByRole('button', { name: 'Tạo bài' }))
+
+    expect(await screen.findByText('Đã tạo bài “Câu điều kiện loại 1”.')).toBeInTheDocument()
+    const body = callsTo('POST /api/admin/lessons')[0].body
+    expect(body).toMatchObject({ skill: 'READING', status: 'PUBLISHED', cefrLevel: 'B1', readingPassages: [{ title: 'Plans for the weekend' }] })
+    expect(body.questions[0]).toMatchObject({ prompt: 'What will Minh do if it rains on Saturday?', passageIndex: 0 })
+    await waitFor(() => expect(location()).toBe('/admin/lessons/25'))
+  })
+
+  it('needs a sample answer for a writing question (scenario 23, branches 3a and 8a)', async () => {
+    renderAdmin('/admin/lessons/new?skill=WRITING', {
+      'POST /api/admin/lessons': ({ body }) => ({ status: 201, data: { ...lesson, ...body, id: 34 } }),
+      'GET /api/admin/lessons/34': () => ({ data: { ...lesson, id: 34, skill: 'WRITING' } }),
+    })
+    const user = userEvent.setup()
+
+    await fill(user, await screen.findByLabelText('Tiêu đề *'), 'Viết về chuyến đi')
+    await user.selectOptions(screen.getByLabelText('Trình độ *'), 'A2')
+    expect(screen.queryByRole('button', { name: '+ Thêm bài đọc' })).not.toBeInTheDocument()
+    const first = screen.getByRole('heading', { name: 'Câu 1' }).closest('article')
+    expect(within(first).getByRole('button', { name: 'Dịch câu' })).toHaveAttribute('aria-pressed', 'true')
+    await fill(user, within(first).getByLabelText('Câu tiếng Việt cần dịch *'), 'Chuyến bay của chúng tôi bị hoãn vì thời tiết xấu.')
+    await user.click(screen.getByRole('button', { name: 'Tạo bài' }))
+
+    expect(await within(first).findByText('Câu viết cần ít nhất một câu trả lời mẫu.')).toBeInTheDocument()
+    expect(callsTo('POST /api/admin/lessons')).toHaveLength(0)
+
+    await fill(user, within(first).getByLabelText('Câu trả lời mẫu 1'), 'Our flight was delayed because of bad weather.')
+    await user.click(within(first).getByRole('button', { name: '+ Thêm câu mẫu' }))
+    await fill(user, within(first).getByLabelText('Câu trả lời mẫu 2'), 'Our flight was delayed due to bad weather.')
+    await user.click(screen.getByRole('button', { name: 'Tạo bài' }))
+
+    await waitFor(() => expect(callsTo('POST /api/admin/lessons')).toHaveLength(1))
+    expect(callsTo('POST /api/admin/lessons')[0].body.questions[0]).toMatchObject({
+      type: 'TRANSLATION',
+      points: 2,
+      options: [],
+      sampleAnswers: ['Our flight was delayed because of bad weather.', 'Our flight was delayed due to bad weather.'],
+    })
+  })
+
+  it('needs the IPA and the model audio of each pronunciation item (scenario 23, branch 3c)', async () => {
+    renderAdmin('/admin/lessons/new?skill=PRONUNCIATION')
+    const user = userEvent.setup()
+
+    await fill(user, await screen.findByLabelText('Tiêu đề *'), 'Âm cuối -ed')
+    await user.selectOptions(screen.getByLabelText('Trình độ *'), 'A2')
+    const item = screen.getByRole('article', { name: 'Câu mẫu 1' })
+    await fill(user, within(item).getByLabelText('Câu hoặc từ *'), 'worked')
+    await user.click(screen.getByRole('button', { name: 'Tạo bài' }))
+
+    expect(await within(item).findByText('Vui lòng nhập phiên âm IPA.')).toBeInTheDocument()
+    expect(within(item).getByText('Vui lòng tải âm thanh mẫu.')).toBeInTheDocument()
+    expect(screen.getByText(/còn 1 chỗ cần sửa/)).toBeInTheDocument()
   })
 })

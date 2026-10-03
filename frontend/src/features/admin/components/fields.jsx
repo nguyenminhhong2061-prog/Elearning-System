@@ -149,8 +149,9 @@ const megabytes = (bytes) => `${Math.round(bytes / (1024 * 1024))} MB`
  * @param {string} props.emptyNote explanation next to the type and size limit
  * @param {boolean} [props.allowUrl] show "Hoặc dán đường dẫn"
  * @param {string} [props.urlError]
+ * @param {string} [props.error] the file is required and missing
  */
-export function MediaPicker({ kind, label, value, onChange, maxBytes, emptyTitle, emptyNote, allowUrl = false, urlError, urlProps }) {
+export function MediaPicker({ kind, label, value, onChange, maxBytes, emptyTitle, emptyNote, allowUrl = false, urlError, urlProps, error }) {
   const media = MEDIA[kind]
   const inputRef = useRef(null)
   const upload = useUploadMedia()
@@ -182,7 +183,7 @@ export function MediaPicker({ kind, label, value, onChange, maxBytes, emptyTitle
       <div
         className={cx(
           'flex flex-wrap items-center gap-3.5 rounded-[10px] border-[1.5px] border-dashed bg-surface-alt px-4 py-3.5',
-          kind === 'AUDIO' ? 'border-brand-tint-line' : 'border-line',
+          error ? 'border-danger-solid' : kind === 'AUDIO' ? 'border-brand-tint-line' : 'border-line',
         )}
       >
         {kind === 'IMAGE' ? (
@@ -200,7 +201,7 @@ export function MediaPicker({ kind, label, value, onChange, maxBytes, emptyTitle
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           {hasFile ? (
             <>
-              <span className="text-label font-semibold text-ink">{kind === 'AUDIO' ? 'Đã có audio' : 'Đã có ảnh'}</span>
+              <span className="text-label font-semibold text-ink">{kind === 'AUDIO' ? 'Đã có âm thanh' : 'Đã có ảnh'}</span>
               {kind === 'AUDIO' && <audio controls src={value} className="mt-1 h-8 w-full max-w-72" />}
               <span className="truncate text-xs text-muted-strong">{value}</span>
             </>
@@ -235,9 +236,9 @@ export function MediaPicker({ kind, label, value, onChange, maxBytes, emptyTitle
           <input ref={inputRef} type="file" accept={media.accept} onChange={pick} className="hidden" aria-label={`${media.button} (${label})`} />
         </div>
       </div>
-      {problem && (
-        <p role="alert" className="text-xs text-danger">
-          {problem}
+      {(problem || error) && (
+        <p role={problem ? 'alert' : undefined} className="text-xs text-danger">
+          {problem ?? error}
         </p>
       )}
       {allowUrl && (

@@ -64,7 +64,7 @@ Cả hai tham số bắt buộc; giao diện tính sẵn cho "7 ngày", "30 ngà
   "attention": {
     "wordsMissingAudio": 180,
     "wordsMissingExample": 48,
-    "lessonsWithIssues": [{ "lessonId": 2, "title": "Hội thoại tại sân bay", "issue": "MISSING_AUDIO" }],
+    "lessonsWithIssues": [{ "lessonId": 2, "title": "Hội thoại tại sân bay", "skill": "LISTENING", "issue": "MISSING_AUDIO" }],
     "periodicTestGap": { "weekStart": "2026-10-04", "weekEnd": "2026-10-10" },
     "lockedUsers": 3
   }
@@ -157,58 +157,78 @@ quá lớn → `400`. Trả `201` `{ "url": "/media/uploads/5f1c….mp3" }`; đ�
 
 ## Bài tập (module B, Đạt)
 
+Bốn kỹ năng như `docs/api/exercises.md` (02/10/2026): `READING` (Đọc hiểu), `WRITING` (Viết), `LISTENING` (Nghe hiểu),
+`PRONUNCIATION` (Phát âm). Không còn `GRAMMAR`.
+
 ### `GET /api/admin/lessons`
 
 Mọi bài (không phân trang, số bài nhỏ), giao diện tự lọc theo kỹ năng, trạng thái, trình độ, tên.
 
 ```json
 [{
-  "id": 2, "title": "Hội thoại tại sân bay", "skill": "LISTENING", "cefrLevel": "A2", "difficulty": "MEDIUM",
-  "status": "PUBLISHED", "questionCount": 2, "segmentCount": 2, "itemCount": 0, "attempts": 112,
-  "updatedAt": "2026-09-27T12:00:00Z", "issues": ["MISSING_AUDIO"]
+  "id": 20, "title": "A trip to Ha Long Bay", "skill": "READING", "cefrLevel": "A2", "difficulty": "MEDIUM",
+  "status": "PUBLISHED", "questionCount": 8, "passageCount": 1, "segmentCount": 0, "itemCount": 0, "attempts": 40,
+  "updatedAt": "2026-09-27T12:00:00Z", "issues": []
 }]
 ```
 
 `status`: `DRAFT`, `PUBLISHED`, `HIDDEN` (`exercise_lessons.publication_status`, như `tbl_exercise_lesson.status`; giao
-diện ghi `HIDDEN` là "Lưu trữ"). `issues`: `MISSING_AUDIO` (bài nghe
-không có file âm thanh), `NO_QUESTIONS` (không có câu hỏi hoặc mục phát âm).
+diện ghi `HIDDEN` là "Lưu trữ"). `passageCount`: số bài đọc (cột "Nội dung" của KB 23 bước 2). `issues`: `MISSING_AUDIO`
+(bài nghe không có file âm thanh), `INCOMPLETE_ITEMS` (bài phát âm có câu mẫu thiếu phiên âm hoặc âm thanh mẫu),
+`NO_QUESTIONS` (không có câu hỏi hoặc câu mẫu).
 
 ### `GET /api/admin/lessons/{id}`
 
 ```json
 {
-  "id": 1, "title": "Thì hiện tại đơn", "description": "…", "topic": "Thì của động từ",
-  "skill": "GRAMMAR", "cefrLevel": "A1", "difficulty": "EASY", "estimatedMinutes": 5, "status": "PUBLISHED",
-  "attempts": 168, "updatedAt": "…", "issues": [],
+  "id": 20, "title": "A trip to Ha Long Bay", "description": "…", "topic": "Du lịch",
+  "skill": "READING", "cefrLevel": "A2", "difficulty": "MEDIUM", "estimatedMinutes": 10, "status": "PUBLISHED",
+  "attempts": 40, "updatedAt": "…", "issues": [],
+  "readingPassages": [{ "id": 71, "title": "A trip to Ha Long Bay", "content": "Last summer, …\n\nOn the second day, …" }],
   "questions": [{
-    "id": 101, "type": "MULTIPLE_CHOICE", "prompt": "She ___ to school every day.",
-    "hint": "Chủ ngữ ngôi thứ ba số ít.", "explanation": "…", "points": 1,
-    "options": [{ "id": 1011, "text": "go", "correct": false }, { "id": 1012, "text": "goes", "correct": true }],
-    "acceptedAnswers": []
+    "id": 201, "type": "MULTIPLE_CHOICE", "prompt": "How did they travel to Ha Long?",
+    "hint": null, "explanation": "…", "points": 1,
+    "options": [{ "id": 2011, "text": "By bus", "correct": true }, { "id": 2012, "text": "By train", "correct": false }],
+    "acceptedAnswers": [], "passageId": 71, "starter": null, "sampleAnswers": []
   }],
   "passage": null,
   "pronunciationItems": []
 }
 ```
 
+| Kỹ năng | Phần riêng | Loại câu hỏi |
+|---|---|---|
+| `READING` | `readingPassages`: nhiều bài đọc (tiêu đề, nội dung; các đoạn cách nhau bằng dòng trống). Câu hỏi về bài đọc có `passageId`, câu ngữ pháp thì `null` | `MULTIPLE_CHOICE`, `FILL_BLANK` |
+| `WRITING` | Không | `TRANSLATION`, `REWRITE` (có `starter`: phần mở đầu cho sẵn, có thể `null`), `KEYWORD_SENTENCE`; mỗi câu có `sampleAnswers` (AI chấm dựa vào đề và các câu mẫu) |
+| `LISTENING` | `passage`: **đúng một** bài nghe (`UNIQUE(lesson_id)` như `tbl_listening_passage`) | `MULTIPLE_CHOICE`, `FILL_BLANK` |
+| `PRONUNCIATION` | `pronunciationItems` thay cho câu hỏi | Không |
+
 Bài nghe có `passage`: `{ "audioUrl": "/media/listening/airport.mp3", "audioMissing": true, "durationMs": 18000,
 "transcript": "…", "translation": "…", "segments": [{ "id": 11, "startMs": 0, "endMs": 8500, "speaker": "Nhân viên",
 "text": "…", "translation": "…" }] }`. Bài phát âm có `pronunciationItems`: `[{ "id": 1, "text": "worked", "ipa": "/wɜːkt/",
-"audioUrl": null, "notes": "…" }]`.
+"audioUrl": "/media/pronunciation/worked.mp3", "notes": "Sau âm vô thanh /k/, -ed đọc là /t/." }]`.
 
 ### `POST /api/admin/lessons`, `PUT /api/admin/lessons/{id}`
 
-Thân như `GET` ở trên, bỏ các trường chỉ đọc (`id` của bài, `attempts`, `updatedAt`, `issues`, `audioMissing`); câu hỏi,
-lựa chọn, đoạn, mục mới không có `id`. `POST` trả `201`. Kiểm tra (sai → `400`):
+Thân như `GET` ở trên, bỏ các trường chỉ đọc (`id` của bài, `attempts`, `updatedAt`, `issues`, `audioMissing`); bài
+đọc, câu hỏi, lựa chọn, đoạn, câu mẫu mới không có `id`. **Câu hỏi trỏ tới bài đọc bằng `passageIndex`** (vị trí trong
+`readingPassages` của chính thân yêu cầu, từ 0) thay cho `passageId`, vì bài đọc mới chưa có id; nhờ vậy câu hỏi chỉ trỏ
+được tới bài đọc của chính bài học (KB 23 bước 12). `POST` trả `201`. Kiểm tra (sai → `400`):
 
-- Tiêu đề 1–150 ký tự, trình độ bắt buộc; bài mới luôn là `DRAFT`.
-- `PUBLISHED` cần ít nhất một câu hỏi (bài phát âm: một mục); bài nghe xuất bản cần file âm thanh và transcript.
-- Trắc nghiệm: 2–6 lựa chọn, đúng một lựa chọn `correct`. Điền từ: ít nhất một đáp án chấp nhận.
+- Tiêu đề 1–150 ký tự, trình độ bắt buộc, kỹ năng là một trong bốn giá trị trên và không đổi khi `PUT`.
+- **Bài mới được tạo ở `DRAFT` hoặc `PUBLISHED`** (KB 23 bước 11); `HIDDEN` chỉ có khi sửa hoặc khi xóa bài đã có
+  lượt làm.
+- `PUBLISHED` cần ít nhất một câu hỏi (bài phát âm: một câu mẫu); bài nghe xuất bản cần file âm thanh và transcript.
+- Mỗi bài đọc có tiêu đề và nội dung; `passageIndex` (nếu có) trỏ tới một bài đọc có trong thân, chỉ ở `READING`.
+- Loại câu hỏi đúng với kỹ năng (bảng trên). Trắc nghiệm: 2–6 lựa chọn, đúng một lựa chọn `correct`. Điền từ: ít
+  nhất một đáp án chấp nhận. Câu viết: ít nhất một câu trả lời mẫu.
+- Câu mẫu phát âm: `text`, `ipa`, `audioUrl` đều bắt buộc (KB 23 nhánh 3c); `notes` không bắt buộc.
 - Sửa bài đang có lượt làm: lượt đã nộp giữ nguyên điểm; chỉ lượt làm mới dùng nội dung mới.
 
 ### `DELETE /api/admin/lessons/{id}`
 
-Bài đã có lượt làm → chuyển `HIDDEN`; chưa có → xóa hẳn. Trả `{ "result": "HIDDEN" | "DELETED" }`.
+Gọi từ nút "Xóa" ở mỗi dòng của bảng hoặc trong trang bài. Bài đã có lượt làm → chuyển `HIDDEN`; chưa có → xóa hẳn.
+Trả `{ "result": "HIDDEN" | "DELETED" }`.
 
 ## Đề kiểm tra (module C, Nhân)
 
@@ -341,3 +361,7 @@ hoặc lưu thời điểm khóa và từ chối token cấp trước đó); đ�
 - **Người dùng (KB 25):** `stats` thêm `chatSessions`, `lastChatDate` cho thẻ "Phiên chat".
 - **Từ vựng (KB 21):** `questionCount`, `openTests` cho mỗi từ; từ có câu hỏi tham chiếu cũng chỉ bị ẩn; từ ẩn ra khỏi
   cả phiên ôn từ đến hạn.
+- **Bài tập (KB 23):** kỹ năng `READING`, `WRITING` thay `GRAMMAR`; `readingPassages` và `passageIndex`/`passageId`; câu
+  viết `TRANSLATION`/`REWRITE`/`KEYWORD_SENTENCE` với `starter`, `sampleAnswers`; bài mới được tạo ở `PUBLISHED`; câu mẫu
+  phát âm bắt buộc IPA và âm thanh mẫu (`issues` thêm `INCOMPLETE_ITEMS`); `passageCount` trong danh sách; xóa ngay ở
+  từng dòng. Bảng và cột mới cho đọc hiểu, viết đã ghi ở mục cuối `exercises.md`.

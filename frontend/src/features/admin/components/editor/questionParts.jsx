@@ -76,14 +76,22 @@ export function OptionsEditor({ options, onChange, error, locked = false, lang }
 }
 
 /**
- * Answers accepted for a fill-in question, compared after trimming and ignoring case (docs/api/exercises.md).
- * @param {{ answers: string[], onChange: (answers: string[]) => void, error?: string, locked?: boolean }} props
+ * A list of English answers, one input each, at least one row: what the shared answer editors below are made of.
+ *
+ * @param {object} props
+ * @param {string} props.legend
+ * @param {string} props.itemLabel accessible name of an input, followed by its number
+ * @param {string} props.addLabel
+ * @param {string[]} props.answers
+ * @param {(answers: string[]) => void} props.onChange
+ * @param {string} [props.error]
+ * @param {boolean} [props.locked]
  */
-export function AcceptedAnswersEditor({ answers, onChange, error, locked = false }) {
+function AnswerList({ legend, itemLabel, addLabel, answers, onChange, error, locked = false }) {
   const list = answers.length > 0 ? answers : ['']
   return (
     <fieldset className="flex min-w-0 flex-col gap-2">
-      <legend className="mb-2 text-label font-medium text-ink-soft">Đáp án chấp nhận (không phân biệt hoa thường)</legend>
+      <legend className="mb-2 text-label font-medium text-ink-soft">{legend}</legend>
       {list.map((answer, index) => (
         <div key={index} className="flex items-center gap-2.5">
           <input
@@ -91,7 +99,7 @@ export function AcceptedAnswersEditor({ answers, onChange, error, locked = false
             lang="en"
             disabled={locked}
             onChange={(event) => onChange(replaceAt(list, index, event.target.value))}
-            aria-label={`Đáp án chấp nhận ${index + 1}`}
+            aria-label={`${itemLabel} ${index + 1}`}
             aria-invalid={error && index === 0 ? true : undefined}
             className={cx(SMALL_INPUT, tone(error && index === 0))}
           />
@@ -99,7 +107,7 @@ export function AcceptedAnswersEditor({ answers, onChange, error, locked = false
             type="button"
             disabled={locked || list.length <= 1}
             onClick={() => onChange(removeAt(list, index))}
-            aria-label={`Bỏ đáp án ${index + 1}`}
+            aria-label={`Bỏ ${itemLabel.toLocaleLowerCase('vi')} ${index + 1}`}
             className="flex size-8 flex-none cursor-pointer items-center justify-center rounded-md text-lg text-ink-soft hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-30"
           >
             ×
@@ -112,12 +120,28 @@ export function AcceptedAnswersEditor({ answers, onChange, error, locked = false
           onClick={() => onChange([...list, ''])}
           className="self-start cursor-pointer rounded-md px-2 py-1.5 text-label font-bold text-brand-dark hover:bg-brand-tint focus-visible:outline-2 focus-visible:outline-brand"
         >
-          + Thêm đáp án
+          {addLabel}
         </button>
       )}
       {error && <p className="text-xs text-danger">{error}</p>}
     </fieldset>
   )
+}
+
+/**
+ * Answers accepted for a fill-in question, compared after trimming and ignoring case (docs/api/exercises.md).
+ * @param {{ answers: string[], onChange: (answers: string[]) => void, error?: string, locked?: boolean }} props
+ */
+export function AcceptedAnswersEditor(props) {
+  return <AnswerList legend="Đáp án chấp nhận (không phân biệt hoa thường)" itemLabel="Đáp án chấp nhận" addLabel="+ Thêm đáp án" {...props} />
+}
+
+/**
+ * Sample answers of a writing question: the AI grades against the prompt and these (scenario 23, branch 3a).
+ * @param {{ answers: string[], onChange: (answers: string[]) => void, error?: string }} props
+ */
+export function SampleAnswersEditor(props) {
+  return <AnswerList legend="Câu trả lời mẫu (AI dựa vào đề bài và các câu mẫu để chấm)" itemLabel="Câu trả lời mẫu" addLabel="+ Thêm câu mẫu" {...props} />
 }
 
 /**
