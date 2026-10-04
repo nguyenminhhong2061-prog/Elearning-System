@@ -191,6 +191,21 @@ Module dùng: Hỏi chatbot AI hỗ trợ giải thích bài tập (B4).
 - id BIGINT UNSIGNED PK, test_id FK→tests.id, vocabulary_id FK→vocabulary.id nullable
 - question_type ENUM(MULTIPLE_CHOICE, FILL_BLANK, LISTENING, SPEAKING, READING, WRITING)
 - skill, content, audio_url (thêm ở migration V202610010900, cho câu nghe hiểu), points INT DEFAULT 1
+- level ENUM CEFR nullable (thêm ở migration V202610031815): bậc của câu hỏi, dùng để tính trình độ theo bậc
+- passage_id FK→test_passages.id nullable (thêm ở migration V202610032151): ngữ liệu mà câu hỏi hỏi về; NULL với câu
+  đứng riêng
+
+## test_passages (thêm ở migration V202610032151)
+
+- id BIGINT UNSIGNED PK, test_id FK→tests.id
+- title nullable, content TEXT nullable (đoạn đọc), audio_url nullable (bài nghe), transcript TEXT nullable (lời thoại
+  bài nghe, chỉ hiện sau khi nộp bài); phải có content hoặc audio_url
+- Một bài nghe hoặc một đoạn đọc dùng chung cho nhiều câu hỏi của đề.
+
+## test_passage_plays (thêm ở migration V202610032151)
+
+- id BIGINT UNSIGNED PK, attempt_id FK→test_attempts.id, passage_id FK→test_passages.id, UNIQUE(attempt_id, passage_id)
+- play_count INT DEFAULT 0: số lần người học đã nghe bài nghe trong lượt làm bài (tối đa 2)
 
 ## test_question_options (đổi tên từ "answer_options" — đã chốt)
 
@@ -208,6 +223,7 @@ Module dùng: Hỏi chatbot AI hỗ trợ giải thích bài tập (B4).
 - start_time, submitted_at (thêm ở migration V202610010900, thời điểm nộp bài), total_score DECIMAL(5,2) DEFAULT 0
 - status ENUM(IN_PROGRESS, SUBMITTED, GRADED)
 - skill_scores JSON -- {nghe, noi, doc, viet}
+- skill_levels JSON nullable (thêm ở migration V202610031815) -- trình độ từng kỹ năng, cùng khóa với skill_scores
 - suggested_level ENUM CEFR nullable
 - suggested_roadmap TEXT nullable
 
@@ -216,6 +232,8 @@ Module dùng: Hỏi chatbot AI hỗ trợ giải thích bài tập (B4).
 - id BIGINT UNSIGNED PK, attempt_id FK→test_attempts.id, question_id FK→test_questions.id
 - selected_option_id FK→test_question_options.id nullable (thêm ở migration V202610010900, cho câu trắc nghiệm/nghe/đọc)
 - answer_content TEXT, is_correct BOOLEAN nullable, score_earned DECIMAL(5,2) DEFAULT 0
+- ai_criteria JSON nullable, ai_comment TEXT nullable (thêm ở migration V202610031815): bậc 0–6 theo từng tiêu chí
+  {task, coherence, vocabulary, grammar} và nhận xét của AI cho câu Nói/Viết
 
 Module dùng: Kiểm tra định kỳ (C1), Kiểm tra tổng hợp (C2) → nguồn dữ liệu cho user_level_history.
 

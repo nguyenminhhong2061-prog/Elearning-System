@@ -9,21 +9,17 @@ import java.util.Optional;
 
 /**
  * Grades the AI-graded question types (SPEAKING, free-form WRITING) and writes the suggested roadmap. Module C talks
- * only to this contract, so a real external service can replace the deterministic fallback without touching the flow.
+ * only to this contract, so the AI service can change without touching the grading flow.
  */
 public interface TestAiGateway {
 
     /**
-     * Grades a spoken answer as a 0-100 score, or {@link Optional#empty()} when it must be graded later (no
-     * transcription and no speech service available).
+     * Assesses a spoken (typed, until recording exists) or written answer, or returns {@link Optional#empty()} when
+     * the AI service cannot grade now: the answer stays "being graded" and is tried again later. It never makes up a
+     * score.
      */
-    Optional<Integer> gradeSpeaking(TestQuestion question, String submittedText);
+    Optional<AiAssessment> assess(TestQuestion question, String submittedText);
 
-    /**
-     * Grades a free-form written answer as a 0-100 score, or {@link Optional#empty()} when it must be graded later.
-     */
-    Optional<Integer> gradeWriting(TestQuestion question, String submittedText);
-
-    /** A Vietnamese roadmap suggestion based on the graded outcome; may return {@code null} when unavailable. */
-    String suggestRoadmap(CefrLevel level, Map<TestSkill, Integer> skills);
+    /** A Vietnamese roadmap suggestion based on the graded outcome. */
+    String suggestRoadmap(CefrLevel level, Map<TestSkill, Integer> skillScores);
 }
