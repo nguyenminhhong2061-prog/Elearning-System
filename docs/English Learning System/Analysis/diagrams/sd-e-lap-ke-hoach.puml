@@ -1,0 +1,51 @@
+@startuml sd-e-lap-ke-hoach
+!include _style-seq.iuml
+
+actor "Người học" as NH
+boundary LearnerHomeView
+boundary PlanView
+boundary SuggestedRoadmapView
+boundary PlanDetailView
+entity StudyPlan
+entity TestAttempt
+entity Reminder
+entity ProgressStat
+boundary AIService
+actor "Dịch vụ AI" as AI
+
+NH -> LearnerHomeView ++ : chọn mục "Kế hoạch" trên thanh bên
+LearnerHomeView -> PlanView ++ : gọi
+deactivate LearnerHomeView
+PlanView -> StudyPlan ++ : gọi
+StudyPlan -> StudyPlan : getActivePlan()
+StudyPlan --> PlanView -- : trả về rỗng (chưa có kế hoạch)
+PlanView -> TestAttempt ++ : gọi
+TestAttempt -> TestAttempt : getLatestResult()
+TestAttempt --> PlanView -- : trả về lượt 06/10/2026 (nghe 7.0, nói 6.5, đọc 8.0, viết 6.5)
+PlanView --> NH : hiển thị thẻ trình độ B1, khối "Đặt mục tiêu học tập"
+
+NH -> PlanView : chọn "Mục tiêu khác", nhập mục tiêu, B2, 12/10/2026–03/01/2027, click "Gợi ý lộ trình"
+PlanView -> AIService ++ : gọi
+AIService -> AIService : suggestRoadmap()
+AIService -> AI : gửi mục tiêu, trình độ, thời gian, kết quả kiểm tra
+AI --> AIService : trả về lộ trình theo tuần
+AIService --> PlanView -- : trả về 12 tuần
+PlanView -> SuggestedRoadmapView ++ : gọi
+SuggestedRoadmapView --> NH : hiển thị khối xem trước 12 tuần
+
+NH -> SuggestedRoadmapView : sửa mục tiêu từ mới tuần 1–2 từ 50 xuống 40, click "Áp dụng kế hoạch"
+SuggestedRoadmapView -> StudyPlan ++ : gọi
+StudyPlan -> StudyPlan : addPlan()
+StudyPlan --> SuggestedRoadmapView -- : trả về
+SuggestedRoadmapView -> Reminder ++ : gọi
+Reminder -> Reminder : addReminders()
+Reminder --> SuggestedRoadmapView -- : trả về
+SuggestedRoadmapView -> PlanDetailView ++ : gọi
+deactivate SuggestedRoadmapView
+deactivate PlanView
+PlanDetailView -> ProgressStat ++ : gọi
+ProgressStat -> ProgressStat : getProgressStats()
+ProgressStat --> PlanDetailView -- : trả về tiến độ 12 tuần (đều bằng 0)
+PlanDetailView --> NH : thông báo "Đã áp dụng kế hoạch mới…", khối "Kế hoạch của bạn"
+deactivate PlanDetailView
+@enduml

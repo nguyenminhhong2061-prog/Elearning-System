@@ -1,0 +1,42 @@
+@startuml uc-quan-ly-tu-vung
+!pragma layout smetana
+left to right direction
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor white
+  BorderColor black
+  ArrowColor black
+}
+skinparam actor {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam rectangle {
+  BackgroundColor white
+  BorderColor black
+}
+
+actor "Admin" as AD
+
+rectangle "Hệ thống học tiếng Anh" {
+  usecase "Quản lý từ vựng" as QTV
+  usecase "Đăng nhập" as DN
+  usecase "Quản lý chủ đề" as QCD
+  usecase "Thêm từ vựng" as THEM
+  usecase "Sửa từ vựng" as SUA
+  usecase "Xóa từ vựng" as XOA
+  usecase "Tìm kiếm từ vựng" as TIM
+}
+
+AD -- QTV
+QTV ..> DN : <<include>>
+QTV <.. QCD : <<extend>>
+QTV <.. THEM : <<extend>>
+QTV <.. SUA : <<extend>>
+QTV <.. XOA : <<extend>>
+SUA ..> TIM : <<include>>
+XOA ..> TIM : <<include>>
+@enduml

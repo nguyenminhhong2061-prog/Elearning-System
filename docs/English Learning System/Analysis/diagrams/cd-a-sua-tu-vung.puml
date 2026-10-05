@@ -1,0 +1,80 @@
+@startuml cd-a-sua-tu-vung
+!include _style.iuml
+show methods
+hide empty methods
+
+class LoginView {
+  -inEmail
+  -inPassword
+  -subLogin
+}
+class AdminHomeView {
+  -subVocabulary
+}
+class ManageVocabularyView {
+  -inKeyword
+  -outsubListVocabulary
+  -subAddVocabulary
+}
+class EditVocabularyView {
+  -outTitle
+  -outInfo
+  -inoutWord
+  -inoutPhonetic
+  -inoutMeaning
+  -inoutExample
+  -inoutTopic
+  -inoutLevel
+  -inoutAudio
+  -inoutImage
+  -subSave
+  -subCancel
+}
+
+abstract class User {
+  -fullName
+  -email
+  -password
+  -status
+  -createdDate
+  -lastActiveTime
+  +checkLogin()
+}
+class Admin
+class Topic {
+  -name
+  -description
+  -image
+  -updatedDate
+  +getTopics()
+}
+class Vocabulary {
+  -word
+  -phonetic
+  -meaning
+  -example
+  -audio
+  -image
+  -level
+  -status
+  -updatedDate
+  +checkWordExists()
+  +updateVocabulary()
+}
+class VocabularyStat {
+  -learnerCount
+  +searchVocabulary()
+}
+
+LoginView -right- AdminHomeView
+AdminHomeView -right- ManageVocabularyView
+ManageVocabularyView -right- EditVocabularyView
+
+LoginView -- User
+User <|-- Admin
+ManageVocabularyView -- VocabularyStat
+EditVocabularyView -- Topic
+EditVocabularyView -- Vocabulary
+Vocabulary <|-- VocabularyStat
+Topic "0..1" o-- "*" Vocabulary
+@enduml

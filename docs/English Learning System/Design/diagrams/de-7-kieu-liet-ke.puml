@@ -1,0 +1,115 @@
+@startuml de-7-kieu-liet-ke
+!include _style.iuml
+show fields
+
+enum CefrLevel {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+}
+enum AccountStatus {
+  ACTIVE
+  LOCKED
+}
+enum ContentStatus {
+  VISIBLE
+  HIDDEN
+}
+enum LessonStatus {
+  DRAFT
+  PUBLISHED
+  HIDDEN
+}
+enum TestStatus {
+  DRAFT
+  VISIBLE
+  HIDDEN
+}
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+enum LearningStatus {
+  NEW
+  LEARNING
+  MASTERED
+}
+enum RecallRating {
+  FORGOT
+  VAGUE
+  REMEMBERED
+}
+enum GameType {
+  MATCHING
+  QUICK_QUIZ
+  GUESS_MEANING
+}
+enum ExerciseSkill {
+  READING
+  WRITING
+  LISTENING
+  PRONUNCIATION
+}
+enum QuestionType {
+  MULTIPLE_CHOICE
+  FILL_IN
+  TRANSLATION
+  REWRITE
+  KEYWORD_SENTENCE
+  SPEAKING
+  ESSAY
+}
+enum TestType {
+  PERIODIC
+  COMPREHENSIVE
+}
+enum TestSkill {
+  LISTENING
+  SPEAKING
+  READING
+  WRITING
+}
+enum MaterialType {
+  LISTENING
+  READING
+}
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  GRADED
+}
+enum ChatRole {
+  LEARNER
+  AI
+}
+enum BadgeCondition {
+  STREAK_DAYS
+  WORDS_LEARNED
+  PERFECT_SCORE
+}
+enum PlanStatus {
+  ACTIVE
+  COMPLETED
+  PAUSED
+}
+enum WeekStatus {
+  UPCOMING
+  IN_PROGRESS
+  DONE
+}
+enum ReminderType {
+  REVIEW
+  TEST
+  PLAN
+}
+enum ContentType {
+  TOPIC
+  EXERCISE
+  TEST
+}
+
+@enduml

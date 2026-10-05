@@ -1,0 +1,39 @@
+@startuml uc-ke-hoach-hoc
+!pragma layout smetana
+left to right direction
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor white
+  BorderColor black
+  ArrowColor black
+}
+skinparam actor {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam rectangle {
+  BackgroundColor white
+  BorderColor black
+}
+
+actor "Người học" as NH
+actor "Dịch vụ AI" as AI
+
+rectangle "Hệ thống học tiếng Anh" {
+  usecase "Quản lý\nkế hoạch học" as KH
+  usecase "Đăng nhập" as DN
+  usecase "Lập kế hoạch mới" as LAP
+  usecase "Điều chỉnh kế hoạch" as DC
+  usecase "Nhận gợi ý\nlộ trình" as GY
+}
+
+NH -- KH
+KH ..> DN : <<include>>
+KH <.. LAP : <<extend>>
+KH <.. DC : <<extend>>
+LAP ..> GY : <<include>>
+GY --- AI
+@enduml

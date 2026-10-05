@@ -1,0 +1,96 @@
+@startuml sd-b-hoc-flashcard
+!include _style-seq.iuml
+
+actor "Người học" as NH
+boundary LearnerHomeView
+boundary VocabularyView
+boundary TopicDetailView
+boundary FlashcardView
+boundary SessionSummaryView
+entity LearnerVocabulary
+entity TopicStat
+entity CustomListStat
+entity Vocabulary
+entity DailyProgress
+entity FlashcardSummary
+
+activate LearnerHomeView
+LearnerHomeView -> LearnerVocabulary ++ : gọi
+LearnerVocabulary -> LearnerVocabulary : getDueList()
+LearnerVocabulary --> LearnerHomeView -- : trả về 2 từ đến hạn
+LearnerHomeView --> NH : hiển thị thẻ "Từ cần ôn hôm nay · 2"
+
+NH -> LearnerHomeView : chọn mục "Từ vựng" trên thanh bên
+LearnerHomeView -> VocabularyView ++ : gọi
+deactivate LearnerHomeView
+VocabularyView -> TopicStat ++ : gọi
+TopicStat -> TopicStat : getTopicStats()
+TopicStat --> VocabularyView -- : trả về 4 chủ đề (Du lịch 12/40…)
+VocabularyView -> CustomListStat ++ : gọi
+CustomListStat -> CustomListStat : getCustomListStats()
+CustomListStat --> VocabularyView -- : trả về 1 danh sách (2/6)
+VocabularyView -> LearnerVocabulary ++ : gọi
+LearnerVocabulary -> LearnerVocabulary : getDueList()
+LearnerVocabulary --> VocabularyView -- : trả về 2 từ đến hạn
+VocabularyView --> NH : hiển thị tab "Chủ đề có sẵn"
+
+NH -> VocabularyView : click thẻ chủ đề "Du lịch"
+VocabularyView -> TopicDetailView ++ : gọi
+deactivate VocabularyView
+TopicDetailView -> TopicStat ++ : gọi
+TopicStat -> TopicStat : getTopicStats()
+TopicStat --> TopicDetailView -- : trả về Du lịch (12/40, 2 từ đến hạn)
+TopicDetailView -> LearnerVocabulary ++ : gọi
+LearnerVocabulary -> LearnerVocabulary : getWordsByTopic()
+LearnerVocabulary --> TopicDetailView -- : trả về 20 từ đầu kèm trạng thái học
+TopicDetailView --> NH : hiển thị trang chủ đề, nút "Học 30 từ →"
+
+NH -> TopicDetailView : click "Học 30 từ →"
+TopicDetailView -> FlashcardView ++ : gọi
+deactivate TopicDetailView
+FlashcardView -> Vocabulary ++ : gọi
+Vocabulary -> Vocabulary : getWordsToStudy()
+Vocabulary --> FlashcardView -- : trả về 30 từ (2 đến hạn, 28 chưa học)
+FlashcardView --> NH : hiển thị "Học chủ đề: Du lịch", "1/30", từ "itinerary"
+
+loop mỗi thẻ, đến khi Lan click "Kết thúc" (Lan đánh giá 4 thẻ)
+  NH -> FlashcardView : bấm vào thẻ để lật
+  FlashcardView --> NH : hiển thị mặt sau
+  NH -> FlashcardView : click mức nhớ (thẻ 1: "Nhớ mơ hồ")
+  FlashcardView -> LearnerVocabulary ++ : gọi
+  LearnerVocabulary -> LearnerVocabulary : reviewWord()
+  LearnerVocabulary --> FlashcardView -- : trả về trạng thái mới (ôn lại 10/10/2026)
+  FlashcardView -> DailyProgress ++ : gọi
+  DailyProgress -> DailyProgress : updateProgress()
+  DailyProgress --> FlashcardView -- : trả về
+  FlashcardView --> NH : thêm một chấm tiến độ, hiển thị thẻ tiếp theo
+end
+
+NH -> FlashcardView : click "Kết thúc" (ở thẻ 5/30)
+FlashcardView -> SessionSummaryView ++ : gọi
+deactivate FlashcardView
+SessionSummaryView -> FlashcardSummary ++ : gọi
+FlashcardSummary -> FlashcardSummary : getSessionSummary()
+FlashcardSummary --> SessionSummaryView -- : trả về 4 thẻ, 5 từ ôn ngày mai
+SessionSummaryView --> NH : hiển thị "Hoàn thành phiên học · Du lịch"
+
+NH -> SessionSummaryView : click "Về chủ đề"
+SessionSummaryView -> TopicDetailView ++ : gọi
+deactivate SessionSummaryView
+TopicDetailView -> TopicStat ++ : gọi
+TopicStat -> TopicStat : getTopicStats()
+TopicStat --> TopicDetailView -- : trả về Du lịch (14/40)
+TopicDetailView -> LearnerVocabulary ++ : gọi
+LearnerVocabulary -> LearnerVocabulary : getWordsByTopic()
+LearnerVocabulary --> TopicDetailView -- : trả về 20 từ đầu kèm trạng thái học
+TopicDetailView --> NH : hiển thị lại trang chủ đề
+
+NH -> TopicDetailView : click "← Chủ đề"
+TopicDetailView -> VocabularyView ++ : gọi
+deactivate TopicDetailView
+VocabularyView -> TopicStat ++ : gọi
+TopicStat -> TopicStat : getTopicStats()
+TopicStat --> VocabularyView -- : trả về 4 chủ đề (Du lịch 14/40)
+VocabularyView --> NH : hiển thị thẻ Du lịch "40 từ · 35% đã học"
+deactivate VocabularyView
+@enduml

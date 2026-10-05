@@ -1,0 +1,93 @@
+@startuml de-6-thong-ke-bao-cao
+!include _style.iuml
+
+class User <<ngoai>>
+class Topic <<ngoai>>
+class Vocabulary <<ngoai>>
+class CustomList <<ngoai>>
+class LearnerVocabulary <<ngoai>>
+class VocabularyReview <<ngoai>>
+class ExerciseLesson <<ngoai>>
+class ExerciseAttempt <<ngoai>>
+class Test <<ngoai>>
+class TestAttempt <<ngoai>>
+class DailyProgress <<ngoai>>
+
+class FlashcardSummary {
+  -topicName : String
+  -cardCount : int
+  -forgotCount : int
+  -vagueCount : int
+  -rememberedCount : int
+  -dueTomorrowCount : int
+}
+class TestReport {
+  -levelBefore : CefrLevel
+  -skillLevels : Map<TestSkill, CefrLevel>
+  -skillComments : Map<TestSkill, String>
+}
+class ProgressStat {
+  -periodName : String
+  -wordsLearned : int
+  -exercisesCompleted : int
+  -avgTestScore : Float
+  -studyMinutes : int
+}
+class SystemStat {
+  -totalUsers : int
+  -newUsers : int
+  -activeUsers : int
+  -reviewCount : int
+  -exerciseAttemptCount : int
+  -testAttemptCount : int
+}
+class ContentStat {
+  -contentName : String
+  -contentType : ContentType
+  -attemptCount : int
+  -learnerCount : int
+}
+class VocabularyStat {
+  -learnerCount : int
+}
+class TopicStat {
+  -learnedCount : int
+  -totalCount : int
+  -dueCount : int
+}
+class CustomListStat {
+  -learnedCount : int
+  -totalCount : int
+}
+class LessonStat {
+  -itemCount : int
+  -practicedCount : int
+  -bestPercent : Float
+  -attemptCount : int
+  -answeredCount : int
+}
+class TestStat {
+  -questionCount : int
+  -attemptCount : int
+  -answeredCount : int
+}
+
+FlashcardSummary ..> VocabularyReview
+FlashcardSummary ..> LearnerVocabulary
+TestAttempt <|-- TestReport
+ProgressStat ..> DailyProgress
+ProgressStat ..> TestAttempt
+SystemStat ..> User
+SystemStat ..> VocabularyReview
+SystemStat ..> ExerciseAttempt
+SystemStat ..> TestAttempt
+SystemStat ..> DailyProgress
+ContentStat ..> Topic
+ContentStat ..> ExerciseLesson
+ContentStat ..> Test
+Vocabulary <|-- VocabularyStat
+Topic <|-- TopicStat
+CustomList <|-- CustomListStat
+ExerciseLesson <|-- LessonStat
+Test <|-- TestStat
+@enduml

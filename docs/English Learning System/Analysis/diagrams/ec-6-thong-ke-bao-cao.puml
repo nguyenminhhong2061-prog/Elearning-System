@@ -1,0 +1,94 @@
+@startuml ec-6-thong-ke-bao-cao
+!include _style.iuml
+
+class User <<ngoai>>
+class Topic <<ngoai>>
+class LearnerVocabulary <<ngoai>>
+class VocabularyReview <<ngoai>>
+class ExerciseLesson <<ngoai>>
+class ExerciseAttempt <<ngoai>>
+class Test <<ngoai>>
+class TestAttempt <<ngoai>>
+class DailyProgress <<ngoai>>
+class CustomList <<ngoai>>
+class Vocabulary <<ngoai>>
+
+class VocabularyStat {
+  -learnerCount
+}
+class TopicStat {
+  -learnedCount
+  -totalCount
+  -dueCount
+}
+class CustomListStat {
+  -learnedCount
+  -totalCount
+}
+class LessonStat {
+  -itemCount
+  -practicedCount
+  -bestPercent
+  -attemptCount
+  -answeredCount
+}
+class TestStat {
+  -questionCount
+  -attemptCount
+  -answeredCount
+}
+
+class FlashcardSummary {
+  -topicName
+  -cardCount
+  -forgotCount
+  -vagueCount
+  -rememberedCount
+  -dueTomorrowCount
+}
+class TestReport {
+  -levelBefore
+  -skillLevels
+  -skillComments
+}
+class ProgressStat {
+  -periodName
+  -wordsLearned
+  -exercisesCompleted
+  -avgTestScore
+  -studyMinutes
+}
+class SystemStat {
+  -totalUsers
+  -newUsers
+  -activeUsers
+  -reviewCount
+  -exerciseAttemptCount
+  -testAttemptCount
+}
+class ContentStat {
+  -contentName
+  -contentType
+  -attemptCount
+  -learnerCount
+}
+
+FlashcardSummary ..> VocabularyReview
+FlashcardSummary ..> LearnerVocabulary
+TestAttempt <|-- TestReport
+ProgressStat ..> DailyProgress
+ProgressStat ..> TestAttempt
+SystemStat ..> User
+SystemStat ..> VocabularyReview
+SystemStat ..> ExerciseAttempt
+SystemStat ..> TestAttempt
+SystemStat ..> DailyProgress
+ContentStat ..> Topic
+ContentStat ..> ExerciseLesson
+ContentStat ..> Test
+Vocabulary <|-- VocabularyStat
+Topic <|-- TopicStat
+CustomList <|-- CustomListStat
+ExerciseLesson <|-- LessonStat
+Test <|-- TestStat
+@enduml

@@ -1,0 +1,51 @@
+@startuml sd-a-sua-tu-vung
+!include _style-seq.iuml
+
+actor "Admin" as AD
+boundary LoginView
+boundary AdminHomeView
+boundary ManageVocabularyView
+boundary EditVocabularyView
+entity User
+entity VocabularyStat
+entity Topic
+entity Vocabulary
+
+AD -> LoginView ++ : nhập email, mật khẩu, click "Đăng nhập →"
+LoginView -> User ++ : gọi
+User -> User : checkLogin()
+User --> LoginView -- : trả về đối tượng Admin
+LoginView -> AdminHomeView ++ : gọi
+deactivate LoginView
+AdminHomeView --> AD : hiển thị "Tổng quan hệ thống"
+
+AD -> AdminHomeView : chọn mục "Từ vựng" trên thanh bên
+AdminHomeView -> ManageVocabularyView ++ : gọi
+deactivate AdminHomeView
+ManageVocabularyView --> AD : hiển thị trang "Từ vựng"
+
+AD -> ManageVocabularyView : gõ "lugg" vào ô "Tìm từ trong toàn bộ kho"
+ManageVocabularyView -> VocabularyStat ++ : gọi
+VocabularyStat -> VocabularyStat : searchVocabulary()
+VocabularyStat --> ManageVocabularyView -- : trả về 3 từ kèm số người học
+ManageVocabularyView --> AD : hiển thị bảng "Kết quả tìm kiếm"
+
+AD -> ManageVocabularyView : click "Sửa" ở dòng "luggage" (mã 105)
+ManageVocabularyView -> EditVocabularyView ++ : gọi
+EditVocabularyView -> Topic ++ : gọi
+Topic -> Topic : getTopics()
+Topic --> EditVocabularyView -- : trả về 4 chủ đề
+EditVocabularyView --> AD : hiển thị ngăn kéo "Sửa từ “luggage”"
+
+AD -> EditVocabularyView : sửa nghĩa và câu ví dụ, click "Lưu"
+EditVocabularyView -> Vocabulary ++ : gọi
+Vocabulary -> Vocabulary : checkWordExists()
+Vocabulary --> EditVocabularyView -- : trả về false (không trùng)
+EditVocabularyView -> Vocabulary ++ : gọi
+Vocabulary -> Vocabulary : updateVocabulary()
+Vocabulary --> EditVocabularyView -- : trả về true
+EditVocabularyView -> ManageVocabularyView : gọi (đóng ngăn kéo)
+deactivate EditVocabularyView
+ManageVocabularyView --> AD : thông báo "Đã lưu · …", bảng kết quả giữ nguyên
+deactivate ManageVocabularyView
+@enduml

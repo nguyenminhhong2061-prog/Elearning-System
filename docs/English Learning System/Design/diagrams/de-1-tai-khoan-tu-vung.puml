@@ -1,0 +1,107 @@
+@startuml de-1-tai-khoan-tu-vung
+!include _style.iuml
+
+class TestAttempt <<ngoai>>
+
+abstract class User {
+  -id : Long
+  -fullName : String
+  -email : String
+  -password : String
+  -status : AccountStatus
+  -createdDate : LocalDate
+  -lastActiveTime : LocalDateTime
+}
+class Learner {
+  -currentLevel : CefrLevel
+}
+class Admin
+class LevelHistory {
+  -id : Long
+  -level : CefrLevel
+  -changedDate : LocalDate
+  -learner : Learner
+  -testAttempt : TestAttempt
+}
+
+class Topic {
+  -id : Long
+  -name : String
+  -description : String
+  -image : String
+  -updatedDate : LocalDate
+}
+class Vocabulary {
+  -id : Long
+  -word : String
+  -phonetic : String
+  -meaning : String
+  -example : String
+  -audio : String
+  -image : String
+  -level : CefrLevel
+  -status : ContentStatus
+  -updatedDate : LocalDate
+  -topic : Topic
+  -creator : User
+}
+class LearnerVocabulary {
+  -id : Long
+  -status : LearningStatus
+  -lastResult : RecallRating
+  -reviewCount : int
+  -firstLearnedDate : LocalDate
+  -lastReviewedDate : LocalDate
+  -nextReviewDate : LocalDate
+  -learner : Learner
+  -vocabulary : Vocabulary
+}
+class VocabularyReview {
+  -id : Long
+  -rating : RecallRating
+  -reviewedTime : LocalDateTime
+  -learnerVocabulary : LearnerVocabulary
+}
+class CustomList {
+  -id : Long
+  -name : String
+  -createdDate : LocalDate
+  -learner : Learner
+  -items : List<CustomListItem>
+}
+class CustomListItem {
+  -id : Long
+  -vocabulary : Vocabulary
+}
+class GamePlay {
+  -id : Long
+  -gameType : GameType
+  -correctCount : int
+  -questionCount : int
+  -score : int
+  -duration : int
+  -playedDate : LocalDate
+  -learner : Learner
+  -topic : Topic
+  -customList : CustomList
+}
+
+User <|-- Learner
+User <|-- Admin
+LevelHistory "*" o-- "1" Learner
+LevelHistory "0..1" o-- "0..1" TestAttempt
+
+Vocabulary "*" o-- "0..1" Topic
+Vocabulary "*" o-- "1" User
+LearnerVocabulary "*" o-- "1" Learner
+LearnerVocabulary "*" o-- "1" Vocabulary
+VocabularyReview "*" o-- "1" LearnerVocabulary
+
+CustomList "*" o-- "1" Learner
+CustomList "1" *-- "*" CustomListItem
+CustomListItem "*" o-- "1" Vocabulary
+
+GamePlay "*" o-- "1" Learner
+GamePlay "*" o-- "0..1" Topic
+GamePlay "*" o-- "0..1" CustomList
+@enduml

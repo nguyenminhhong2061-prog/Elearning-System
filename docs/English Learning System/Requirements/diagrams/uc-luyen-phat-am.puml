@@ -1,0 +1,43 @@
+@startuml uc-luyen-phat-am
+!pragma layout smetana
+left to right direction
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor white
+  BorderColor black
+  ArrowColor black
+}
+skinparam actor {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam rectangle {
+  BackgroundColor white
+  BorderColor black
+}
+
+actor "Người học" as NH
+actor "Dịch vụ AI" as AI
+
+rectangle "Hệ thống học tiếng Anh" {
+  usecase "<i>Làm bài tập</i>" as BT
+  usecase "Luyện phát âm" as PA
+  usecase "Đăng nhập" as DN
+  usecase "Chọn mục\nluyện phát âm" as CHON
+  usecase "Ghi âm và\nchấm phát âm" as GA
+  usecase "Hỏi chatbot" as CB
+}
+
+NH -- PA
+NH -- CB
+PA --|> BT
+PA ..> DN : <<include>>
+PA ..> CHON : <<include>>
+PA ..> GA : <<include>>
+CB ..> BT : <<extend>>
+GA ---- AI
+CB ---- AI
+@enduml

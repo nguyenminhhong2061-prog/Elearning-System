@@ -1,0 +1,106 @@
+@startuml dc-a1-dang-nhap
+!include _style-dc.iuml
+
+package "Frontend (React)" {
+  class LoginPage {
+    -email : string
+    -password : string
+    +handleLogin() : void
+  }
+  class AdminLayout {
+    -user : Admin
+    -menuItems : object[]
+    +handleSelectMenuItem(path : string) : void
+    +handleLogout() : void
+  }
+  class LearnerLayout {
+    -user : Learner
+    -menuItems : object[]
+    +handleSelectMenuItem(path : string) : void
+    +handleLogout() : void
+  }
+  class AdminHomePage
+  class LearnerHomePage <<ngoai>>
+  class AuthContext {
+    -user : User
+    -token : string
+    +login(token : string, user : User) : void
+    +updateUser(user : User) : void
+    +logout() : void
+  }
+  class apiClient {
+    -baseURL : string
+    +get(url : string, params : object) : Promise
+    +post(url : string, body : object) : Promise
+    +put(url : string, body : object) : Promise
+  }
+}
+
+package "Backend (Spring Boot)" {
+  class AuthController {
+    -userDAO : UserDAO
+    -jwtService : JwtService
+    +login(email : String, password : String) : LoginResponse
+  }
+  class LoginResponse {
+    -token : String
+    -user : User
+  }
+  class JwtService {
+    -secretKey : String
+    +createToken(user : User) : String
+    +parseUserId(token : String) : Long
+  }
+  class OncePerRequestFilter <<khung>>
+  class JwtAuthFilter {
+    -jwtService : JwtService
+    -userDAO : UserDAO
+    +doFilterInternal(req : HttpServletRequest, res : HttpServletResponse, chain : FilterChain) : void
+  }
+  abstract class DAO {
+    #jdbcTemplate : JdbcTemplate
+    +DAO(jdbcTemplate : JdbcTemplate)
+  }
+  class UserDAO {
+    -passwordEncoder : PasswordEncoder
+    +checkLogin(email : String, password : String) : User
+    +getUserById(id : Long) : User
+  }
+  abstract class User {
+    -id : Long
+    -fullName : String
+    -email : String
+    -password : String
+    -status : AccountStatus
+    -createdDate : LocalDate
+    -lastActiveTime : LocalDateTime
+  }
+  class Learner {
+    -currentLevel : CefrLevel
+  }
+  class Admin
+}
+
+LoginPage -right- AdminHomePage
+LoginPage -- LearnerHomePage
+AdminLayout *-- AdminHomePage
+LearnerLayout *-- LearnerHomePage
+LoginPage ..> apiClient
+LoginPage ..> AuthContext
+AdminLayout ..> AuthContext
+LearnerLayout ..> AuthContext
+apiClient ..> AuthContext
+
+LoginPage -- AuthController
+AuthController -- UserDAO
+AuthController -- JwtService
+AuthController ..> LoginResponse
+LoginResponse o-- User
+OncePerRequestFilter <|-- JwtAuthFilter
+JwtAuthFilter -- JwtService
+JwtAuthFilter -- UserDAO
+DAO <|-- UserDAO
+UserDAO -- User
+User <|-- Learner
+User <|-- Admin
+@enduml

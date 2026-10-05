@@ -1,0 +1,115 @@
+@startuml ds-a2-sua-tu-vung
+!include _style-ds.iuml
+
+actor "Admin" as AD
+box "Frontend (React)" #FAFAFA
+  boundary AdminLayout
+  boundary ManageVocabularyPage
+  boundary EditVocabularyDrawer
+end box
+box "Backend (Spring Boot)" #FAFAFA
+  control JwtAuthFilter
+  control JwtService
+  control UserDAO
+  control VocabularyAdminController
+  control FileStorageService
+  control VocabularyStatDAO
+  control TopicDAO
+  control VocabularyDAO
+  entity Admin
+  entity VocabularyStat
+  entity Vocabulary
+  entity Topic
+end box
+
+activate AdminLayout
+AD -> AdminLayout : chọn mục "Từ vựng" trên thanh bên
+AdminLayout -> AdminLayout : handleSelectMenuItem()
+AdminLayout -> ManageVocabularyPage ++ : chuyển trang
+deactivate AdminLayout
+ManageVocabularyPage --> AD : hiển thị trang "Từ vựng"
+
+AD -> ManageVocabularyPage : gõ "lugg" vào ô "Tìm từ trong toàn bộ kho"
+ManageVocabularyPage -> ManageVocabularyPage : handleChangeKeyword()
+ManageVocabularyPage -> JwtAuthFilter ++ : GET /api/admin/vocabulary?q=lugg (kèm token)
+JwtAuthFilter -> JwtAuthFilter : doFilterInternal()
+JwtAuthFilter -> JwtService ++ : gọi
+JwtService -> JwtService : parseUserId()
+JwtService --> JwtAuthFilter -- : trả về id của Hùng
+JwtAuthFilter -> UserDAO ++ : gọi
+UserDAO -> UserDAO : getUserById()
+UserDAO -> Admin ++ : gọi
+Admin -> Admin : Admin(), setter
+Admin --> UserDAO -- : trả về
+UserDAO --> JwtAuthFilter -- : trả về Admin (đang hoạt động)
+JwtAuthFilter -> VocabularyAdminController ++ : chuyển tiếp yêu cầu
+deactivate JwtAuthFilter
+VocabularyAdminController -> VocabularyAdminController : searchVocabulary()
+VocabularyAdminController -> VocabularyStatDAO ++ : gọi
+VocabularyStatDAO -> VocabularyStatDAO : searchVocabulary()
+loop mỗi từ tìm được (luggage, hand luggage, luggage rack)
+  VocabularyStatDAO -> VocabularyStat ++ : gọi
+  VocabularyStat -> VocabularyStat : VocabularyStat(), setter (cả thuộc tính kế thừa từ Vocabulary)
+  VocabularyStat -> Topic ++ : gọi
+  Topic -> Topic : Topic()
+  Topic --> VocabularyStat -- : trả về chủ đề Du lịch
+  VocabularyStat --> VocabularyStatDAO -- : trả về
+end
+VocabularyStatDAO --> VocabularyAdminController -- : trả về 3 từ kèm số người học
+VocabularyAdminController --> ManageVocabularyPage -- : 200, JSON 3 từ
+ManageVocabularyPage --> AD : hiển thị bảng "Kết quả tìm kiếm"
+
+AD -> ManageVocabularyPage : click "Sửa" ở dòng "luggage" (mã 105)
+ManageVocabularyPage -> ManageVocabularyPage : handleSelectVocabulary()
+ManageVocabularyPage -> EditVocabularyDrawer ++ : hiện (truyền từ 105)
+EditVocabularyDrawer -> EditVocabularyDrawer : loadTopics()
+EditVocabularyDrawer -> VocabularyAdminController ++ : GET /api/admin/topics
+VocabularyAdminController -> VocabularyAdminController : getTopics()
+VocabularyAdminController -> TopicDAO ++ : gọi
+TopicDAO -> TopicDAO : getTopics()
+loop mỗi chủ đề (4 chủ đề)
+  TopicDAO -> Topic ++ : gọi
+  Topic -> Topic : Topic()
+  Topic --> TopicDAO -- : trả về
+end
+TopicDAO --> VocabularyAdminController -- : trả về 4 chủ đề
+VocabularyAdminController --> EditVocabularyDrawer -- : 200, JSON 4 chủ đề
+EditVocabularyDrawer --> AD : hiển thị ngăn kéo "Sửa từ “luggage”"
+
+opt admin chọn file mới ở nút "Thay file" (kịch bản chuẩn không đổi file)
+  AD -> EditVocabularyDrawer : chọn file âm thanh
+  EditVocabularyDrawer -> EditVocabularyDrawer : handleChooseFile()
+  EditVocabularyDrawer -> VocabularyAdminController ++ : POST /api/admin/media?kind=AUDIO (nội dung file)
+  VocabularyAdminController -> VocabularyAdminController : uploadMedia()
+  VocabularyAdminController -> FileStorageService ++ : gọi
+  FileStorageService -> FileStorageService : storeAudio()
+  FileStorageService --> VocabularyAdminController -- : trả về đường dẫn file
+  VocabularyAdminController --> EditVocabularyDrawer -- : 201, JSON đường dẫn file
+  EditVocabularyDrawer --> AD : hiện file mới để nghe thử
+end
+AD -> EditVocabularyDrawer : sửa nghĩa, câu ví dụ, click "Lưu"
+EditVocabularyDrawer -> EditVocabularyDrawer : handleSave()
+EditVocabularyDrawer -> VocabularyAdminController ++ : PUT /api/vocabulary/105 (từ đã sửa, không có file mới)
+VocabularyAdminController -> Vocabulary ++ : gọi (Spring đóng gói JSON)
+Vocabulary -> Vocabulary : Vocabulary(), setter
+Vocabulary -> Topic ++ : gọi
+Topic -> Topic : Topic()
+Topic --> Vocabulary -- : trả về
+Vocabulary --> VocabularyAdminController -- : trả về từ 105 đã sửa
+VocabularyAdminController -> VocabularyAdminController : updateVocabulary()
+VocabularyAdminController -> VocabularyDAO ++ : gọi
+VocabularyDAO -> VocabularyDAO : checkWordExists()
+VocabularyDAO --> VocabularyAdminController -- : trả về false (không trùng)
+VocabularyAdminController -> Vocabulary ++ : gọi
+Vocabulary -> Vocabulary : setter (ngày cập nhật 06/10/2026)
+Vocabulary --> VocabularyAdminController -- : trả về
+VocabularyAdminController -> VocabularyDAO ++ : gọi
+VocabularyDAO -> VocabularyDAO : updateVocabulary()
+VocabularyDAO --> VocabularyAdminController -- : trả về true
+VocabularyAdminController --> EditVocabularyDrawer -- : 200, JSON từ đã sửa
+EditVocabularyDrawer -> ManageVocabularyPage : gọi handleSaved() (truyền từ đã sửa)
+deactivate EditVocabularyDrawer
+ManageVocabularyPage -> ManageVocabularyPage : handleSaved()
+ManageVocabularyPage --> AD : đóng ngăn kéo, cập nhật dòng "luggage", thông báo "Đã lưu · …"
+deactivate ManageVocabularyPage
+@enduml

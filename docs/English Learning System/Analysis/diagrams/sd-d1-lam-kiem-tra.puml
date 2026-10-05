@@ -1,0 +1,48 @@
+@startuml sd-d1-lam-kiem-tra
+!include _style-seq.iuml
+
+actor "Người học" as NH
+boundary LearnerHomeView
+boundary TestView
+boundary TestInfoView
+boundary DoTestView
+entity TestStat
+entity TestQuestion
+entity TestAttempt
+entity TestAnswer
+
+NH -> LearnerHomeView ++ : chọn mục "Kiểm tra" trên thanh bên
+LearnerHomeView -> TestView ++ : gọi
+deactivate LearnerHomeView
+TestView -> TestStat ++ : gọi
+TestStat -> TestStat : getOpenTests()
+TestStat --> TestView -- : trả về 3 đề đang mở (1 đề tổng hợp)
+TestView --> NH : hiển thị trang "Kiểm tra"
+
+NH -> TestView : click "Bắt đầu" ở đề "Kiểm tra tổng hợp tháng 10/2026"
+TestView -> TestInfoView ++ : gọi
+deactivate TestView
+TestInfoView -> TestQuestion ++ : gọi
+TestQuestion -> TestQuestion : getQuestionsByTest()
+TestQuestion --> TestInfoView -- : trả về 23 câu hỏi kèm tài liệu
+TestInfoView --> NH : hiển thị màn giới thiệu đề, cấu trúc theo phần
+
+NH -> TestInfoView : click "Bắt đầu"
+TestInfoView -> TestAttempt ++ : gọi
+TestAttempt -> TestAttempt : startAttempt()
+TestAttempt --> TestInfoView -- : trả về lượt làm bài (đang làm)
+TestInfoView -> DoTestView ++ : gọi
+deactivate TestInfoView
+DoTestView --> NH : hiển thị câu 1, bài nghe "Planning a weekend trip"
+
+loop mỗi câu, từ câu 1 đến câu 23
+  NH -> DoTestView : chọn đáp án, ghi âm (câu 11, 12) hoặc viết bài (câu 23)
+  DoTestView -> TestAnswer ++ : gọi
+  TestAnswer -> TestAnswer : saveAnswer()
+  TestAnswer --> DoTestView -- : trả về
+  DoTestView --> NH : hiển thị "Đã lưu"
+  NH -> DoTestView : click "Câu tiếp theo →"
+  DoTestView --> NH : hiển thị câu tiếp theo
+end
+deactivate DoTestView
+@enduml

@@ -1,0 +1,159 @@
+@startuml dc-d2-cham-bao-cao
+!include _style-dc.iuml
+
+package "Frontend (React)" {
+  class DoTestPage {
+    -attempt : TestAttempt
+    -startTime : Date
+    +handleSubmit() : void
+  }
+  class TestReportPage {
+    -attempt : TestAttempt
+    -report : TestReport
+    +gradeAttempt() : void
+    +loadReport() : void
+    +handleApplyRoadmap() : void
+    +handleBackToList() : void
+  }
+  class LearnerLayout {
+    +handleSelectMenuItem(path : string) : void
+  }
+  class LearnerHomePage <<ngoai>>
+  class AuthContext <<ngoai>>
+}
+
+package "Backend (Spring Boot)" {
+  class TestController {
+    -testAttemptDAO : TestAttemptDAO
+    -testAnswerDAO : TestAnswerDAO
+    -learnerDAO : LearnerDAO
+    -dailyProgressDAO : DailyProgressDAO
+    -testReportDAO : TestReportDAO
+    -aiService : AIService
+    +submitAttempt(attemptId : Long, startTime : LocalDateTime) : TestAttempt
+    +gradeAttempt(attemptId : Long) : TestAttempt
+    +getReport(attemptId : Long) : TestReport
+  }
+  class AIService {
+    -restClient : RestClient
+    +gradeAnswer(answer : TestAnswer) : TestAnswer
+    +classifyLevel(attempt : TestAttempt, currentLevel : CefrLevel) : TestAttempt
+  }
+  abstract class DAO {
+    #jdbcTemplate : JdbcTemplate
+    +DAO(jdbcTemplate : JdbcTemplate)
+  }
+  class TestAttemptDAO {
+    +getAttempt(attemptId : Long, learnerId : Long) : TestAttempt
+    +submitAttempt(attempt : TestAttempt) : TestAttempt
+    +calculateScores(attempt : TestAttempt) : TestAttempt
+    +saveResult(attempt : TestAttempt) : boolean
+  }
+  class TestAnswerDAO {
+    +saveAnswer(attemptId : Long, answer : TestAnswer) : boolean
+  }
+  class LearnerDAO {
+    +updateLevel(learnerId : Long, level : CefrLevel, attemptId : Long, date : LocalDate) : boolean
+  }
+  class DailyProgressDAO {
+    +updateProgress(learnerId : Long, date : LocalDate, minutes : int) : void
+  }
+  class TestReportDAO {
+    +getReport(attemptId : Long) : TestReport
+  }
+
+  class Learner {
+    -currentLevel : CefrLevel
+  }
+  class LevelHistory {
+    -id : Long
+    -level : CefrLevel
+    -changedDate : LocalDate
+    -learner : Learner
+    -testAttempt : TestAttempt
+  }
+  class TestAttempt {
+    -id : Long
+    -startTime : LocalDateTime
+    -submitTime : LocalDateTime
+    -status : AttemptStatus
+    -totalScore : Float
+    -listeningScore : Float
+    -speakingScore : Float
+    -readingScore : Float
+    -writingScore : Float
+    -suggestedLevel : CefrLevel
+    -suggestedRoadmap : String
+    -learner : Learner
+    -test : Test
+    -answers : List<TestAnswer>
+  }
+  class TestAnswer {
+    -id : Long
+    -answerText : String
+    -recording : String
+    -isCorrect : Boolean
+    -score : Float
+    -aiFeedback : String
+    -question : TestQuestion
+    -selectedOption : AnswerOption
+  }
+  class TestReport {
+    -levelBefore : CefrLevel
+    -skillLevels : Map<TestSkill, CefrLevel>
+    -skillComments : Map<TestSkill, String>
+  }
+  class DailyProgress {
+    -id : Long
+    -date : LocalDate
+    -wordsLearned : int
+    -exercisesCompleted : int
+    -testsCompleted : int
+    -studyMinutes : int
+    -learner : Learner
+  }
+  class User <<ngoai>>
+  class Test <<ngoai>>
+  class TestQuestion <<ngoai>>
+  class AnswerOption <<ngoai>>
+}
+
+DoTestPage -right- TestReportPage
+TestReportPage -right- LearnerLayout
+LearnerLayout *-- LearnerHomePage
+
+DoTestPage -- TestController
+TestReportPage ..> AuthContext
+TestReportPage -- TestController
+
+TestController -- TestAttemptDAO
+TestController -- TestAnswerDAO
+TestController -- LearnerDAO
+TestController -- DailyProgressDAO
+TestController -- TestReportDAO
+TestController -- AIService
+DAO <|-- TestAttemptDAO
+DAO <|-- TestAnswerDAO
+DAO <|-- LearnerDAO
+DAO <|-- DailyProgressDAO
+DAO <|-- TestReportDAO
+TestAttemptDAO -- TestAttempt
+TestAnswerDAO -- TestAnswer
+LearnerDAO -- Learner
+LearnerDAO -- LevelHistory
+DailyProgressDAO -- DailyProgress
+TestReportDAO -- TestReport
+AIService ..> TestAnswer
+AIService ..> TestAttempt
+
+User <|-- Learner
+TestAttempt <|-- TestReport
+TestAttempt "*" o-- "1" Learner
+TestAttempt "*" o-- "1" Test
+TestAttempt "1" *-- "*" TestAnswer
+TestAnswer "*" o-- "1" TestQuestion
+TestAnswer "*" o-- "0..1" AnswerOption
+LevelHistory "*" o-- "1" Learner
+LevelHistory "0..1" o-- "0..1" TestAttempt
+DailyProgress "*" o-- "1" Learner
+@enduml

@@ -1,0 +1,71 @@
+@startuml sd-c-luyen-phat-am
+!include _style-seq.iuml
+
+actor "Người học" as NH
+boundary LearnerHomeView
+boundary ExerciseView
+boundary PracticePronunciationView
+boundary PronunciationSummaryView
+entity LessonStat
+entity PronunciationItem
+entity PronunciationAttempt
+entity DailyProgress
+boundary AIService
+actor "Dịch vụ AI" as AI
+
+NH -> LearnerHomeView ++ : chọn mục "Bài tập" trên thanh bên
+LearnerHomeView -> ExerciseView ++ : gọi
+deactivate LearnerHomeView
+ExerciseView -> LessonStat ++ : gọi
+LessonStat -> LessonStat : getLessonStats()
+LessonStat --> ExerciseView -- : trả về 5 bài đọc hiểu (tab mặc định)
+ExerciseView --> NH : hiển thị tab "Đọc hiểu"
+
+NH -> ExerciseView : chọn tab "Phát âm"
+ExerciseView -> LessonStat ++ : gọi
+LessonStat -> LessonStat : getLessonStats()
+LessonStat --> ExerciseView -- : trả về 3 bài phát âm
+ExerciseView --> NH : hiển thị các bài theo cột CEFR
+
+NH -> ExerciseView : click thẻ "Âm /θ/ và /ð/"
+ExerciseView -> PracticePronunciationView ++ : gọi
+deactivate ExerciseView
+PracticePronunciationView -> PronunciationItem ++ : gọi
+PronunciationItem -> PronunciationItem : getItemsByLesson()
+PronunciationItem --> PracticePronunciationView -- : trả về 5 mục
+PracticePronunciationView --> NH : hiển thị "Câu 1/5" "Thank you for the three tickets."
+
+loop mỗi lần ghi âm (mục 1 ghi 2 lần, sau đó mục 2–5)
+  NH -> PracticePronunciationView : bấm micro, đọc câu mẫu, bấm dừng
+  PracticePronunciationView -> AIService ++ : gọi
+  AIService -> AIService : assessPronunciation()
+  AIService -> AI : gửi bản ghi âm và văn bản mẫu
+  AI --> AIService : trả về điểm và nhận xét
+  AIService --> PracticePronunciationView -- : trả về kết quả (lần 1: điểm tổng 72)
+  PracticePronunciationView -> PronunciationAttempt ++ : gọi
+  PronunciationAttempt -> PronunciationAttempt : addAttempt()
+  PronunciationAttempt --> PracticePronunciationView -- : trả về
+  PracticePronunciationView --> NH : hiển thị điểm, từ đọc chưa đúng, gợi ý
+  NH -> PracticePronunciationView : bấm micro để ghi lại, hoặc click "Tiếp tục"
+end
+
+NH -> PracticePronunciationView : click "Xem kết quả" (ở mục 5)
+PracticePronunciationView -> PronunciationSummaryView ++ : gọi
+deactivate PracticePronunciationView
+PronunciationSummaryView -> PronunciationAttempt ++ : gọi
+PronunciationAttempt -> PronunciationAttempt : getAttemptsByLesson()
+PronunciationAttempt --> PronunciationSummaryView -- : trả về 9 lượt luyện
+PronunciationSummaryView -> DailyProgress ++ : gọi
+DailyProgress -> DailyProgress : updateProgress()
+DailyProgress --> PronunciationSummaryView -- : trả về
+PronunciationSummaryView --> NH : hiển thị "Hoàn thành bài luyện phát âm"
+
+NH -> PronunciationSummaryView : click "Về danh sách"
+PronunciationSummaryView -> ExerciseView ++ : gọi
+deactivate PronunciationSummaryView
+ExerciseView -> LessonStat ++ : gọi
+LessonStat -> LessonStat : getLessonStats()
+LessonStat --> ExerciseView -- : trả về 3 bài phát âm
+ExerciseView --> NH : hiển thị tab "Phát âm" ("Đã luyện 5/5 mục")
+deactivate ExerciseView
+@enduml

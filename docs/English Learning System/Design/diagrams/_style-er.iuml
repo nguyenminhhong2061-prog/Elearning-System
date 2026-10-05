@@ -1,0 +1,18 @@
+' Kiểu dùng chung cho các biểu đồ ER (sinh bởi gen_er_from_schema.py).
+' Bảng thuộc module khác gắn stereotype <<ngoai>>: tô xám, ẩn cột.
+!pragma layout smetana
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor white
+  BorderColor black
+  ArrowColor black
+}
+skinparam classBackgroundColor<<ngoai>> #E6E6E6
+skinparam classFontColor<<ngoai>> #555555
+hide circle
+hide empty members
+hide <<ngoai>> stereotype
+hide <<ngoai>> members

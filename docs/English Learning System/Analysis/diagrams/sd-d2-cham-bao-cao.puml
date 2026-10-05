@@ -1,0 +1,68 @@
+@startuml sd-d2-cham-bao-cao
+!include _style-seq.iuml
+
+actor "Người học" as NH
+boundary DoTestView
+boundary TestReportView
+boundary LearnerHomeView
+entity TestAnswer
+entity TestAttempt
+entity Learner
+entity DailyProgress
+entity TestReport
+boundary AIService
+actor "Dịch vụ AI" as AI
+
+NH -> DoTestView ++ : click "Nộp bài" (câu 23 đã viết 136 từ)
+DoTestView --> NH : hộp thoại "Nộp bài kiểm tra?"
+NH -> DoTestView : click "Nộp bài" trong hộp thoại
+DoTestView -> TestAttempt ++ : gọi
+TestAttempt -> TestAttempt : submitAttempt()
+TestAttempt --> DoTestView -- : trả về lượt đã nộp (nghe 7.0, đọc 8.0)
+DoTestView -> TestReportView ++ : gọi
+deactivate DoTestView
+TestReportView --> NH : hiển thị "Đang chấm phần Nói, Viết"
+
+loop mỗi câu nói và câu viết (3 câu)
+  TestReportView -> AIService ++ : gọi
+  AIService -> AIService : gradeAnswer()
+  AIService -> AI : gửi câu trả lời và đề bài
+  AI --> AIService : trả về điểm và nhận xét
+  AIService --> TestReportView -- : trả về câu trả lời đã chấm (nói 1: 6.0)
+  TestReportView -> TestAnswer ++ : gọi
+  TestAnswer -> TestAnswer : saveAnswer()
+  TestAnswer --> TestReportView -- : trả về
+end
+
+TestReportView -> TestAttempt ++ : gọi
+TestAttempt -> TestAttempt : calculateScores()
+TestAttempt --> TestReportView -- : trả về (nói 6.5, viết 6.5, tổng 7.0)
+TestReportView -> AIService ++ : gọi
+AIService -> AIService : classifyLevel()
+AIService -> AI : gửi điểm 4 kỹ năng và trình độ A2
+AI --> AIService : trả về trình độ và lộ trình đề xuất
+AIService --> TestReportView -- : trả về B1, lộ trình 12 tuần
+TestReportView -> TestAttempt ++ : gọi
+TestAttempt -> TestAttempt : saveResult()
+TestAttempt --> TestReportView -- : trả về
+
+opt trình độ đề xuất khác trình độ hiện tại (B1 khác A2)
+  TestReportView -> Learner ++ : gọi
+  Learner -> Learner : updateLevel()
+  Learner --> TestReportView -- : trả về
+end
+
+TestReportView -> DailyProgress ++ : gọi
+DailyProgress -> DailyProgress : updateProgress()
+DailyProgress --> TestReportView -- : trả về
+TestReportView -> TestReport ++ : gọi
+TestReport -> TestReport : getReport()
+TestReport --> TestReportView -- : trả về báo cáo
+TestReportView --> NH : hiển thị báo cáo (7.0/10, B1, lộ trình, điểm kỹ năng)
+
+NH -> TestReportView : chọn mục "Tiến độ" trên thanh bên
+TestReportView -> LearnerHomeView ++ : gọi
+deactivate TestReportView
+LearnerHomeView --> NH : hiển thị trang "Tiến độ" (trình độ hiện tại B1)
+deactivate LearnerHomeView
+@enduml

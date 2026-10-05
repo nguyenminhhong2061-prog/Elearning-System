@@ -1,0 +1,134 @@
+@startuml de-2-bai-tap
+!include _style.iuml
+
+class Learner <<ngoai>>
+
+class ExerciseLesson {
+  -id : Long
+  -skill : ExerciseSkill
+  -title : String
+  -description : String
+  -topic : String
+  -level : CefrLevel
+  -difficulty : Difficulty
+  -estimatedDuration : int
+  -status : LessonStatus
+  -readingPassages : List<ReadingPassage>
+  -listeningPassage : ListeningPassage
+  -pronunciationItems : List<PronunciationItem>
+  -questions : List<ExerciseQuestion>
+}
+class ReadingPassage {
+  -id : Long
+  -title : String
+  -content : String
+}
+class ListeningPassage {
+  -id : Long
+  -title : String
+  -audio : String
+  -duration : int
+  -transcript : String
+  -translation : String
+  -segments : List<ListeningSegment>
+}
+class ListeningSegment {
+  -id : Long
+  -orderNo : int
+  -startTime : int
+  -endTime : int
+  -speaker : String
+  -transcript : String
+  -translation : String
+}
+class PronunciationItem {
+  -id : Long
+  -sampleText : String
+  -ipa : String
+  -sampleAudio : String
+  -notes : String
+}
+class PronunciationAttempt {
+  -id : Long
+  -attemptNo : int
+  -recording : String
+  -accuracyScore : float
+  -fluencyScore : float
+  -overallScore : float
+  -aiFeedback : String
+  -practicedTime : LocalDateTime
+  -learner : Learner
+  -item : PronunciationItem
+}
+
+abstract class Question {
+  -id : Long
+  -type : QuestionType
+  -content : String
+  -score : float
+  -options : List<AnswerOption>
+  -acceptedAnswers : List<AcceptedAnswer>
+}
+class ExerciseQuestion {
+  -hint : String
+  -explanation : String
+  -readingPassage : ReadingPassage
+  -sampleAnswers : List<SampleAnswer>
+}
+class AnswerOption {
+  -id : Long
+  -content : String
+  -isCorrect : boolean
+}
+class AcceptedAnswer {
+  -id : Long
+  -content : String
+}
+class SampleAnswer {
+  -id : Long
+  -content : String
+}
+
+class ExerciseAttempt {
+  -id : Long
+  -status : AttemptStatus
+  -maxScore : float
+  -score : Float
+  -percent : Float
+  -startTime : LocalDateTime
+  -endTime : LocalDateTime
+  -learner : Learner
+  -lesson : ExerciseLesson
+  -answers : List<ExerciseAnswer>
+}
+class ExerciseAnswer {
+  -id : Long
+  -answerText : String
+  -isCorrect : Boolean
+  -score : Float
+  -aiFeedback : String
+  -question : ExerciseQuestion
+  -selectedOption : AnswerOption
+}
+
+ExerciseLesson "1" *-- "*" ReadingPassage
+ExerciseLesson "1" *-- "0..1" ListeningPassage
+ListeningPassage "1" *-- "*" ListeningSegment
+ExerciseLesson "1" *-- "*" PronunciationItem
+ExerciseLesson "1" *-- "*" ExerciseQuestion
+
+Question <|-- ExerciseQuestion
+Question "1" *-- "*" AnswerOption
+Question "1" *-- "*" AcceptedAnswer
+ExerciseQuestion "1" *-- "*" SampleAnswer
+ExerciseQuestion "*" o-- "0..1" ReadingPassage
+
+PronunciationAttempt "*" o-- "1" Learner
+PronunciationAttempt "*" o-- "1" PronunciationItem
+
+ExerciseAttempt "*" o-- "1" Learner
+ExerciseAttempt "*" o-- "1" ExerciseLesson
+ExerciseAttempt "1" *-- "*" ExerciseAnswer
+ExerciseAnswer "*" o-- "1" ExerciseQuestion
+ExerciseAnswer "*" o-- "0..1" AnswerOption
+@enduml

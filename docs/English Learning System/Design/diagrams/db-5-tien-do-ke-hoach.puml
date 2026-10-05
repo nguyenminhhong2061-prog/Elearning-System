@@ -1,0 +1,66 @@
+@startuml db-5-tien-do-ke-hoach
+!include _style-er.iuml
+
+entity tbl_user <<ngoai>>
+entity tbl_test_attempt <<ngoai>>
+entity tbl_test <<ngoai>>
+
+entity tbl_daily_progress {
+  {field} id : BIGINT  [PK]
+  {field} date : DATE
+  {field} study_minutes : INTEGER
+  {field} learner_id : BIGINT  [FK]
+}
+entity tbl_badge {
+  {field} id : BIGINT  [PK]
+  {field} name : VARCHAR(100)  [U]
+  {field} description : VARCHAR(255)  [N]
+  {field} icon : VARCHAR(255)  [N]
+  {field} condition_type : VARCHAR(20)
+  {field} threshold : INTEGER
+}
+entity tbl_learner_badge {
+  {field} id : BIGINT  [PK]
+  {field} achieved_date : DATE
+  {field} learner_id : BIGINT  [FK]
+  {field} badge_id : BIGINT  [FK]
+}
+entity tbl_study_plan {
+  {field} id : BIGINT  [PK]
+  {field} goal : TEXT
+  {field} target_level : VARCHAR(2)
+  {field} start_date : DATE
+  {field} end_date : DATE
+  {field} status : VARCHAR(20)
+  {field} learner_id : BIGINT  [FK]
+  {field} source_attempt_id : BIGINT  [FK, N]
+}
+entity tbl_study_week {
+  {field} id : BIGINT  [PK]
+  {field} week_no : INTEGER
+  {field} description : TEXT  [N]
+  {field} target_words : INTEGER
+  {field} target_exercises : INTEGER
+  {field} study_plan_id : BIGINT  [FK]
+}
+entity tbl_reminder {
+  {field} id : BIGINT  [PK]
+  {field} type : VARCHAR(20)
+  {field} remind_time : TIMESTAMP
+  {field} content : VARCHAR(500)
+  {field} is_sent : BOOLEAN
+  {field} learner_id : BIGINT  [FK]
+  {field} test_id : BIGINT  [FK, N]
+  {field} study_week_id : BIGINT  [FK, U, N]
+}
+
+tbl_user ||--o{ tbl_daily_progress
+tbl_user ||--o{ tbl_learner_badge
+tbl_badge ||--o{ tbl_learner_badge
+tbl_user ||--o{ tbl_study_plan
+tbl_test_attempt |o--o{ tbl_study_plan
+tbl_study_plan ||--o{ tbl_study_week
+tbl_user ||--o{ tbl_reminder
+tbl_test |o--o{ tbl_reminder
+tbl_study_week |o--o| tbl_reminder
+@enduml

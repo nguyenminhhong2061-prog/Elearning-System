@@ -1,0 +1,71 @@
+@startuml de-4-kiem-tra
+!include _style.iuml
+
+class Learner <<ngoai>>
+class Vocabulary <<ngoai>>
+abstract class Question <<ngoai>>
+class AnswerOption <<ngoai>>
+
+class Test {
+  -id : Long
+  -title : String
+  -type : TestType
+  -skill : String
+  -instruction : String
+  -openDate : LocalDate
+  -closeDate : LocalDate
+  -status : TestStatus
+  -materials : List<TestMaterial>
+  -questions : List<TestQuestion>
+}
+class TestMaterial {
+  -id : Long
+  -type : MaterialType
+  -title : String
+  -audio : String
+  -text : String
+}
+class TestQuestion {
+  -skill : TestSkill
+  -material : TestMaterial
+  -vocabulary : Vocabulary
+}
+class TestAttempt {
+  -id : Long
+  -startTime : LocalDateTime
+  -submitTime : LocalDateTime
+  -status : AttemptStatus
+  -totalScore : Float
+  -listeningScore : Float
+  -speakingScore : Float
+  -readingScore : Float
+  -writingScore : Float
+  -suggestedLevel : CefrLevel
+  -suggestedRoadmap : String
+  -learner : Learner
+  -test : Test
+  -answers : List<TestAnswer>
+}
+class TestAnswer {
+  -id : Long
+  -answerText : String
+  -recording : String
+  -isCorrect : Boolean
+  -score : Float
+  -aiFeedback : String
+  -question : TestQuestion
+  -selectedOption : AnswerOption
+}
+
+Test "1" *-- "*" TestMaterial
+Test "1" *-- "*" TestQuestion
+TestQuestion "*" o-- "0..1" TestMaterial
+TestQuestion "*" o-- "0..1" Vocabulary
+Question <|-- TestQuestion
+
+TestAttempt "*" o-- "1" Learner
+TestAttempt "*" o-- "1" Test
+TestAttempt "1" *-- "*" TestAnswer
+TestAnswer "*" o-- "1" TestQuestion
+TestAnswer "*" o-- "0..1" AnswerOption
+@enduml

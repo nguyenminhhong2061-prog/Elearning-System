@@ -1,0 +1,83 @@
+@startuml ds-b2-hoc-the
+!include _style-ds.iuml
+
+actor "Người học" as NH
+box "Frontend (React)" #FAFAFA
+  boundary FlashcardPage
+  boundary SessionSummary
+  boundary TopicDetailPage
+end box
+box "Backend (Spring Boot)" #FAFAFA
+  control FlashcardController
+  control VocabularyDAO
+  control LearnerVocabularyDAO
+  control DailyProgressDAO
+  control FlashcardSummaryDAO
+  entity Vocabulary
+  entity VocabularyReview
+  entity LearnerVocabulary
+  entity FlashcardSummary
+end box
+
+activate FlashcardPage
+FlashcardPage -> FlashcardPage : loadWords()
+FlashcardPage -> FlashcardController ++ : GET /api/flashcard/words (chủ đề Du lịch)
+FlashcardController -> FlashcardController : getWordsToStudy()
+FlashcardController -> VocabularyDAO ++ : gọi
+VocabularyDAO -> VocabularyDAO : getWordsToStudy()
+loop mỗi từ của phiên (30 từ)
+  VocabularyDAO -> Vocabulary ++ : gọi
+  Vocabulary -> Vocabulary : Vocabulary()
+  Vocabulary --> VocabularyDAO -- : trả về
+end
+VocabularyDAO --> FlashcardController -- : trả về 30 từ (2 đến hạn xếp trước, 28 chưa học)
+FlashcardController --> FlashcardPage -- : 200, JSON 30 từ
+FlashcardPage --> NH : hiển thị "Học chủ đề: Du lịch", "1/30", từ "itinerary" (tự phát âm)
+
+loop mỗi thẻ, đến khi Lan click "Kết thúc" (Lan đánh giá 4 thẻ)
+  NH -> FlashcardPage : bấm vào thẻ
+  FlashcardPage -> FlashcardPage : handleFlip()
+  FlashcardPage --> NH : hiển thị mặt sau
+  NH -> FlashcardPage : click mức nhớ (thẻ 1: "Nhớ mơ hồ")
+  FlashcardPage -> FlashcardPage : handleRate()
+  FlashcardPage -> FlashcardController ++ : POST /api/flashcard/reviews (itinerary, VAGUE)
+  FlashcardController -> FlashcardController : reviewWord()
+  FlashcardController -> LearnerVocabularyDAO ++ : gọi
+  LearnerVocabularyDAO -> LearnerVocabularyDAO : reviewWord()
+  LearnerVocabularyDAO -> VocabularyReview ++ : gọi
+  VocabularyReview -> VocabularyReview : VocabularyReview()
+  VocabularyReview --> LearnerVocabularyDAO -- : trả về lượt ôn (06/10/2026, nhớ mơ hồ)
+  LearnerVocabularyDAO -> LearnerVocabulary ++ : gọi
+  LearnerVocabulary -> LearnerVocabulary : LearnerVocabulary(), setter
+  LearnerVocabulary --> LearnerVocabularyDAO -- : trả về
+  LearnerVocabularyDAO --> FlashcardController -- : trả về trạng thái mới (đang học, ôn lại 10/10/2026)
+  FlashcardController --> FlashcardPage -- : 200, JSON trạng thái mới
+  FlashcardPage --> NH : thêm một chấm tiến độ, hiển thị thẻ tiếp theo
+end
+
+NH -> FlashcardPage : click "Kết thúc" (ở thẻ 5/30)
+FlashcardPage -> FlashcardPage : handleFinish()
+FlashcardPage -> FlashcardController ++ : POST /api/flashcard/sessions/finish (chủ đề Du lịch, thời điểm bắt đầu phiên)
+FlashcardController -> FlashcardController : finishSession()
+FlashcardController -> DailyProgressDAO ++ : gọi
+DailyProgressDAO -> DailyProgressDAO : updateProgress()
+DailyProgressDAO --> FlashcardController -- : trả về
+FlashcardController -> FlashcardSummaryDAO ++ : gọi
+FlashcardSummaryDAO -> FlashcardSummaryDAO : getSessionSummary()
+FlashcardSummaryDAO -> FlashcardSummary ++ : gọi
+FlashcardSummary -> FlashcardSummary : FlashcardSummary()
+FlashcardSummary --> FlashcardSummaryDAO -- : trả về
+FlashcardSummaryDAO --> FlashcardController -- : trả về 4 thẻ; chưa nhớ 1, nhớ mơ hồ 1, nhớ rõ 2; 5 từ cần ôn ngày 07/10/2026
+FlashcardController --> FlashcardPage -- : 200, JSON kết quả tổng kết
+FlashcardPage -> SessionSummary ++ : hiện (truyền kết quả tổng kết)
+SessionSummary --> NH : hiển thị "Hoàn thành phiên học · Du lịch"
+
+NH -> SessionSummary : click "Về chủ đề"
+SessionSummary -> SessionSummary : handleBackToTopic()
+SessionSummary -> TopicDetailPage ++ : chuyển trang
+deactivate SessionSummary
+deactivate FlashcardPage
+ref over TopicDetailPage, FlashcardController : loadTopic() và loadWords() như hình b1: Du lịch đã học 14/40
+TopicDetailPage --> NH : hiển thị lại trang chủ đề, các từ vừa học có dấu đã học
+deactivate TopicDetailPage
+@enduml
