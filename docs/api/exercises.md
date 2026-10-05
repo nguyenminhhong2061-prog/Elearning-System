@@ -175,7 +175,7 @@ Sắp xếp "cơ bản đến nâng cao" (B1): `cefr_level` A1 → C2, rồi `so
   ```json
   {
     "title": "Hội thoại tại sân bay",
-    "audioUrl": "/media/listening/airport.mp3",
+    "audioUrl": "/media/r2/media/listening/airport.mp3",
     "durationMs": 110000,
     "segments": [
       { "id": 501, "order": 1, "startMs": 0, "endMs": 6200, "speaker": "Hành khách", "transcript": "Excuse me, could you tell me where the check-in counter for flight VN209 is?" }
@@ -184,8 +184,9 @@ Sắp xếp "cơ bản đến nâng cao" (B1): `cefr_level` A1 → C2, rồi `so
   ```
 
   `segments` là phụ đề (người học bật "Hiện phụ đề" mới thấy); **không** kèm bản dịch (`translation_vi` chỉ trả sau khi
-  nộp bài, để đối chiếu). `speaker` có thể `null`. `audioUrl` phải phát được trực tiếp bằng thẻ `<audio>` (cùng origin
-  hoặc có CORS), hỗ trợ HTTP Range để tua.
+  nộp bài, để đối chiếu). `speaker` có thể `null`. Khi bật R2 proxy, `audioUrl` trỏ tới `/media/r2/<object-key>`;
+  endpoint GET/HEAD chỉ đọc audio trong `media/listening/`, hỗ trợ HTTP Range để thẻ `<audio>` tua được và không cần JWT.
+  Khi tắt R2 proxy, backend giữ nguyên URI local hoặc URL công khai đã lưu.
 - `pronunciationItems` (chỉ `PRONUNCIATION`, còn lại `[]`), theo `sort_order`:
 
   ```json
@@ -364,32 +365,43 @@ bài hoặc chưa được trả lời trong lượt.
 Body là **file âm thanh thô** (không phải multipart), `Content-Type: audio/wav`: WAV PCM 16 bit, **16 kHz, một kênh**,
 tối đa 10 giây (giao diện tự dừng ở 10 giây). Trình duyệt tự chuyển bản ghi sang định dạng này trước khi gửi.
 
-> Vì sao WAV 16 kHz mono: đây là định dạng mọi dịch vụ nhận diện giọng nói đều nhận (Azure Speech pronunciation
-> assessment, Google Speech-to-Text `LINEAR16`, Whisper), nên backend không cần `ffmpeg` để chuyển đổi. Bản ghi mặc định
-> của trình duyệt thì khác nhau (Chrome: WebM/Opus, Safari: MP4/AAC). 10 giây ≈ 320 KB.
+> Vì sao WAV 16 kHz mono: đây là định dạng giao diện tạo ổn định trước khi gửi. OpenPronounce nhận file qua multipart ở
+> dịch vụ Python và tự nạp audio bằng `ffmpeg`/`espeak-ng` trong container. Bản ghi mặc định của trình duyệt thì khác nhau
+> (Chrome: WebM/Opus, Safari: MP4/AAC). 10 giây PCM ≈ 320 KB.
 
-Backend gửi file cho dịch vụ AI, lưu một dòng `pronunciation_attempts` (`try_number` tăng dần theo mục trong lượt; điểm;
-`assessment_details` là JSON gốc của dịch vụ), rồi trả `201`:
+Backend xác minh lượt/mục thuộc người học hiện tại, chuyển WAV cùng `reference_text` tới OpenPronounce ở
+`OPENPRONOUNCE_BASE_URL` (mặc định `http://localhost:8001`), lưu một dòng `pronunciation_attempts` (`try_number` tăng dần
+theo mục trong lượt; `overall_score`; `accuracy_score` là tỷ lệ khớp âm vị; `assessment_details` là JSON gốc), rồi trả `201`:
 
 ```json
 {
   "itemId": 801,
   "tryNumber": 2,
   "overallScore": 86,
-  "accuracyScore": 90,
-  "fluencyScore": 78,
-  "completenessScore": 92,
+  "phonemeAccuracyScore": 90,
+  "wordAccuracyScore": 82,
   "recognizedText": "sustainability",
-  "words": [ { "word": "sustainability", "accuracyScore": 88, "errorType": "NONE" } ],
-  "tips": [ "Nhấn mạnh âm tiết \"bil\" rõ hơn." ]
+  "errors": [ {
+    "word": "sustainability",
+    "expectedIpa": "səsteɪnəbɪləti",
+    "heardIpa": "səsteɪnəbɪləti",
+    "confidence": 72,
+    "errorType": "MISPRONUNCIATION",
+    "phones": [ { "expected": "ɪ", "heard": "i", "confidence": 72 } ]
+  } ],
+  "tips": [ "Kiểm tra lại từ sustainability: mong đợi IPA, hệ thống nghe IPA." ]
 }
 ```
 
-- Điểm từ 0 đến 100 (số). `words`: các từ của câu mẫu theo thứ tự (dùng để tô màu từ đọc sai), `OMISSION` là từ bị bỏ
-  sót. `tips`: gợi ý cải thiện bằng tiếng Việt (B3), có thể `[]`.
-- `400`: không phải WAV hợp lệ, hoặc ngắn hơn 0,3 giây. `413`: lớn hơn 1 MB. `422`: không nhận diện được giọng nói
-  (ngoại lệ B3, giao diện báo "không nhận diện được, thử lại"; **không** lưu dòng nào). `503`: dịch vụ AI lỗi hoặc
-  quá thời gian (backend nên tự cắt ở khoảng 20 giây). Giao diện chờ tối đa 60 giây.
+- `overallScore`: điểm tổng OpenPronounce 0–100. `phonemeAccuracyScore` và `wordAccuracyScore` là tỷ lệ khớp được
+  quy đổi từ phoneme/word error rate nên chỉ mang tính xấp xỉ; không phải điểm fluency của Azure.
+- `errors`: các từ bị mô hình gắn cờ cùng IPA dự kiến/nhận dạng. `confidence` là độ tin cậy của cảnh báo, không phải
+  điểm phát âm của từ. `phones` có thể rỗng nếu upstream tắt phone model. `tips` được backend tạo từ IPA để đối chiếu.
+- `400`: WAV không hợp lệ hoặc lớn hơn 1 MB. Giao diện từ chối bản ghi ngắn hơn 0,3 giây trước khi gửi. `503`: service
+  OpenPronounce lỗi hoặc timeout; khi đó không lưu dòng đánh giá. Giao diện chờ tối đa 10 phút để lần chấm đầu có thời
+  gian tải model.
+- OpenPronounce là mô hình ước lượng, không phải chấm chuẩn giáo viên; cảnh báo sai vẫn có thể xảy ra. Cách chạy local,
+  cache model và hạn chế xem tại [`docs/api/pronunciation.md`](pronunciation.md).
 
 ## Việc backend cần làm (gợi ý cho Đạt)
 
@@ -397,9 +409,9 @@ Backend gửi file cho dịch vụ AI, lưu một dòng `pronunciation_attempts`
    `common.persistence`), module `modules/exercise`. Thay đổi ngày 02/10 ở mục cuối.
 2. Seed nội dung mẫu bằng migration Flyway đặt tên theo thời gian (`V<yyyyMMddHHmm>__seed_exercises.sql`). Dữ liệu giả
    trong `frontend/mock/exerciseFixtures.js` dùng làm mẫu được.
-3. File audio: đặt trong `src/main/resources/static/media/…` (Spring phục vụ luôn, hỗ trợ Range) hoặc một kho lưu trữ
-   ngoài. Nếu đặt trong `static/`, cần mở quyền `permitAll` cho `/media/**` trong `SecurityConfig` (thẻ `<audio>` không gửi
-   được header `Authorization`).
+3. File audio: có thể đặt trong `src/main/resources/static/media/…` hoặc bucket R2 `learning-audio`. Với R2, backend
+   dùng token S3 chỉ-đọc để stream qua `/media/r2/**`; giới hạn khóa object vào prefix `media/listening/`, và mở GET/HEAD
+   `permitAll` vì thẻ `<audio>` không gửi được header `Authorization`.
 4. Chấm điểm là hàm thuần (so khớp đáp án, tính phần trăm), dễ viết unit test. Luật "làm tiếp được" (kỹ năng, 7 ngày,
    `updated_at` của bài) cũng nên là một hàm thuần nhận thời điểm hiện tại, để test không phụ thuộc đồng hồ.
    "Hoạt động cuối" là giá trị lớn nhất của `question_responses.answered_at`, `pronunciation_attempts.assessed_at` và

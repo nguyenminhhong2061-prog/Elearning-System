@@ -65,7 +65,7 @@ async function record(user) {
 }
 
 describe('pronunciation exercise', () => {
-  it('plays the model, records the learner, sends the WAV and shows the score with word feedback and tips', async () => {
+  it('plays the model, records the learner, sends the WAV and shows OpenPronounce IPA feedback', async () => {
     app = renderApp('/exercises/lessons/21', pronunciationRoutes())
     const user = userEvent.setup()
     const card = (await screen.findByText('Từ 1/2')).closest('section')
@@ -80,18 +80,18 @@ describe('pronunciation exercise', () => {
 
     expect(await screen.findByRole('img', { name: 'Điểm phát âm 86 trên 100' })).toBeInTheDocument()
     expect(app.callsTo(RECORDING)[0].body).toBe(WAV)
-    expect(card).toHaveTextContent('Chính xác 90 · Trôi chảy 78')
-    expect(card).not.toHaveTextContent('Đầy đủ')
-    expect(card).not.toHaveTextContent('55 điểm') // a single word is not repeated below the score
+    expect(card).toHaveTextContent('Khớp âm vị ≈90% · Khớp từ ≈82%')
+    expect(card).toHaveTextContent('Âm dự kiến /səsteɪnəbɪləti/')
+    expect(card).toHaveTextContent('/ɪ/ → /i/')
     expect(card).toHaveTextContent('Máy nghe được: “sustainability”')
-    expect(card).toHaveTextContent('Nhấn mạnh âm tiết "bil" rõ hơn.')
+    expect(card).toHaveTextContent('Kiểm tra lại phát âm từ sustainability.')
     expect(within(card).getByRole('button', { name: '▶ Nghe lại giọng bạn' })).toBeInTheDocument()
 
     await user.click(within(card).getByRole('button', { name: 'Thử lại' }))
     expect(screen.getByRole('button', { name: 'Bắt đầu ghi âm' })).toBeInTheDocument()
   })
 
-  it('colours each word of a sentence by how well it was said', async () => {
+  it('shows phoneme substitutions and omitted words in a sentence', async () => {
     app = renderApp(
       '/exercises/lessons/21',
       pronunciationRoutes({
@@ -100,10 +100,16 @@ describe('pronunciation exercise', () => {
           data: {
             ...ASSESSMENT,
             itemId: 802,
-            words: [
-              { word: 'We', accuracyScore: 95, errorType: 'NONE' },
-              { word: 'reach', accuracyScore: 52, errorType: 'MISPRONUNCIATION' },
-              { word: 'agreement', accuracyScore: 0, errorType: 'OMISSION' },
+            errors: [
+              {
+                word: 'reach', expectedIpa: 'riːtʃ', heardIpa: 'riːs', confidence: 76,
+                errorType: 'MISPRONUNCIATION',
+                phones: [{ expected: 'tʃ', heard: 's', confidence: 82 }],
+              },
+              {
+                word: 'agreement', expectedIpa: 'əɡriːmənt', heardIpa: '', confidence: 91,
+                errorType: 'OMISSION', phones: [],
+              },
             ],
           },
         }),
@@ -116,9 +122,10 @@ describe('pronunciation exercise', () => {
     await record(user)
 
     await screen.findByRole('img', { name: /Điểm phát âm/ })
-    expect(card).toHaveTextContent('We (95 điểm)')
-    expect(card).toHaveTextContent('reach (52 điểm, đọc chưa chuẩn)')
-    expect(card).toHaveTextContent('agreement (0 điểm, bị bỏ sót)')
+    expect(card).toHaveTextContent('reach')
+    expect(card).toHaveTextContent('/tʃ/ → /s/')
+    expect(card).toHaveTextContent('agreement')
+    expect(card).toHaveTextContent('không nghe rõ')
   })
 
   it('explains a recording without speech, a blocked microphone, and a recording that is too short', async () => {

@@ -112,11 +112,10 @@
  * @property {number} itemId
  * @property {number} tryNumber
  * @property {number} overallScore
- * @property {number} accuracyScore
- * @property {number} fluencyScore
- * @property {number} completenessScore
+ * @property {number} phonemeAccuracyScore Approximate 0–100 phoneme match rate from the recognizer.
+ * @property {number} wordAccuracyScore Approximate 0–100 word match rate from the recognizer.
  * @property {string} recognizedText
- * @property {Array<{ word: string, accuracyScore: number, errorType: WordErrorType }>} words
+ * @property {Array<{ word: string, expectedIpa: string, heardIpa: string, confidence: number, errorType: WordErrorType, phones: Array<{ expected: string, heard: string, confidence: number }> }>} errors
  * @property {string[]} tips
  *
  * @typedef {object} AttemptProgress what was already done in an attempt when the lesson was opened

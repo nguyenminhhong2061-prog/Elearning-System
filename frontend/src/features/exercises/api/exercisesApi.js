@@ -4,6 +4,8 @@ import { httpClient } from '@/api/httpClient'
 
 /** Grading a recording goes through an AI service, which can take much longer than the default 15s. */
 export const AI_TIMEOUT_MS = 60_000
+// OpenPronounce downloads two model checkpoints the first time it assesses a recording.
+export const PRONUNCIATION_TIMEOUT_MS = 600_000
 
 // Until the backend follows the 02/10/2026 contract (grammar replaced by reading and writing), it still answers with
 // the GRAMMAR skill and does not know READING or WRITING. A grammar lesson is a reading lesson without a passage
@@ -102,7 +104,7 @@ export async function completeAttempt(attemptId, { responses = [], playbackRate 
 export async function assessPronunciation(attemptId, itemId, wav) {
   const { data } = await httpClient.post(`/api/exercise-attempts/${attemptId}/pronunciation/${itemId}`, wav, {
     headers: { 'Content-Type': 'audio/wav' },
-    timeout: AI_TIMEOUT_MS,
+    timeout: PRONUNCIATION_TIMEOUT_MS,
   })
   return data
 }

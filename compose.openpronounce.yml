@@ -1,0 +1,31 @@
+# Optional local pronunciation assessor. Kept separate from docker-compose.yml because
+# its CPU ML dependencies and model checkpoints are large.
+services:
+  openpronounce:
+    build:
+      context: .
+      dockerfile: services/openpronounce/Dockerfile
+      args:
+        OPENPRONOUNCE_REF: ${OPENPRONOUNCE_REF:-main}
+    container_name: datn-openpronounce
+    restart: unless-stopped
+    environment:
+      OPENPRONOUNCE_DEVICE: ${OPENPRONOUNCE_DEVICE:-cpu}
+      OPENPRONOUNCE_TTS: ${OPENPRONOUNCE_TTS:-gtts}
+    ports:
+      - "127.0.0.1:${OPENPRONOUNCE_PORT:-8001}:8000"
+    volumes:
+      - openpronounce-models:/models
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  openpronounce-models:
