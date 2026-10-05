@@ -5,6 +5,8 @@ import com.example.datn.common.event.TestCompletedEvent;
 import com.example.datn.common.security.CurrentUser;
 import com.example.datn.common.user.LevelRecorder;
 import com.example.datn.modules.test.dto.request.SaveAnswerRequest;
+import com.example.datn.modules.test.dto.response.PassagePlayResponse;
+import com.example.datn.modules.test.dto.response.PassageReviewResponse;
 import com.example.datn.modules.test.dto.response.ReviewItemResponse;
 import com.example.datn.modules.test.dto.response.SavedAnswerResponse;
 import com.example.datn.modules.test.dto.response.SkillScoreResponse;
@@ -13,19 +15,26 @@ import com.example.datn.modules.test.dto.response.TestResultResponse;
 import com.example.datn.modules.test.entity.Test;
 import com.example.datn.modules.test.entity.TestAttempt;
 import com.example.datn.modules.test.entity.TestAttemptAnswer;
+import com.example.datn.modules.test.entity.TestPassage;
+import com.example.datn.modules.test.entity.TestPassagePlay;
 import com.example.datn.modules.test.entity.TestQuestion;
 import com.example.datn.modules.test.entity.TestQuestionAcceptedAnswer;
 import com.example.datn.modules.test.entity.TestQuestionOption;
 import com.example.datn.modules.test.enums.TestAttemptStatus;
-import com.example.datn.modules.test.enums.TestQuestionType;
 import com.example.datn.modules.test.enums.TestSkill;
 import com.example.datn.modules.test.enums.TestType;
 import com.example.datn.modules.test.exception.InvalidTestAnswerException;
+import com.example.datn.modules.test.exception.ListenLimitReachedException;
 import com.example.datn.modules.test.exception.TestAttemptNotFoundException;
 import com.example.datn.modules.test.exception.TestAttemptNotInProgressException;
+import com.example.datn.modules.test.exception.TestAttemptNotSubmittedException;
 import com.example.datn.modules.test.exception.TestNotFoundException;
+import com.example.datn.modules.test.exception.TestPassageNotFoundException;
+import com.example.datn.modules.test.exception.TestRetakeNotAllowedException;
 import com.example.datn.modules.test.repository.TestAttemptAnswerRepository;
 import com.example.datn.modules.test.repository.TestAttemptRepository;
+import com.example.datn.modules.test.repository.TestPassagePlayRepository;
+import com.example.datn.modules.test.repository.TestPassageRepository;
 import com.example.datn.modules.test.repository.TestQuestionAcceptedAnswerRepository;
 import com.example.datn.modules.test.repository.TestQuestionOptionRepository;
 import com.example.datn.modules.test.repository.TestQuestionRepository;
@@ -35,9 +44,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Instant;
-import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -47,12 +54,16 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/** Runs a test attempt: start/resume, save answers, submit with grading, and read the result. */
+/** Runs a test attempt: start/resume, save answers, submit (graded by {@link TestGradingService}), read the result. */
 @Service
 @Transactional
 public class TestAttemptService {
 
+    private static final List<TestAttemptStatus> COMPLETED = List.of(TestAttemptStatus.SUBMITTED, TestAttemptStatus.GRADED);
+
     private final TestRepository testRepository;
+    private final TestPassageRepository passageRepository;
+    private final TestPassagePlayRepository playRepository;
     private final TestQuestionRepository questionRepository;
     private final TestQuestionOptionRepository optionRepository;
     private final TestQuestionAcceptedAnswerRepository acceptedAnswerRepository;
@@ -61,12 +72,14 @@ public class TestAttemptService {
     private final TestService testService;
     private final CurrentUser currentUser;
     private final TestCalendar calendar;
-    private final TestAiGateway aiGateway;
+    private final TestGradingService gradingService;
     private final LevelRecorder levelRecorder;
     private final ApplicationEventPublisher eventPublisher;
 
     public TestAttemptService(
             TestRepository testRepository,
+            TestPassageRepository passageRepository,
+            TestPassagePlayRepository playRepository,
             TestQuestionRepository questionRepository,
             TestQuestionOptionRepository optionRepository,
             TestQuestionAcceptedAnswerRepository acceptedAnswerRepository,
@@ -75,10 +88,12 @@ public class TestAttemptService {
             TestService testService,
             CurrentUser currentUser,
             TestCalendar calendar,
-            TestAiGateway aiGateway,
+            TestGradingService gradingService,
             LevelRecorder levelRecorder,
             ApplicationEventPublisher eventPublisher) {
         this.testRepository = testRepository;
+        this.passageRepository = passageRepository;
+        this.playRepository = playRepository;
         this.questionRepository = questionRepository;
         this.optionRepository = optionRepository;
         this.acceptedAnswerRepository = acceptedAnswerRepository;
@@ -87,21 +102,31 @@ public class TestAttemptService {
         this.testService = testService;
         this.currentUser = currentUser;
         this.calendar = calendar;
-        this.aiGateway = aiGateway;
+        this.gradingService = gradingService;
         this.levelRecorder = levelRecorder;
         this.eventPublisher = eventPublisher;
     }
 
     public StartAttemptResponse start(Long testId, boolean restart) {
-        testService.findOpen(testId);
+        Test test = testService.findOpen(testId);
         Long userId = currentUser.id();
 
         TestAttempt attempt = attemptRepository
                 .findFirstByTestIdAndUserIdAndStatusOrderByIdDesc(testId, userId, TestAttemptStatus.IN_PROGRESS)
                 .orElse(null);
 
+        if (!test.getType().retakeAllowed()) {
+            // Taken once: a submitted attempt is final, and the one in progress cannot be thrown away to start over
+            // (that would also hand back the plays of its recordings).
+            boolean submitted = attempt == null
+                    && attemptRepository.existsByTestIdAndUserIdAndStatusIn(testId, userId, COMPLETED);
+            if (submitted || (restart && attempt != null)) {
+                throw new TestRetakeNotAllowedException(testId);
+            }
+        }
+
         if (restart && attempt != null) {
-            // Deleting the attempt cascades to its answers (test_attempt_answers.attempt_id ON DELETE CASCADE).
+            // Deleting the attempt cascades to its answers and plays (attempt_id ON DELETE CASCADE).
             attemptRepository.delete(attempt);
             attempt = null;
         }
@@ -111,7 +136,29 @@ public class TestAttemptService {
             attempt = attemptRepository.save(new TestAttempt(testId, userId));
         }
 
-        return new StartAttemptResponse(attempt.getId(), resumed, attempt.getStatus(), savedAnswers(attempt.getId()));
+        return new StartAttemptResponse(attempt.getId(), resumed, attempt.getStatus(), savedAnswers(attempt.getId()),
+                passagePlays(attempt.getId()));
+    }
+
+    /**
+     * Counts one play of a passage's recording, refused once the attempt has used them all. The client asks before
+     * each play, so the count survives a reload and a resumed attempt.
+     */
+    public PassagePlayResponse recordPlay(Long attemptId, Long passageId) {
+        TestAttempt attempt = inProgressOwnedAttempt(attemptId);
+        passageRepository.findById(passageId)
+                .filter(passage -> passage.getTestId().equals(attempt.getTestId()) && passage.hasAudio())
+                .orElseThrow(() -> new TestPassageNotFoundException(passageId));
+
+        TestPassagePlay play = playRepository.findByAttemptIdAndPassageId(attemptId, passageId)
+                .orElseGet(() -> new TestPassagePlay(attemptId, passageId));
+        if (play.getPlayCount() >= TestPassage.MAX_PLAYS) {
+            throw new ListenLimitReachedException(passageId);
+        }
+        play.countPlay();
+        playRepository.save(play);
+
+        return new PassagePlayResponse(passageId, play.getPlayCount(), TestPassage.MAX_PLAYS);
     }
 
     public void saveAnswer(Long attemptId, Long questionId, SaveAnswerRequest request) {
@@ -153,83 +200,15 @@ public class TestAttemptService {
         TestAttempt attempt = inProgressOwnedAttempt(attemptId);
         Test test = testRepository.findById(attempt.getTestId())
                 .orElseThrow(() -> new TestNotFoundException(attempt.getTestId()));
-        List<TestQuestion> questions = questionRepository.findByTestIdOrderByIdAsc(test.getId());
-        List<Long> questionIds = questions.stream().map(TestQuestion::getId).toList();
-
-        Map<Long, List<TestQuestionOption>> optionsByQuestion = optionsOf(questionIds);
-        Map<Long, List<TestQuestionAcceptedAnswer>> acceptedByQuestion = acceptedAnswersOf(questionIds);
-        Map<Long, TestAttemptAnswer> answerByQuestion = answerRepository.findByAttemptId(attemptId).stream()
-                .collect(Collectors.toMap(TestAttemptAnswer::getQuestionId, Function.identity()));
-
-        Map<TestSkill, Integer> skillPoints = new EnumMap<>(TestSkill.class);
-        Map<TestSkill, BigDecimal> skillEarned = new EnumMap<>(TestSkill.class);
-        Set<TestSkill> pendingSkills = EnumSet.noneOf(TestSkill.class);
-
-        for (TestQuestion question : questions) {
-            TestSkill skill = effectiveSkill(question);
-            skillPoints.merge(skill, question.getPoints(), Integer::sum);
-
-            TestAttemptAnswer answer = answerByQuestion.get(question.getId());
-            if (answer == null) {
-                continue; // unanswered: contributes 0 points, not persisted
-            }
-
-            List<TestQuestionOption> options = optionsByQuestion.getOrDefault(question.getId(), List.of());
-            List<TestQuestionAcceptedAnswer> accepted = acceptedByQuestion.getOrDefault(question.getId(), List.of());
-
-            if (!options.isEmpty()) {
-                boolean correct = gradeOption(answer, options);
-                answer.grade(correct, correct ? BigDecimal.valueOf(question.getPoints()) : BigDecimal.ZERO);
-            } else if (!accepted.isEmpty()) {
-                boolean correct = gradeText(answer, accepted);
-                answer.grade(correct, correct ? BigDecimal.valueOf(question.getPoints()) : BigDecimal.ZERO);
-            } else if (question.getQuestionType() == TestQuestionType.SPEAKING
-                    || question.getQuestionType() == TestQuestionType.WRITING) {
-                Optional<Integer> score = gradeAi(question, answer);
-                if (score.isPresent()) {
-                    answer.grade(null, scaledPoints(question.getPoints(), score.get()));
-                } else {
-                    answer.grade(null, BigDecimal.ZERO);
-                    pendingSkills.add(skill);
-                }
-            }
-
-            skillEarned.merge(skill, answer.getScoreEarned(), BigDecimal::add);
-            answerRepository.save(answer);
-        }
-
-        Map<TestSkill, Integer> skillScores = new EnumMap<>(TestSkill.class);
-        for (Map.Entry<TestSkill, Integer> entry : skillPoints.entrySet()) {
-            if (pendingSkills.contains(entry.getKey())) {
-                continue;
-            }
-            skillScores.put(entry.getKey(), percent(skillEarned.getOrDefault(entry.getKey(), BigDecimal.ZERO), entry.getValue()));
-        }
 
         Instant submittedAt = calendar.now();
-        boolean fullyGraded = pendingSkills.isEmpty();
-        BigDecimal totalScore = BigDecimal.ZERO;
-        CefrLevel suggestedLevel = null;
-        String roadmap = null;
-        Map<String, Integer> storedSkillScores = Map.of();
-
-        if (fullyGraded) {
-            int overall = average(skillScores.values());
-            totalScore = BigDecimal.valueOf(overall);
-            suggestedLevel = CefrLevels.fromScore(overall);
-            roadmap = aiGateway.suggestRoadmap(suggestedLevel, skillScores);
-            storedSkillScores = skillScores.entrySet().stream()
-                    .collect(Collectors.toMap(entry -> entry.getKey().dbKey(), Map.Entry::getValue));
-        }
-
-        attempt.grade(totalScore, fullyGraded ? TestAttemptStatus.GRADED : TestAttemptStatus.SUBMITTED,
-                storedSkillScores, suggestedLevel, roadmap, submittedAt);
-        attemptRepository.save(attempt);
+        gradingService.grade(attempt, submittedAt);
+        boolean fullyGraded = attempt.getStatus() == TestAttemptStatus.GRADED;
 
         if (fullyGraded && test.getType() == TestType.COMPREHENSIVE) {
             Optional<CefrLevel> previous = currentUser.currentLevel();
-            if (previous.isEmpty() || previous.get() != suggestedLevel) {
-                levelRecorder.recordLevelChange(currentUser.id(), suggestedLevel, attemptId);
+            if (previous.isEmpty() || previous.get() != attempt.getSuggestedLevel()) {
+                levelRecorder.recordLevelChange(currentUser.id(), attempt.getSuggestedLevel(), attemptId);
             }
         }
 
@@ -238,7 +217,7 @@ public class TestAttemptService {
                 attemptId,
                 test.getId(),
                 test.getType().name(),
-                fullyGraded ? totalScore.intValue() : 0,
+                fullyGraded ? attempt.getTotalScore().intValue() : 0,
                 calendar.today(),
                 submittedAt));
 
@@ -247,7 +226,12 @@ public class TestAttemptService {
 
     @Transactional(readOnly = true)
     public TestResultResponse getResult(Long attemptId) {
-        return buildResult(ownedAttempt(attemptId));
+        TestAttempt attempt = ownedAttempt(attemptId);
+        if (attempt.getStatus() == TestAttemptStatus.IN_PROGRESS) {
+            // The result carries the correct answers and the transcripts: not before the attempt is submitted.
+            throw new TestAttemptNotSubmittedException(attemptId);
+        }
+        return buildResult(attempt);
     }
 
     private TestResultResponse buildResult(TestAttempt attempt) {
@@ -281,23 +265,28 @@ public class TestAttemptService {
                 .toList();
 
         Set<TestSkill> testSkills = questions.stream()
-                .map(question -> effectiveSkill(question))
+                .map(TestGradingService::skillOf)
                 .collect(Collectors.toCollection(() -> EnumSet.noneOf(TestSkill.class)));
         Map<String, SkillScoreResponse> skills = new LinkedHashMap<>();
-        Map<String, Integer> stored = attempt.getSkillScores();
+        Map<String, Integer> storedScores = attempt.getSkillScores();
+        Map<String, CefrLevel> storedLevels = attempt.getSkillLevels();
         for (TestSkill skill : TestSkill.values()) {
             if (!testSkills.contains(skill)) {
                 continue;
             }
-            Integer score = stored == null ? null : stored.get(skill.dbKey());
-            skills.put(skill.apiKey(), new SkillScoreResponse(score, score == null ? null : CefrLevels.fromScore(score)));
+            Integer score = storedScores == null ? null : storedScores.get(skill.dbKey());
+            CefrLevel level = storedLevels == null ? null : storedLevels.get(skill.dbKey());
+            if (level == null && score != null) {
+                level = CefrLevels.fromScore(score); // graded before skill levels were stored
+            }
+            skills.put(skill.apiKey(), new SkillScoreResponse(score, level));
         }
 
         Integer best = null;
         boolean personalBest = false;
         Integer currentScore = attempt.getStatus() == TestAttemptStatus.GRADED ? attempt.getTotalScore().intValue() : null;
         List<TestAttempt> completed = attemptRepository.findByTestIdAndUserIdAndStatusIn(
-                test.getId(), currentUser.id(), List.of(TestAttemptStatus.SUBMITTED, TestAttemptStatus.GRADED));
+                test.getId(), currentUser.id(), COMPLETED);
         Integer previousBest = completed.stream()
                 .filter(other -> other.getStatus() == TestAttemptStatus.GRADED && !other.getId().equals(attempt.getId()))
                 .map(other -> other.getTotalScore().intValue())
@@ -307,6 +296,11 @@ public class TestAttemptService {
             best = previousBest == null ? currentScore : Math.max(previousBest, currentScore);
         }
         personalBest = previousBest != null && currentScore != null && currentScore > previousBest;
+
+        List<PassageReviewResponse> passages = passageRepository.findByTestIdOrderByIdAsc(test.getId()).stream()
+                .map(passage -> new PassageReviewResponse(passage.getId(), passage.getTitle(), passage.getContent(),
+                        passage.getAudioUrl(), passage.getTranscript()))
+                .toList();
 
         return new TestResultResponse(
                 attempt.getId(),
@@ -325,6 +319,7 @@ public class TestAttemptService {
                 attempt.getSuggestedLevel(),
                 attempt.getSuggestedRoadmap(),
                 skills,
+                passages,
                 review);
     }
 
@@ -354,20 +349,30 @@ public class TestAttemptService {
 
         return new ReviewItemResponse(
                 question.getId(),
+                question.getPassageId(),
                 question.getQuestionType(),
+                question.getLevel(),
                 correct,
                 answer == null ? null : answer.getSelectedOptionId(),
                 answer == null ? null : answer.getAnswerContent(),
                 correctOptionId,
                 correctAnswer,
                 question.getPoints(),
-                answer == null ? BigDecimal.ZERO : answer.getScoreEarned());
+                answer == null ? BigDecimal.ZERO : answer.getScoreEarned(),
+                answer == null ? null : answer.getAiCriteria(),
+                answer == null ? null : answer.getAiComment());
     }
 
     private List<SavedAnswerResponse> savedAnswers(Long attemptId) {
         return answerRepository.findByAttemptId(attemptId).stream()
                 .map(answer -> new SavedAnswerResponse(
                         answer.getQuestionId(), answer.getSelectedOptionId(), answer.getAnswerContent()))
+                .toList();
+    }
+
+    private List<PassagePlayResponse> passagePlays(Long attemptId) {
+        return playRepository.findByAttemptId(attemptId).stream()
+                .map(play -> new PassagePlayResponse(play.getPassageId(), play.getPlayCount(), TestPassage.MAX_PLAYS))
                 .toList();
     }
 
@@ -385,58 +390,6 @@ public class TestAttemptService {
         }
         return acceptedAnswerRepository.findByQuestionIdIn(questionIds).stream()
                 .collect(Collectors.groupingBy(TestQuestionAcceptedAnswer::getQuestionId));
-    }
-
-    private boolean gradeOption(TestAttemptAnswer answer, List<TestQuestionOption> options) {
-        Long selected = answer.getSelectedOptionId();
-        return options.stream().anyMatch(option -> option.isCorrect() && option.getId().equals(selected));
-    }
-
-    private boolean gradeText(TestAttemptAnswer answer, List<TestQuestionAcceptedAnswer> accepted) {
-        String normalized = AnswerNormalizer.normalize(answer.getAnswerContent());
-        return accepted.stream().anyMatch(item -> item.getNormalizedAnswer().equals(normalized));
-    }
-
-    private Optional<Integer> gradeAi(TestQuestion question, TestAttemptAnswer answer) {
-        if (question.getQuestionType() == TestQuestionType.SPEAKING) {
-            return aiGateway.gradeSpeaking(question, answer.getAnswerContent());
-        }
-        return aiGateway.gradeWriting(question, answer.getAnswerContent());
-    }
-
-    private static BigDecimal scaledPoints(int points, int score) {
-        return BigDecimal.valueOf(points)
-                .multiply(BigDecimal.valueOf(score))
-                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-    }
-
-    private static int percent(BigDecimal earned, int points) {
-        if (points <= 0) {
-            return 0;
-        }
-        return earned.multiply(BigDecimal.valueOf(100))
-                .divide(BigDecimal.valueOf(points), 0, RoundingMode.HALF_UP)
-                .intValue();
-    }
-
-    private static int average(java.util.Collection<Integer> scores) {
-        if (scores.isEmpty()) {
-            return 0;
-        }
-        return (int) Math.round(scores.stream().mapToInt(Integer::intValue).average().orElse(0));
-    }
-
-    private static TestSkill effectiveSkill(TestQuestion question) {
-        if (question.getSkill() != null) {
-            return question.getSkill();
-        }
-        return switch (question.getQuestionType()) {
-            case LISTENING -> TestSkill.LISTENING;
-            case SPEAKING -> TestSkill.SPEAKING;
-            case WRITING -> TestSkill.WRITING;
-            case FILL_BLANK -> TestSkill.WRITING;
-            case READING, MULTIPLE_CHOICE -> TestSkill.READING;
-        };
     }
 
     private TestAttempt inProgressOwnedAttempt(Long attemptId) {

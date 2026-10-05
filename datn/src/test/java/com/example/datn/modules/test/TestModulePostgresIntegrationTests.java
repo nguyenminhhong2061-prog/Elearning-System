@@ -1,20 +1,27 @@
 package com.example.datn.modules.test;
 
+import com.example.datn.modules.test.service.AiAssessment;
+import com.example.datn.modules.test.service.TestAiGateway;
 import com.example.datn.support.AbstractPostgresIntegrationTest;
 import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -23,8 +30,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Runs the test module against a real PostgreSQL with the Flyway seed data. Proves that the upper-case enum values
- * satisfy the CHECK constraints, that skill_scores round-trips through JSONB, and that a comprehensive test records a
- * level change in users and user_level_history.
+ * satisfy the CHECK constraints, that the JSONB columns (skill scores and levels, the examiner's bands) round-trip, and
+ * that a comprehensive test records a level change in users and user_level_history. The AI examiner is a mock.
  */
 class TestModulePostgresIntegrationTests extends AbstractPostgresIntegrationTest {
 
@@ -36,6 +43,16 @@ class TestModulePostgresIntegrationTests extends AbstractPostgresIntegrationTest
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @MockitoBean
+    private TestAiGateway aiGateway;
+
+    @BeforeEach
+    void examinerGradesEverything() {
+        when(aiGateway.assess(any(), any())).thenReturn(Optional.of(new AiAssessment(
+                Map.of("task", 3, "coherence", 3, "vocabulary", 3, "grammar", 3), "Phát âm rõ ràng.")));
+        when(aiGateway.suggestRoadmap(any(), any())).thenReturn("Lộ trình đề xuất");
+    }
 
     @Test
     void periodicTestGradesAndStoresUpperCaseEnumsAndJsonb() throws Exception {
@@ -85,6 +102,53 @@ class TestModulePostgresIntegrationTests extends AbstractPostgresIntegrationTest
                 "select count(*) from user_level_history where user_id = ? and test_attempt_id = ?",
                 Integer.class, account.userId(), attemptId);
         assertThat(historyRows).isEqualTo(1);
+
+        // The skill levels and the examiner's bands are stored as JSONB.
+        String skillLevels = jdbcTemplate.queryForObject(
+                "select skill_levels::text from test_attempts where id = ?", String.class, attemptId);
+        assertThat(skillLevels).contains("\"noi\"").contains("B1");
+        String criteria = jdbcTemplate.queryForObject(
+                "select ai_criteria::text from test_attempt_answers where attempt_id = ? and ai_criteria is not null",
+                String.class, attemptId);
+        assertThat(criteria).contains("\"grammar\"");
+    }
+
+    @Test
+    void playsOfAPassageAreCountedAndDeletedWithTheirAttempt() throws Exception {
+        Account account = registerAndLogin();
+        Long testId = jdbcTemplate.queryForObject(
+                "insert into tests (title, type) values ('Kiểm tra nghe', 'PERIODIC') returning id", Long.class);
+        Long passageId = jdbcTemplate.queryForObject(
+                "insert into test_passages (test_id, title, audio_url, transcript)"
+                        + " values (?, 'At the airport', '/media/listening/airport.mp3', 'Flight VN209 is boarding.')"
+                        + " returning id",
+                Long.class, testId);
+        jdbcTemplate.update(
+                "insert into test_questions (test_id, passage_id, question_type, skill, level, content, points)"
+                        + " values (?, ?, 'LISTENING', 'listening', 'A2', 'Which flight is boarding?', 1)",
+                testId, passageId);
+
+        mockMvc.perform(get("/api/tests/" + testId).header(HttpHeaders.AUTHORIZATION, "Bearer " + account.token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.passages[0].maxPlays").value(2))
+                .andExpect(jsonPath("$.questions[0].passageId").value(passageId.intValue()));
+
+        long attemptId = startAttempt(account.token(), testId);
+        String playsUrl = "/api/test-attempts/" + attemptId + "/passages/" + passageId + "/plays";
+        mockMvc.perform(post(playsUrl).header(HttpHeaders.AUTHORIZATION, "Bearer " + account.token()))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(playsUrl).header(HttpHeaders.AUTHORIZATION, "Bearer " + account.token()))
+                .andExpect(jsonPath("$.playCount").value(2));
+        mockMvc.perform(post(playsUrl).header(HttpHeaders.AUTHORIZATION, "Bearer " + account.token()))
+                .andExpect(status().isConflict());
+
+        // Starting over deletes the attempt, and the database deletes its plays with it.
+        mockMvc.perform(post("/api/tests/" + testId + "/attempts").param("restart", "true")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + account.token()))
+                .andExpect(status().isCreated());
+        Integer plays = jdbcTemplate.queryForObject(
+                "select count(*) from test_passage_plays where passage_id = ?", Integer.class, passageId);
+        assertThat(plays).isZero();
     }
 
     private long startAttempt(String token, long testId) throws Exception {

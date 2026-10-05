@@ -27,5 +27,6 @@ public record TestResultResponse(
         CefrLevel suggestedLevel,
         String suggestedRoadmap,
         Map<String, SkillScoreResponse> skills,
+        List<PassageReviewResponse> passages,
         List<ReviewItemResponse> review) {
 }

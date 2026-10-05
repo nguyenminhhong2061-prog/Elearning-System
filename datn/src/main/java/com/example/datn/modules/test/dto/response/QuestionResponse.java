@@ -8,6 +8,7 @@ import java.util.List;
 /** A question of a test, without answers (they are only revealed after submission). */
 public record QuestionResponse(
         Long id,
+        Long passageId,
         TestQuestionType type,
         TestSkill skill,
         String content,

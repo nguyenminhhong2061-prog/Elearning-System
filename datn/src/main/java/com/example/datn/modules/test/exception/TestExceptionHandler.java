@@ -14,7 +14,10 @@ import java.time.Instant;
 @RestControllerAdvice(basePackages = "com.example.datn.modules.test")
 public class TestExceptionHandler {
 
-    @ExceptionHandler({TestNotFoundException.class, TestAttemptNotFoundException.class})
+    @ExceptionHandler({
+            TestNotFoundException.class,
+            TestAttemptNotFoundException.class,
+            TestPassageNotFoundException.class})
     public ResponseEntity<ApiErrorResponse> handleNotFound(RuntimeException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ApiErrorResponse(Instant.now(), 404, exception.getMessage()));
@@ -25,8 +28,12 @@ public class TestExceptionHandler {
         return badRequest(exception.getMessage());
     }
 
-    @ExceptionHandler(TestAttemptNotInProgressException.class)
-    public ResponseEntity<ApiErrorResponse> handleConflict(TestAttemptNotInProgressException exception) {
+    @ExceptionHandler({
+            TestAttemptNotInProgressException.class,
+            TestAttemptNotSubmittedException.class,
+            TestRetakeNotAllowedException.class,
+            ListenLimitReachedException.class})
+    public ResponseEntity<ApiErrorResponse> handleConflict(RuntimeException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ApiErrorResponse(Instant.now(), 409, exception.getMessage()));
     }

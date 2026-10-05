@@ -1,6 +1,7 @@
 package com.example.datn.modules.test.controller;
 
 import com.example.datn.modules.test.dto.request.SaveAnswerRequest;
+import com.example.datn.modules.test.dto.response.PassagePlayResponse;
 import com.example.datn.modules.test.dto.response.TestResultResponse;
 import com.example.datn.modules.test.service.TestAttemptService;
 import jakarta.validation.Valid;
@@ -14,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Saves answers, submits and reads the result of a test attempt (docs/api/tests.md). */
+/** Saves answers, counts plays of recordings, submits and reads the result of a test attempt (docs/api/tests.md). */
 @RestController
 @RequestMapping("/api/test-attempts")
 public class TestAttemptController {
@@ -32,6 +33,11 @@ public class TestAttemptController {
             @PathVariable Long questionId,
             @Valid @RequestBody SaveAnswerRequest request) {
         service.saveAnswer(attemptId, questionId, request);
+    }
+
+    @PostMapping("/{attemptId}/passages/{passageId}/plays")
+    public PassagePlayResponse recordPlay(@PathVariable Long attemptId, @PathVariable Long passageId) {
+        return service.recordPlay(attemptId, passageId);
     }
 
     @PostMapping("/{attemptId}/submit")

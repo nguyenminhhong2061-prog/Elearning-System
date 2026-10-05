@@ -6,8 +6,11 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 /** The learner's answer to one question of an attempt (test_attempt_answers). */
 @Entity
@@ -35,6 +38,14 @@ public class TestAttemptAnswer {
 
     @Column(name = "score_earned", nullable = false)
     private BigDecimal scoreEarned;
+
+    // The AI examiner's band (0-6) per criterion; null for auto-graded answers and while the AI has not graded yet.
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "ai_criteria")
+    private Map<String, Integer> aiCriteria;
+
+    @Column(name = "ai_comment", columnDefinition = "TEXT")
+    private String aiComment;
 
     protected TestAttemptAnswer() {
     }
@@ -73,6 +84,14 @@ public class TestAttemptAnswer {
         return scoreEarned;
     }
 
+    public Map<String, Integer> getAiCriteria() {
+        return aiCriteria;
+    }
+
+    public String getAiComment() {
+        return aiComment;
+    }
+
     public void setOption(Long selectedOptionId) {
         this.selectedOptionId = selectedOptionId;
         this.answerContent = null;
@@ -86,5 +105,12 @@ public class TestAttemptAnswer {
     public void grade(Boolean correct, BigDecimal scoreEarned) {
         this.correct = correct;
         this.scoreEarned = scoreEarned;
+    }
+
+    public void gradeByAi(BigDecimal scoreEarned, Map<String, Integer> aiCriteria, String aiComment) {
+        this.correct = null;
+        this.scoreEarned = scoreEarned;
+        this.aiCriteria = aiCriteria;
+        this.aiComment = aiComment;
     }
 }
