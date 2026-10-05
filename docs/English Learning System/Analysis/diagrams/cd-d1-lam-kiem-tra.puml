@@ -1,0 +1,100 @@
+@startuml cd-d1-lam-kiem-tra
+!include _style.iuml
+show methods
+hide empty methods
+
+class LearnerHomeView {
+  -subTest
+}
+class TestView {
+  -outsubListPeriodicTest
+  -outsubListComprehensiveTest
+  -outsubListHistory
+}
+class TestInfoView {
+  -outTitle
+  -outPartSummary
+  -outInstruction
+  -subStart
+}
+class DoTestView {
+  -outsubListQuestionNo
+  -outSaveStatus
+  -outMaterial
+  -outQuestion
+  -inAnswer
+  -subRecord
+  -outWordCount
+  -subPrevious
+  -subNext
+  -subSubmit
+}
+
+class Learner {
+  -currentLevel
+}
+class Test {
+  -title
+  -type
+  -skill
+  -instruction
+  -openDate
+  -closeDate
+  -status
+}
+class TestStat {
+  -questionCount
+  -attemptCount
+  -answeredCount
+  +getOpenTests()
+}
+class TestMaterial {
+  -type
+  -title
+  -audio
+  -text
+}
+class TestQuestion {
+  -skill
+  +getQuestionsByTest()
+}
+class TestAttempt {
+  -startTime
+  -submitTime
+  -status
+  -totalScore
+  -listeningScore
+  -speakingScore
+  -readingScore
+  -writingScore
+  -suggestedLevel
+  -suggestedRoadmap
+  +startAttempt()
+}
+class TestAnswer {
+  -answerText
+  -recording
+  -isCorrect
+  -score
+  -aiFeedback
+  +saveAnswer()
+}
+
+LearnerHomeView -right- TestView
+TestView -right- TestInfoView
+TestInfoView -right- DoTestView
+
+TestView -- TestStat
+TestInfoView -- TestQuestion
+TestInfoView -- TestAttempt
+DoTestView -- TestAnswer
+
+Test <|-- TestStat
+Test "1" *-- "*" TestMaterial
+Test "1" *-- "*" TestQuestion
+TestMaterial "0..1" -- "*" TestQuestion
+Learner "1" -- "*" TestAttempt
+Test "1" -- "*" TestAttempt
+TestAttempt "1" *-- "*" TestAnswer
+TestQuestion "1" -- "*" TestAnswer
+@enduml

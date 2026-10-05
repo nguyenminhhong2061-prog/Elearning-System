@@ -1,0 +1,44 @@
+@startuml de-3-chatbot
+!include _style.iuml
+
+class Learner <<ngoai>>
+class ExerciseLesson <<ngoai>>
+class ExerciseQuestion <<ngoai>>
+
+class ChatSession {
+  -id : Long
+  -title : String
+  -learner : Learner
+  -lesson : ExerciseLesson
+  -question : ExerciseQuestion
+  -messages : List<ChatMessage>
+}
+class ChatMessage {
+  -id : Long
+  -role : ChatRole
+  -content : String
+  -sentTime : LocalDateTime
+  -sources : List<MessageSource>
+}
+class MessageSource {
+  -id : Long
+  -chunk : KnowledgeChunk
+}
+class KnowledgeChunk {
+  -id : Long
+  -source : String
+  -title : String
+  -content : String
+  -lesson : ExerciseLesson
+  -question : ExerciseQuestion
+}
+
+ChatSession "*" o-- "1" Learner
+ChatSession "*" o-- "0..1" ExerciseLesson
+ChatSession "*" o-- "0..1" ExerciseQuestion
+ChatSession "1" *-- "*" ChatMessage
+ChatMessage "1" *-- "*" MessageSource
+MessageSource "*" o-- "1" KnowledgeChunk
+KnowledgeChunk "*" o-- "0..1" ExerciseLesson
+KnowledgeChunk "*" o-- "0..1" ExerciseQuestion
+@enduml

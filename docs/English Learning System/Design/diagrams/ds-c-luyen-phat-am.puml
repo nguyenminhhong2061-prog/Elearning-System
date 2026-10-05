@@ -1,0 +1,147 @@
+@startuml ds-c-luyen-phat-am
+!include _style-ds.iuml
+
+actor "Người học" as NH
+box "Frontend (React)" #FAFAFA
+  boundary LearnerLayout
+  boundary ExercisePage
+  boundary PracticePronunciationPage
+  boundary PronunciationSummary
+end box
+box "Backend (Spring Boot)" #FAFAFA
+  control ExerciseController
+  control LessonStatDAO
+  control PronunciationController
+  control PronunciationItemDAO
+  control FileStorageService
+  boundary AIService
+  control PronunciationAttemptDAO
+  control DailyProgressDAO
+  entity LessonStat
+  entity PronunciationItem
+  entity PronunciationAttempt
+end box
+actor "Dịch vụ AI" as AI
+
+NH -> LearnerLayout ++ : chọn mục "Bài tập" trên thanh bên
+LearnerLayout -> LearnerLayout : handleSelectMenuItem()
+LearnerLayout -> ExercisePage ++ : chuyển trang
+deactivate LearnerLayout
+ExercisePage -> ExercisePage : loadLessons()
+ExercisePage -> ExerciseController ++ : GET /api/exercises/lessons?skill=READING
+ExerciseController -> ExerciseController : getLessonStats()
+ExerciseController -> LessonStatDAO ++ : gọi
+LessonStatDAO -> LessonStatDAO : getLessonStats()
+loop mỗi bài (5 bài đọc hiểu)
+  LessonStatDAO -> LessonStat ++ : gọi
+  LessonStat -> LessonStat : LessonStat(), setter (cả thuộc tính kế thừa từ ExerciseLesson)
+  LessonStat --> LessonStatDAO -- : trả về
+end
+LessonStatDAO --> ExerciseController -- : trả về 5 bài
+ExerciseController --> ExercisePage -- : 200, JSON 5 bài
+ExercisePage --> NH : hiển thị tab "Đọc hiểu"
+
+NH -> ExercisePage : chọn tab "Phát âm"
+ExercisePage -> ExercisePage : handleChangeTab()
+ExercisePage -> ExercisePage : loadLessons()
+ExercisePage -> ExerciseController ++ : GET /api/exercises/lessons?skill=PRONUNCIATION
+ExerciseController -> ExerciseController : getLessonStats()
+ExerciseController -> LessonStatDAO ++ : gọi
+LessonStatDAO -> LessonStatDAO : getLessonStats()
+loop mỗi bài (3 bài phát âm)
+  LessonStatDAO -> LessonStat ++ : gọi
+  LessonStat -> LessonStat : LessonStat(), setter
+  LessonStat --> LessonStatDAO -- : trả về
+end
+LessonStatDAO --> ExerciseController -- : trả về 3 bài
+ExerciseController --> ExercisePage -- : 200, JSON 3 bài
+ExercisePage --> NH : hiển thị các bài theo cột CEFR ("Đã luyện 0/5 mục")
+
+NH -> ExercisePage : click thẻ "Âm /θ/ và /ð/"
+ExercisePage -> ExercisePage : handleSelectLesson()
+ExercisePage -> PracticePronunciationPage ++ : chuyển trang (truyền bài đã chọn)
+deactivate ExercisePage
+PracticePronunciationPage -> PracticePronunciationPage : loadItems()
+PracticePronunciationPage -> PronunciationController ++ : GET /api/pronunciation/lessons/{id}/items
+PronunciationController -> PronunciationController : getItemsByLesson()
+PronunciationController -> PronunciationItemDAO ++ : gọi
+PronunciationItemDAO -> PronunciationItemDAO : getItemsByLesson()
+loop mỗi mục luyện (5 mục)
+  PronunciationItemDAO -> PronunciationItem ++ : gọi
+  PronunciationItem -> PronunciationItem : PronunciationItem()
+  PronunciationItem --> PronunciationItemDAO -- : trả về
+end
+PronunciationItemDAO --> PronunciationController -- : trả về 5 mục
+PronunciationController --> PracticePronunciationPage -- : 200, JSON 5 mục
+PracticePronunciationPage --> NH : hiển thị "Câu 1/5" "Thank you for the three tickets."
+
+loop mỗi lần ghi âm (9 lần: mục 1 hai lần, sau đó các mục 2–5)
+  NH -> PracticePronunciationPage : bấm nút micro
+  PracticePronunciationPage -> PracticePronunciationPage : handleRecord()
+  NH -> PracticePronunciationPage : đọc câu mẫu, bấm nút micro lần nữa
+  PracticePronunciationPage -> PracticePronunciationPage : handleStop()
+  PracticePronunciationPage -> PronunciationController ++ : POST /api/pronunciation/items/{id}/attempts (bản ghi 3 giây)
+  PronunciationController -> PronunciationController : assessPronunciation()
+  PronunciationController -> PronunciationItemDAO ++ : gọi
+  PronunciationItemDAO -> PronunciationItemDAO : getItemById()
+  PronunciationItemDAO -> PronunciationItem ++ : gọi
+  PronunciationItem -> PronunciationItem : PronunciationItem()
+  PronunciationItem --> PronunciationItemDAO -- : trả về
+  PronunciationItemDAO --> PronunciationController -- : trả về mục 1
+  PronunciationController -> FileStorageService ++ : gọi
+  FileStorageService -> FileStorageService : storeAudio()
+  FileStorageService --> PronunciationController -- : trả về đường dẫn bản ghi
+  PronunciationController -> AIService ++ : gọi
+  AIService -> AIService : assessPronunciation()
+  AIService -> AI : gửi bản ghi âm và văn bản mẫu
+  AI --> AIService : trả về điểm và nhận xét theo từng từ
+  AIService -> PronunciationAttempt ++ : gọi
+  PronunciationAttempt -> PronunciationAttempt : PronunciationAttempt()
+  PronunciationAttempt --> AIService -- : trả về
+  AIService --> PronunciationController -- : trả về lượt luyện chưa lưu (lần 1: điểm tổng 72, độ chính xác 68, độ trôi chảy 80)
+  PronunciationController -> PronunciationAttempt ++ : gọi
+  PronunciationAttempt -> PronunciationAttempt : setter (người học, mục luyện, thời điểm luyện)
+  PronunciationAttempt --> PronunciationController -- : trả về
+  PronunciationController -> PronunciationAttemptDAO ++ : gọi
+  PronunciationAttemptDAO -> PronunciationAttemptDAO : addAttempt()
+  PronunciationAttemptDAO --> PronunciationController -- : trả về true
+  PronunciationController --> PracticePronunciationPage -- : 200, JSON lượt luyện
+  PracticePronunciationPage --> NH : hiển thị 72/100, "Chính xác 68 · Trôi chảy 80", tô đỏ "the", "three", gợi ý
+  opt Lan click "Tiếp tục" sang mục tiếp theo
+    NH -> PracticePronunciationPage : click "Tiếp tục"
+    PracticePronunciationPage -> PracticePronunciationPage : handleNextItem()
+    PracticePronunciationPage --> NH : hiển thị mục tiếp theo
+  end
+end
+
+NH -> PracticePronunciationPage : click "Xem kết quả" (ở mục 5)
+PracticePronunciationPage -> PracticePronunciationPage : handleFinish()
+PracticePronunciationPage -> PronunciationController ++ : POST /api/pronunciation/lessons/{id}/finish (thời điểm bắt đầu luyện)
+PronunciationController -> PronunciationController : finishLesson()
+PronunciationController -> DailyProgressDAO ++ : gọi
+DailyProgressDAO -> DailyProgressDAO : updateProgress()
+DailyProgressDAO --> PronunciationController -- : trả về
+PronunciationController -> PronunciationAttemptDAO ++ : gọi
+PronunciationAttemptDAO -> PronunciationAttemptDAO : getAttemptsByLesson()
+loop mỗi lượt luyện của bài (9 lượt)
+  PronunciationAttemptDAO -> PronunciationAttempt ++ : gọi
+  PronunciationAttempt -> PronunciationAttempt : PronunciationAttempt()
+  PronunciationAttempt -> PronunciationItem ++ : gọi
+  PronunciationItem -> PronunciationItem : PronunciationItem()
+  PronunciationItem --> PronunciationAttempt -- : trả về
+  PronunciationAttempt --> PronunciationAttemptDAO -- : trả về
+end
+PronunciationAttemptDAO --> PronunciationController -- : trả về 9 lượt
+PronunciationController --> PracticePronunciationPage -- : 200, JSON 9 lượt
+PracticePronunciationPage -> PronunciationSummary ++ : hiện (truyền các mục và 9 lượt)
+PronunciationSummary --> NH : hiển thị "Hoàn thành bài luyện phát âm", "Đã luyện 5/5 mục · điểm trung bình 84"
+
+NH -> PronunciationSummary : click "Về danh sách"
+PronunciationSummary -> PronunciationSummary : handleBackToList()
+PronunciationSummary -> ExercisePage ++ : chuyển trang (tab "Phát âm")
+deactivate PronunciationSummary
+deactivate PracticePronunciationPage
+ref over ExercisePage, ExerciseController : loadLessons() cho tab "Phát âm" như bước 17–26
+ExercisePage --> NH : hiển thị thẻ "Âm /θ/ và /ð/" với "Đã luyện 5/5 mục"
+deactivate ExercisePage
+@enduml

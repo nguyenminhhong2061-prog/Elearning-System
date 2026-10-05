@@ -1,0 +1,62 @@
+@startuml db-4-kiem-tra
+!include _style-er.iuml
+
+entity tbl_question <<ngoai>>
+entity tbl_user <<ngoai>>
+entity tbl_answer_option <<ngoai>>
+entity tbl_level_history <<ngoai>>
+entity tbl_study_plan <<ngoai>>
+entity tbl_reminder <<ngoai>>
+
+entity tbl_test {
+  {field} id : BIGINT  [PK]
+  {field} title : VARCHAR(200)
+  {field} type : VARCHAR(20)
+  {field} skill : VARCHAR(200)  [N]
+  {field} instruction : TEXT  [N]
+  {field} open_date : DATE
+  {field} close_date : DATE
+  {field} status : VARCHAR(20)
+}
+entity tbl_test_material {
+  {field} id : BIGINT  [PK]
+  {field} type : VARCHAR(20)
+  {field} title : VARCHAR(200)  [N]
+  {field} audio : VARCHAR(255)  [N]
+  {field} text : TEXT  [N]
+  {field} test_id : BIGINT  [FK]
+}
+entity tbl_test_attempt {
+  {field} id : BIGINT  [PK]
+  {field} start_time : TIMESTAMP
+  {field} submit_time : TIMESTAMP  [N]
+  {field} status : VARCHAR(20)
+  {field} suggested_level : VARCHAR(2)  [N]
+  {field} suggested_roadmap : TEXT  [N]
+  {field} learner_id : BIGINT  [FK]
+  {field} test_id : BIGINT  [FK]
+}
+entity tbl_test_answer {
+  {field} id : BIGINT  [PK]
+  {field} answer_text : TEXT  [N]
+  {field} recording : VARCHAR(255)  [N]
+  {field} is_correct : BOOLEAN  [N]
+  {field} score : REAL  [N]
+  {field} ai_feedback : TEXT  [N]
+  {field} test_attempt_id : BIGINT  [FK]
+  {field} question_id : BIGINT  [FK]
+  {field} selected_option_id : BIGINT  [FK, N]
+}
+
+tbl_test ||--o{ tbl_test_material
+tbl_test |o--o{ tbl_question
+tbl_test_material |o--o{ tbl_question
+tbl_user ||--o{ tbl_test_attempt
+tbl_test ||--o{ tbl_test_attempt
+tbl_test_attempt ||--o{ tbl_test_answer
+tbl_question ||--o{ tbl_test_answer
+tbl_answer_option |o--o{ tbl_test_answer
+tbl_test_attempt |o--o| tbl_level_history
+tbl_test_attempt |o--o{ tbl_study_plan
+tbl_test |o--o{ tbl_reminder
+@enduml

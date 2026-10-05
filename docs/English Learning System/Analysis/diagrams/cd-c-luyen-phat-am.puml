@@ -1,0 +1,110 @@
+@startuml cd-c-luyen-phat-am
+!include _style.iuml
+show methods
+hide empty methods
+
+class LearnerHomeView {
+  -subExercise
+}
+class ExerciseView {
+  -subReadingTab
+  -subWritingTab
+  -subListeningTab
+  -subPronunciationTab
+  -outsubListLesson
+}
+class PracticePronunciationView {
+  -subBack
+  -outLessonTitle
+  -outItemIndex
+  -outSampleText
+  -outIpa
+  -subPlaySample
+  -subRecord
+  -subSkip
+  -outOverallScore
+  -outAccuracyScore
+  -outFluencyScore
+  -outMarkedText
+  -outSuggestion
+  -subPlayRecording
+  -subNextItem
+  -subAskChatbot
+}
+class PronunciationSummaryView {
+  -outAverageScore
+  -outPracticedCount
+  -outListItemResult
+  -subBackToList
+}
+
+class Learner {
+  -currentLevel
+}
+class ExerciseLesson {
+  -skill
+  -title
+  -description
+  -topic
+  -level
+  -difficulty
+  -estimatedDuration
+  -status
+}
+class LessonStat {
+  -itemCount
+  -practicedCount
+  -bestPercent
+  -attemptCount
+  -answeredCount
+  +getLessonStats()
+}
+class PronunciationItem {
+  -sampleText
+  -ipa
+  -sampleAudio
+  -notes
+  +getItemsByLesson()
+}
+class PronunciationAttempt {
+  -attemptNo
+  -recording
+  -accuracyScore
+  -fluencyScore
+  -overallScore
+  -aiFeedback
+  -practicedTime
+  +addAttempt()
+  +getAttemptsByLesson()
+}
+class DailyProgress {
+  -date
+  -wordsLearned
+  -exercisesCompleted
+  -testsCompleted
+  -studyMinutes
+  +updateProgress()
+}
+class AIService {
+  +assessPronunciation()
+}
+
+LearnerHomeView -right- ExerciseView
+ExerciseView -right- PracticePronunciationView
+PracticePronunciationView -right- PronunciationSummaryView
+PronunciationSummaryView -- ExerciseView
+
+ExerciseView -- Learner
+ExerciseView -- LessonStat
+PracticePronunciationView -- PronunciationItem
+PracticePronunciationView -- PronunciationAttempt
+PracticePronunciationView -- AIService
+PronunciationSummaryView -- PronunciationAttempt
+PronunciationSummaryView -- DailyProgress
+
+ExerciseLesson <|-- LessonStat
+ExerciseLesson "1" *-- "*" PronunciationItem
+PronunciationItem "1" -- "*" PronunciationAttempt
+Learner "1" -- "*" PronunciationAttempt
+Learner "1" -- "*" DailyProgress
+@enduml

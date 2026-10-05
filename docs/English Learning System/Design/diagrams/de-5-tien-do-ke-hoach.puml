@@ -1,0 +1,70 @@
+@startuml de-5-tien-do-ke-hoach
+!include _style.iuml
+
+class Learner <<ngoai>>
+class Test <<ngoai>>
+class TestAttempt <<ngoai>>
+
+class DailyProgress {
+  -id : Long
+  -date : LocalDate
+  -wordsLearned : int
+  -exercisesCompleted : int
+  -testsCompleted : int
+  -studyMinutes : int
+  -learner : Learner
+}
+class Badge {
+  -id : Long
+  -name : String
+  -description : String
+  -icon : String
+  -conditionType : BadgeCondition
+  -threshold : int
+}
+class LearnerBadge {
+  -id : Long
+  -achievedDate : LocalDate
+  -learner : Learner
+  -badge : Badge
+}
+class StudyPlan {
+  -id : Long
+  -goal : String
+  -targetLevel : CefrLevel
+  -startDate : LocalDate
+  -endDate : LocalDate
+  -status : PlanStatus
+  -learner : Learner
+  -sourceAttempt : TestAttempt
+  -weeks : List<StudyWeek>
+}
+class StudyWeek {
+  -id : Long
+  -weekNo : int
+  -description : String
+  -targetWords : int
+  -targetExercises : int
+  -status : WeekStatus
+}
+class Reminder {
+  -id : Long
+  -type : ReminderType
+  -remindTime : LocalDateTime
+  -content : String
+  -isSent : boolean
+  -learner : Learner
+  -test : Test
+  -studyWeek : StudyWeek
+}
+
+DailyProgress "*" o-- "1" Learner
+LearnerBadge "*" o-- "1" Learner
+LearnerBadge "*" o-- "1" Badge
+StudyPlan "*" o-- "1" Learner
+StudyPlan "*" o-- "0..1" TestAttempt
+StudyPlan "1" *-- "*" StudyWeek
+Reminder "*" o-- "1" Learner
+Reminder "*" o-- "0..1" Test
+Reminder "0..1" o-- "0..1" StudyWeek
+@enduml

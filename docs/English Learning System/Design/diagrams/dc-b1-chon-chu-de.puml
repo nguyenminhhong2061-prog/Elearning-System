@@ -1,0 +1,124 @@
+@startuml dc-b1-chon-chu-de
+!include _style-dc.iuml
+
+package "Frontend (React)" {
+  class LearnerHomePage {
+    -dueWords : LearnerVocabulary[]
+    +loadDueList() : void
+  }
+  class LearnerLayout {
+    +handleSelectMenuItem(path : string) : void
+  }
+  class VocabularyPage {
+    -tab : string
+    -topicStats : TopicStat[]
+    -customListStats : CustomListStat[]
+    -dueWords : LearnerVocabulary[]
+    +loadData() : void
+    +handleChangeTab(tab : string) : void
+    +handleSelectTopic(topic : TopicStat) : void
+    +handleSelectCustomList(list : CustomListStat) : void
+  }
+  class TopicDetailPage {
+    -topic : TopicStat
+    -words : LearnerVocabulary[]
+    -page : number
+    +loadTopic() : void
+    +loadWords() : void
+    +handleMoreWords() : void
+    +handleStudy() : void
+    +handleBack() : void
+  }
+  class FlashcardPage <<ngoai>>
+}
+
+package "Backend (Spring Boot)" {
+  class FlashcardController {
+    -learnerVocabularyDAO : LearnerVocabularyDAO
+    -topicStatDAO : TopicStatDAO
+    -customListStatDAO : CustomListStatDAO
+    +getDueList() : List<LearnerVocabulary>
+    +getTopicStats(topicId : Long) : List<TopicStat>
+    +getCustomListStats() : List<CustomListStat>
+    +getWordsByTopic(topicId : Long, page : int) : List<LearnerVocabulary>
+  }
+  abstract class DAO {
+    #jdbcTemplate : JdbcTemplate
+    +DAO(jdbcTemplate : JdbcTemplate)
+  }
+  class LearnerVocabularyDAO {
+    +getDueList(learnerId : Long, date : LocalDate) : List<LearnerVocabulary>
+    +getWordsByTopic(learnerId : Long, topicId : Long, offset : int, limit : int) : List<LearnerVocabulary>
+  }
+  class TopicStatDAO {
+    +getTopicStats(learnerId : Long, topicId : Long, date : LocalDate) : List<TopicStat>
+  }
+  class CustomListStatDAO {
+    +getCustomListStats(learnerId : Long) : List<CustomListStat>
+  }
+
+  class LearnerVocabulary {
+    -id : Long
+    -status : LearningStatus
+    -lastResult : RecallRating
+    -reviewCount : int
+    -firstLearnedDate : LocalDate
+    -lastReviewedDate : LocalDate
+    -nextReviewDate : LocalDate
+    -learner : Learner
+    -vocabulary : Vocabulary
+  }
+  class Topic {
+    -id : Long
+    -name : String
+    -description : String
+    -image : String
+    -updatedDate : LocalDate
+  }
+  class TopicStat {
+    -learnedCount : int
+    -totalCount : int
+    -dueCount : int
+  }
+  class CustomList {
+    -id : Long
+    -name : String
+    -createdDate : LocalDate
+    -learner : Learner
+    -items : List<CustomListItem>
+  }
+  class CustomListStat {
+    -learnedCount : int
+    -totalCount : int
+  }
+  class Learner <<ngoai>>
+  class Vocabulary <<ngoai>>
+  class CustomListItem <<ngoai>>
+}
+
+LearnerLayout *-- LearnerHomePage
+LearnerLayout -right- VocabularyPage
+VocabularyPage -right- TopicDetailPage
+TopicDetailPage -right- FlashcardPage
+
+LearnerHomePage -- FlashcardController
+VocabularyPage -- FlashcardController
+TopicDetailPage -- FlashcardController
+
+FlashcardController -- LearnerVocabularyDAO
+FlashcardController -- TopicStatDAO
+FlashcardController -- CustomListStatDAO
+DAO <|-- LearnerVocabularyDAO
+DAO <|-- TopicStatDAO
+DAO <|-- CustomListStatDAO
+LearnerVocabularyDAO -- LearnerVocabulary
+TopicStatDAO -- TopicStat
+CustomListStatDAO -- CustomListStat
+
+Topic <|-- TopicStat
+CustomList <|-- CustomListStat
+LearnerVocabulary "*" o-- "1" Learner
+LearnerVocabulary "*" o-- "1" Vocabulary
+CustomList "*" o-- "1" Learner
+CustomList "1" *-- "*" CustomListItem
+@enduml

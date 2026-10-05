@@ -4,6 +4,7 @@ import com.example.datn.common.dto.PageResponse;
 import com.example.datn.common.enums.CefrLevel;
 import com.example.datn.modules.vocabulary.dto.request.CreateVocabularyRequest;
 import com.example.datn.modules.vocabulary.dto.request.UpdateVocabularyRequest;
+import com.example.datn.modules.vocabulary.dto.response.DeleteResultResponse;
 import com.example.datn.modules.vocabulary.dto.response.VocabularyResponse;
 import com.example.datn.modules.vocabulary.service.VocabularyService;
 import jakarta.validation.Valid;
@@ -67,10 +68,10 @@ public class VocabularyController {
         return service.update(id, request);
     }
 
+    /** Scenario 21: hides a word in use, deletes an unused one; the body says which (docs/api/admin.md). */
     @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('ADMIN')")
-    public void delete(@PathVariable Long id) {
-        service.delete(id);
+    public DeleteResultResponse delete(@PathVariable Long id) {
+        return service.delete(id);
     }
 }

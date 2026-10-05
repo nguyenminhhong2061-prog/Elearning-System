@@ -1,0 +1,31 @@
+' Kiểu dùng chung cho các biểu đồ tuần tự thiết kế (ds-*.puml).
+' Trang React và AIService dùng biểu tượng boundary; controller, DAO và các lớp
+' hỗ trợ ở backend dùng biểu tượng control; lớp thực thể dùng biểu tượng entity.
+' Hai khung box tách phía trình duyệt (Frontend) và phía server (Backend).
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam maxMessageSize 200
+skinparam sequence {
+  ArrowColor black
+  LifeLineBorderColor #555555
+  LifeLineBackgroundColor white
+  ParticipantBorderColor black
+  ParticipantBackgroundColor white
+  ActorBorderColor black
+  ActorBackgroundColor white
+  GroupBorderColor #555555
+  GroupBackgroundColor #F2F2F2
+  BoxBorderColor #999999
+  BoxFontColor #555555
+  ReferenceBorderColor #555555
+  ReferenceBackgroundColor #F2F2F2
+}
+skinparam BoundaryBorderColor black
+skinparam BoundaryBackgroundColor white
+skinparam ControlBorderColor black
+skinparam ControlBackgroundColor white
+skinparam EntityBorderColor black
+skinparam EntityBackgroundColor white
+hide footbox
+autonumber

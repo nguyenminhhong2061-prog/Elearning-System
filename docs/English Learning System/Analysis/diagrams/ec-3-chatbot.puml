@@ -1,0 +1,31 @@
+@startuml ec-3-chatbot
+!include _style.iuml
+
+class Learner <<ngoai>>
+class ExerciseLesson <<ngoai>>
+class ExerciseQuestion <<ngoai>>
+
+class ChatSession {
+  -title
+}
+class ChatMessage {
+  -role
+  -content
+  -sentTime
+}
+class KnowledgeChunk {
+  -source
+  -title
+  -content
+}
+class MessageSource
+
+Learner "1" -- "*" ChatSession
+ExerciseLesson "0..1" -- "*" ChatSession
+ExerciseQuestion "0..1" -- "*" ChatSession
+ChatSession "1" *-- "*" ChatMessage
+ChatMessage "1" -- "*" MessageSource
+KnowledgeChunk "1" -- "*" MessageSource
+ExerciseLesson "0..1" -- "*" KnowledgeChunk
+ExerciseQuestion "0..1" -- "*" KnowledgeChunk
+@enduml

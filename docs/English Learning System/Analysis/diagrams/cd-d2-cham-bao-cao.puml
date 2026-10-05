@@ -1,0 +1,94 @@
+@startuml cd-d2-cham-bao-cao
+!include _style.iuml
+show methods
+hide empty methods
+
+class DoTestView {
+  -subSubmit
+}
+class TestReportView {
+  -outGradingStatus
+  -outTest
+  -outLearner
+  -outTestDate
+  -outLevelBefore
+  -outTotalScore
+  -outSuggestedLevel
+  -outRoadmap
+  -outListSkillScore
+  -outListAnswer
+  -subApplyRoadmap
+  -subBackToList
+}
+class LearnerHomeView {
+  -subTest
+}
+
+class Learner {
+  -currentLevel
+  +updateLevel()
+}
+class LevelHistory {
+  -level
+  -changedDate
+}
+class TestAttempt {
+  -startTime
+  -submitTime
+  -status
+  -totalScore
+  -listeningScore
+  -speakingScore
+  -readingScore
+  -writingScore
+  -suggestedLevel
+  -suggestedRoadmap
+  +submitAttempt()
+  +calculateScores()
+  +saveResult()
+}
+class TestAnswer {
+  -answerText
+  -recording
+  -isCorrect
+  -score
+  -aiFeedback
+  +saveAnswer()
+}
+class TestReport {
+  -levelBefore
+  -skillLevels
+  -skillComments
+  +getReport()
+}
+class DailyProgress {
+  -date
+  -wordsLearned
+  -exercisesCompleted
+  -testsCompleted
+  -studyMinutes
+  +updateProgress()
+}
+class AIService {
+  +gradeAnswer()
+  +classifyLevel()
+}
+
+DoTestView -right- TestReportView
+TestReportView -right- LearnerHomeView
+
+DoTestView -- TestAttempt
+TestReportView -- TestAttempt
+TestReportView -- TestAnswer
+TestReportView -- AIService
+TestReportView -- Learner
+TestReportView -- DailyProgress
+TestReportView -- TestReport
+
+TestAttempt "1" *-- "*" TestAnswer
+TestAttempt <|-- TestReport
+Learner "1" -- "*" TestAttempt
+Learner "1" -- "*" LevelHistory
+TestAttempt "0..1" -- "0..1" LevelHistory
+Learner "1" -- "*" DailyProgress
+@enduml

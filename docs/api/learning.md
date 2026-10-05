@@ -162,6 +162,13 @@ Trả `PageResponse<LearningCard>` gồm các từ người dùng đã đánh gi
 `masteredCount`, `reviewedToday`), vì giao diện hiện hai con số này cạnh nhau. `400` nếu `status` hoặc `reviewedToday`
 sai giá trị.
 
+### Từ bị admin ẩn (kịch bản 21 bước 8)
+
+Khi admin xóa một từ đã có người học, từ chỉ bị ẩn (`docs/api/admin.md`, `DELETE /api/vocabulary/{id}`). Từ ẩn **không
+còn** vào phiên học (theo chủ đề, theo danh sách riêng), phiên ôn từ đến hạn, `dueToday`, `upcoming`, `dueTomorrow` của
+`session-summary`, trò chơi, tìm kiếm và danh sách riêng. Trạng thái học và lượt ôn cũ **giữ nguyên**: từ vẫn tính
+trong `learningCount`, `masteredCount` và vẫn hiện trong `history`.
+
 ## Frontend dùng như thế nào
 
 | Màn hình | Gọi |

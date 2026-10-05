@@ -1,0 +1,44 @@
+@startuml db-3-chatbot
+!include _style-er.iuml
+
+entity tbl_exercise_lesson <<ngoai>>
+entity tbl_question <<ngoai>>
+entity tbl_user <<ngoai>>
+
+entity tbl_chat_session {
+  {field} id : BIGINT  [PK]
+  {field} title : VARCHAR(200)  [N]
+  {field} learner_id : BIGINT  [FK]
+  {field} lesson_id : BIGINT  [FK, N]
+  {field} question_id : BIGINT  [FK, N]
+}
+entity tbl_chat_message {
+  {field} id : BIGINT  [PK]
+  {field} role : VARCHAR(20)
+  {field} content : TEXT
+  {field} sent_time : TIMESTAMP
+  {field} chat_session_id : BIGINT  [FK]
+}
+entity tbl_message_source {
+  {field} id : BIGINT  [PK]
+  {field} chat_message_id : BIGINT  [FK]
+  {field} chunk_id : BIGINT  [FK]
+}
+entity tbl_knowledge_chunk {
+  {field} id : BIGINT  [PK]
+  {field} source : VARCHAR(255)  [N]
+  {field} title : VARCHAR(200)
+  {field} content : TEXT
+  {field} lesson_id : BIGINT  [FK, N]
+  {field} question_id : BIGINT  [FK, N]
+}
+
+tbl_exercise_lesson |o--o{ tbl_knowledge_chunk
+tbl_question |o--o{ tbl_knowledge_chunk
+tbl_user ||--o{ tbl_chat_session
+tbl_exercise_lesson |o--o{ tbl_chat_session
+tbl_question |o--o{ tbl_chat_session
+tbl_chat_session ||--o{ tbl_chat_message
+tbl_chat_message ||--o{ tbl_message_source
+tbl_knowledge_chunk ||--o{ tbl_message_source
+@enduml

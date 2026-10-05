@@ -1,0 +1,61 @@
+@startuml ds-d2-lam-bai
+!include _style-ds.iuml
+
+actor "Người học" as NH
+box "Frontend (React)" #FAFAFA
+  boundary DoTestPage
+end box
+box "Backend (Spring Boot)" #FAFAFA
+  control TestController
+  control TestAttemptDAO
+  control FileStorageService
+  control TestAnswerDAO
+  entity TestAnswer
+  entity TestAttempt
+end box
+
+activate DoTestPage
+loop mỗi câu, từ câu 1 đến câu 23
+  alt câu trắc nghiệm (phần Nghe, Đọc)
+    NH -> DoTestPage : chọn đáp án
+    DoTestPage -> DoTestPage : handleSelectOption()
+  else câu nói (câu 11: 45 giây, câu 12: 58 giây)
+    NH -> DoTestPage : bấm nút micro
+    DoTestPage -> DoTestPage : handleRecord()
+    NH -> DoTestPage : trả lời, bấm nút micro lần nữa
+    DoTestPage -> DoTestPage : handleStop()
+  else câu viết (câu 23: 136 từ)
+    NH -> DoTestPage : gõ bài vào ô "Bài viết của bạn"
+    DoTestPage -> DoTestPage : handleChangeText()
+  end
+  DoTestPage -> DoTestPage : saveAnswer()
+  DoTestPage -> TestController ++ : PUT /api/test-attempts/{id}/answers/{questionId} (câu nói kèm file ghi âm)
+  TestController -> TestAnswer ++ : gọi (Spring đóng gói JSON)
+  TestAnswer -> TestAnswer : TestAnswer(), setter
+  TestAnswer --> TestController -- : trả về
+  TestController -> TestController : saveAnswer()
+  TestController -> TestAttemptDAO ++ : gọi
+  TestAttemptDAO -> TestAttemptDAO : getAttempt()
+  TestAttemptDAO -> TestAttempt ++ : gọi
+  TestAttempt -> TestAttempt : TestAttempt()
+  TestAttempt --> TestAttemptDAO -- : trả về
+  TestAttemptDAO --> TestController -- : trả về lượt của Lan, đang làm
+  opt câu nói có file ghi âm
+    TestController -> FileStorageService ++ : gọi
+    FileStorageService -> FileStorageService : storeAudio()
+    FileStorageService --> TestController -- : trả về đường dẫn
+    TestController -> TestAnswer ++ : gọi
+    TestAnswer -> TestAnswer : setter (đường dẫn bản ghi)
+    TestAnswer --> TestController -- : trả về
+  end
+  TestController -> TestAnswerDAO ++ : gọi
+  TestAnswerDAO -> TestAnswerDAO : saveAnswer()
+  TestAnswerDAO --> TestController -- : trả về true
+  TestController --> DoTestPage -- : 200
+  DoTestPage --> NH : hiển thị "Đã lưu", tô màu số câu
+  NH -> DoTestPage : click "Câu tiếp theo →"
+  DoTestPage -> DoTestPage : handleGoTo()
+  DoTestPage --> NH : hiển thị câu tiếp theo (phần Đọc: kèm đoạn văn "Eco-tourism in Vietnam")
+end
+deactivate DoTestPage
+@enduml

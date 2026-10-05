@@ -5,16 +5,20 @@ import com.example.datn.common.enums.CefrLevel;
 import com.example.datn.common.security.CurrentUser;
 import com.example.datn.modules.vocabulary.dto.request.CreateVocabularyRequest;
 import com.example.datn.modules.vocabulary.dto.request.UpdateVocabularyRequest;
+import com.example.datn.modules.vocabulary.dto.response.DeleteResultResponse;
 import com.example.datn.modules.vocabulary.dto.response.VocabularyResponse;
 import com.example.datn.modules.vocabulary.entity.UserVocabulary;
 import com.example.datn.modules.vocabulary.entity.Vocabulary;
+import com.example.datn.modules.vocabulary.enums.DeleteResult;
 import com.example.datn.modules.vocabulary.enums.LearningStatus;
+import com.example.datn.modules.vocabulary.exception.DuplicateWordException;
 import com.example.datn.modules.vocabulary.exception.TopicNotFoundException;
 import com.example.datn.modules.vocabulary.exception.VocabularyNotFoundException;
 import com.example.datn.modules.vocabulary.mapper.VocabularyMapper;
 import com.example.datn.modules.vocabulary.repository.TopicRepository;
 import com.example.datn.modules.vocabulary.repository.UserVocabularyRepository;
 import com.example.datn.modules.vocabulary.repository.VocabularyRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -35,35 +39,44 @@ public class VocabularyService {
     private final UserVocabularyRepository userVocabularyRepository;
     private final VocabularyMapper mapper;
     private final CurrentUser currentUser;
+    private final WordUsageService usageService;
+    private final StudyCalendar calendar;
 
     public VocabularyService(
             VocabularyRepository repository,
             TopicRepository topicRepository,
             UserVocabularyRepository userVocabularyRepository,
             VocabularyMapper mapper,
-            CurrentUser currentUser) {
+            CurrentUser currentUser,
+            WordUsageService usageService,
+            StudyCalendar calendar) {
         this.repository = repository;
         this.topicRepository = topicRepository;
         this.userVocabularyRepository = userVocabularyRepository;
         this.mapper = mapper;
         this.currentUser = currentUser;
+        this.usageService = usageService;
+        this.calendar = calendar;
     }
 
     public VocabularyResponse create(CreateVocabularyRequest request) {
+        String word = request.word().strip();
         requireTopicIfPresent(request.topicId());
+        requireNewWordInTopic(request.topicId(), word, -1L);
         // System words keep created_by NULL, whichever admin adds them. A non-null created_by marks a learner's own
         // word, visible only to that learner (Phase 4), so visibility never depends on the creator's current role.
         Vocabulary vocabulary = new Vocabulary(
                 request.topicId(),
                 null,
-                request.word(),
-                request.meaning(),
-                request.exampleSentence(),
-                request.phonetic(),
-                request.audioUrl(),
-                request.imageUrl(),
+                word,
+                request.meaning().strip(),
+                blankToNull(request.exampleSentence()),
+                blankToNull(request.phonetic()),
+                blankToNull(request.audioUrl()),
+                blankToNull(request.imageUrl()),
                 request.difficultyLevel());
-        return mapper.toResponse(repository.save(vocabulary), LearningStatus.NEW);
+        vocabulary.touch(calendar.now());
+        return mapper.toResponse(saveAndCheck(vocabulary, word), LearningStatus.NEW);
     }
 
     /**
@@ -99,26 +112,66 @@ public class VocabularyService {
     }
 
     public VocabularyResponse update(Long id, UpdateVocabularyRequest request) {
-        Vocabulary vocabulary = findEntity(id);
+        Vocabulary vocabulary = findShownEntity(id);
+        String word = request.word().strip();
         requireTopicIfPresent(request.topicId());
+        requireNewWordInTopic(request.topicId(), word, id);
         vocabulary.update(
                 request.topicId(),
-                request.word(),
-                request.meaning(),
-                request.exampleSentence(),
-                request.phonetic(),
-                request.audioUrl(),
-                request.imageUrl(),
+                word,
+                request.meaning().strip(),
+                blankToNull(request.exampleSentence()),
+                blankToNull(request.phonetic()),
+                blankToNull(request.audioUrl()),
+                blankToNull(request.imageUrl()),
                 request.difficultyLevel());
-        return toResponse(vocabulary);
+        vocabulary.touch(calendar.now());
+        return toResponse(saveAndCheck(vocabulary, word));
     }
 
-    public void delete(Long id) {
-        repository.delete(findEntity(id));
+    /**
+     * Scenario 21: a word that learners study, keep in a list or that a test question uses is hidden, so their
+     * progress and the question stay; a word nothing uses is deleted for good.
+     */
+    public DeleteResultResponse delete(Long id) {
+        Vocabulary vocabulary = findShownEntity(id);
+        if (usageService.usageOf(id).inUse()) {
+            vocabulary.hide(calendar.now());
+            return new DeleteResultResponse(DeleteResult.HIDDEN);
+        }
+        repository.delete(vocabulary);
+        return new DeleteResultResponse(DeleteResult.DELETED);
     }
 
     private Vocabulary findEntity(Long id) {
         return repository.findById(id).orElseThrow(() -> new VocabularyNotFoundException(id));
+    }
+
+    /** A word an admin may still edit or delete: a hidden word is gone from the admin area too. */
+    private Vocabulary findShownEntity(Long id) {
+        return repository.findById(id)
+                .filter(word -> !word.isHidden())
+                .orElseThrow(() -> new VocabularyNotFoundException(id));
+    }
+
+    /** Scenarios 19 (branch 12b) and 20 (branch 4b): one visible system word per text and topic, ignoring case. */
+    private void requireNewWordInTopic(Long topicId, String word, Long excludedId) {
+        if (topicId != null && repository.existsSystemWordInTopic(topicId, word, excludedId)) {
+            throw new DuplicateWordException(word);
+        }
+    }
+
+    /** Flushes now, so that two admins saving the same word at once meet the unique index here: 409, not 500. */
+    private Vocabulary saveAndCheck(Vocabulary vocabulary, String word) {
+        try {
+            return repository.saveAndFlush(vocabulary);
+        } catch (DataIntegrityViolationException exception) {
+            throw new DuplicateWordException(word);
+        }
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.strip();
     }
 
     private void requireTopicIfPresent(Long topicId) {

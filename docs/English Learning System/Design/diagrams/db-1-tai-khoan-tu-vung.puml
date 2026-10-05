@@ -1,0 +1,96 @@
+@startuml db-1-tai-khoan-tu-vung
+!include _style-er.iuml
+
+entity tbl_question <<ngoai>>
+entity tbl_test_attempt <<ngoai>>
+
+entity tbl_user {
+  {field} id : BIGINT  [PK]
+  {field} role : VARCHAR(20)
+  {field} full_name : VARCHAR(100)
+  {field} email : VARCHAR(255)  [U]
+  {field} password : VARCHAR(255)
+  {field} status : VARCHAR(20)
+  {field} created_date : DATE
+  {field} last_active_time : TIMESTAMP  [N]
+}
+entity tbl_level_history {
+  {field} id : BIGINT  [PK]
+  {field} level : VARCHAR(2)
+  {field} changed_date : DATE
+  {field} learner_id : BIGINT  [FK]
+  {field} test_attempt_id : BIGINT  [FK, U, N]
+}
+entity tbl_topic {
+  {field} id : BIGINT  [PK]
+  {field} name : VARCHAR(150)  [U]
+  {field} description : TEXT  [N]
+  {field} image : VARCHAR(255)  [N]
+  {field} updated_date : DATE
+}
+entity tbl_vocabulary {
+  {field} id : BIGINT  [PK]
+  {field} word : VARCHAR(150)
+  {field} phonetic : VARCHAR(150)  [N]
+  {field} meaning : TEXT
+  {field} example : TEXT  [N]
+  {field} audio : VARCHAR(255)  [N]
+  {field} image : VARCHAR(255)  [N]
+  {field} level : VARCHAR(2)  [N]
+  {field} status : VARCHAR(20)
+  {field} updated_date : DATE
+  {field} topic_id : BIGINT  [FK, N]
+  {field} creator_id : BIGINT  [FK]
+}
+entity tbl_learner_vocabulary {
+  {field} id : BIGINT  [PK]
+  {field} status : VARCHAR(20)
+  {field} next_review_date : DATE
+  {field} learner_id : BIGINT  [FK]
+  {field} vocabulary_id : BIGINT  [FK]
+}
+entity tbl_vocabulary_review {
+  {field} id : BIGINT  [PK]
+  {field} rating : VARCHAR(20)
+  {field} reviewed_time : TIMESTAMP
+  {field} learner_vocabulary_id : BIGINT  [FK]
+}
+entity tbl_custom_list {
+  {field} id : BIGINT  [PK]
+  {field} name : VARCHAR(100)
+  {field} created_date : DATE
+  {field} learner_id : BIGINT  [FK]
+}
+entity tbl_custom_list_item {
+  {field} id : BIGINT  [PK]
+  {field} custom_list_id : BIGINT  [FK]
+  {field} vocabulary_id : BIGINT  [FK]
+}
+entity tbl_game_play {
+  {field} id : BIGINT  [PK]
+  {field} game_type : VARCHAR(20)
+  {field} correct_count : INTEGER
+  {field} question_count : INTEGER
+  {field} score : INTEGER
+  {field} duration : INTEGER
+  {field} played_date : DATE
+  {field} learner_id : BIGINT  [FK]
+  {field} topic_id : BIGINT  [FK, N]
+  {field} custom_list_id : BIGINT  [FK, N]
+}
+
+tbl_topic |o--o{ tbl_vocabulary
+tbl_user ||--o{ tbl_vocabulary
+tbl_user ||--o{ tbl_learner_vocabulary
+tbl_vocabulary ||--o{ tbl_learner_vocabulary
+tbl_learner_vocabulary ||--o{ tbl_vocabulary_review
+tbl_user ||--o{ tbl_custom_list
+tbl_custom_list ||--o{ tbl_custom_list_item
+tbl_vocabulary ||--o{ tbl_custom_list_item
+tbl_user ||--o{ tbl_game_play
+tbl_topic |o--o{ tbl_game_play
+tbl_custom_list |o--o{ tbl_game_play
+tbl_vocabulary |o--o{ tbl_question
+tbl_user ||--o{ tbl_level_history
+tbl_test_attempt |o--o| tbl_level_history
+@enduml

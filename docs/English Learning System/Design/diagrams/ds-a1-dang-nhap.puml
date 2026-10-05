@@ -1,0 +1,42 @@
+@startuml ds-a1-dang-nhap
+!include _style-ds.iuml
+
+actor "Admin" as AD
+box "Frontend (React)" #FAFAFA
+  boundary LoginPage
+  control AuthContext
+  boundary AdminHomePage
+end box
+box "Backend (Spring Boot)" #FAFAFA
+  control AuthController
+  control UserDAO
+  control JwtService
+  participant LoginResponse
+  entity Admin
+end box
+
+AD -> LoginPage ++ : nhập email admin01@englishapp.vn, mật khẩu, click "Đăng nhập →"
+LoginPage -> LoginPage : handleLogin()
+LoginPage -> AuthController ++ : POST /api/auth/login
+AuthController -> AuthController : login()
+AuthController -> UserDAO ++ : gọi
+UserDAO -> UserDAO : checkLogin()
+UserDAO -> Admin ++ : gọi
+Admin -> Admin : Admin(), setter
+Admin --> UserDAO -- : trả về đối tượng Admin (Lê Văn Hùng)
+UserDAO --> AuthController -- : trả về Admin (mật khẩu khớp, tài khoản hoạt động)
+AuthController -> JwtService ++ : gọi
+JwtService -> JwtService : createToken()
+JwtService --> AuthController -- : trả về token
+AuthController -> LoginResponse ++ : gọi
+LoginResponse -> LoginResponse : LoginResponse()
+LoginResponse --> AuthController -- : trả về
+AuthController --> LoginPage -- : 200, JSON {token, user: role ADMIN}
+LoginPage -> AuthContext ++ : gọi
+AuthContext -> AuthContext : login()
+AuthContext --> LoginPage -- : trả về
+LoginPage -> AdminHomePage ++ : chuyển trang (vai trò ADMIN, trong khung AdminLayout)
+deactivate LoginPage
+AdminHomePage --> AD : hiển thị "Tổng quan hệ thống"
+deactivate AdminHomePage
+@enduml

@@ -16,6 +16,16 @@ export function listeningAudioUrl(lessonId) {
   return `/mock-media/listening-${lessonId}.wav`
 }
 
+/** Model audio of a pronunciation item, as the admin pages show it (a short tone: the mock has no voice). */
+export function pronunciationAudioUrl(itemId) {
+  return `/mock-media/pronunciation-${itemId}.wav`
+}
+
+function buildTone(itemId) {
+  const durationMs = 900 + (itemId % 4) * 300
+  return buildAudio({ durationMs, segments: [{ startMs: 0, endMs: durationMs, speaker: 'model' }] })
+}
+
 function buildAudio(passage) {
   const frames = Math.ceil((passage.durationMs / 1000) * SAMPLE_RATE)
   const samples = new Float32Array(frames)
@@ -43,9 +53,9 @@ function audioFor(lessonId) {
 
 /** Answers GET /mock-media/…; returns false when the path is not a media file (the request goes on). */
 export function serveMedia(req, res) {
-  const match = /^\/mock-media\/listening-(\d+)\.wav$/.exec(new URL(req.url, 'http://localhost').pathname)
+  const match = /^\/mock-media\/(listening|pronunciation)-(\d+)\.wav$/.exec(new URL(req.url, 'http://localhost').pathname)
   if (!match || req.method !== 'GET') return false
-  const data = audioFor(Number(match[1]))
+  const data = match[1] === 'listening' ? audioFor(Number(match[2])) : buildTone(Number(match[2]))
   if (!data) {
     res.statusCode = 404
     res.end()

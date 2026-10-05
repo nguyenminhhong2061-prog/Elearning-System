@@ -1,0 +1,181 @@
+@startuml dc-d1-lam-kiem-tra
+!include _style-dc.iuml
+
+package "Frontend (React)" {
+  class LearnerLayout {
+    +handleSelectMenuItem(path : string) : void
+  }
+  class TestPage {
+    -tests : TestStat[]
+    +loadTests() : void
+    +handleSelectTest(test : TestStat) : void
+  }
+  class DoTestPage {
+    -test : TestStat
+    -questions : TestQuestion[]
+    -attempt : TestAttempt
+    -answers : TestAnswer[]
+    -index : number
+    -saveStatus : string
+    -recorder : MediaRecorder
+    -startTime : Date
+    +loadQuestions() : void
+    +handleStarted(attempt : TestAttempt) : void
+    +handleGoTo(index : number) : void
+    +handleSelectOption(option : AnswerOption) : void
+    +handleChangeText(text : string) : void
+    +handleRecord() : void
+    +handleStop() : void
+    +saveAnswer(answer : TestAnswer) : void
+    +handleSubmit() : void
+  }
+  class TestInfo {
+    -test : TestStat
+    -questions : TestQuestion[]
+    +handleStart() : void
+  }
+}
+
+package "Backend (Spring Boot)" {
+  class TestController {
+    -testStatDAO : TestStatDAO
+    -testQuestionDAO : TestQuestionDAO
+    -testAttemptDAO : TestAttemptDAO
+    -testAnswerDAO : TestAnswerDAO
+    -fileStorage : FileStorageService
+    +getOpenTests(type : TestType) : List<TestStat>
+    +getQuestionsByTest(testId : Long) : List<TestQuestion>
+    +startAttempt(testId : Long) : TestAttempt
+    +saveAnswer(attemptId : Long, questionId : Long, answer : TestAnswer, recording : MultipartFile) : boolean
+  }
+  class FileStorageService {
+    -storageDir : String
+    +storeAudio(content : byte[], contentType : String) : String
+  }
+  abstract class DAO {
+    #jdbcTemplate : JdbcTemplate
+    +DAO(jdbcTemplate : JdbcTemplate)
+  }
+  class TestStatDAO {
+    +getOpenTests(learnerId : Long, type : TestType, date : LocalDate) : List<TestStat>
+  }
+  class TestQuestionDAO {
+    +getQuestionsByTest(testId : Long) : List<TestQuestion>
+  }
+  class TestAttemptDAO {
+    +startAttempt(learnerId : Long, testId : Long, time : LocalDateTime) : TestAttempt
+    +getAttempt(attemptId : Long, learnerId : Long) : TestAttempt
+  }
+  class TestAnswerDAO {
+    +saveAnswer(attemptId : Long, answer : TestAnswer) : boolean
+  }
+
+  class Test {
+    -id : Long
+    -title : String
+    -type : TestType
+    -skill : String
+    -instruction : String
+    -openDate : LocalDate
+    -closeDate : LocalDate
+    -status : TestStatus
+    -materials : List<TestMaterial>
+    -questions : List<TestQuestion>
+  }
+  class TestStat {
+    -questionCount : int
+    -attemptCount : int
+    -answeredCount : int
+  }
+  class TestMaterial {
+    -id : Long
+    -type : MaterialType
+    -title : String
+    -audio : String
+    -text : String
+  }
+  abstract class Question {
+    -id : Long
+    -type : QuestionType
+    -content : String
+    -score : float
+    -options : List<AnswerOption>
+    -acceptedAnswers : List<AcceptedAnswer>
+  }
+  class TestQuestion {
+    -skill : TestSkill
+    -material : TestMaterial
+    -vocabulary : Vocabulary
+  }
+  class AnswerOption {
+    -id : Long
+    -content : String
+    -isCorrect : boolean
+  }
+  class TestAttempt {
+    -id : Long
+    -startTime : LocalDateTime
+    -submitTime : LocalDateTime
+    -status : AttemptStatus
+    -totalScore : Float
+    -listeningScore : Float
+    -speakingScore : Float
+    -readingScore : Float
+    -writingScore : Float
+    -suggestedLevel : CefrLevel
+    -suggestedRoadmap : String
+    -learner : Learner
+    -test : Test
+    -answers : List<TestAnswer>
+  }
+  class TestAnswer {
+    -id : Long
+    -answerText : String
+    -recording : String
+    -isCorrect : Boolean
+    -score : Float
+    -aiFeedback : String
+    -question : TestQuestion
+    -selectedOption : AnswerOption
+  }
+  class AcceptedAnswer <<ngoai>>
+  class Vocabulary <<ngoai>>
+  class Learner <<ngoai>>
+}
+
+LearnerLayout -right- TestPage
+TestPage -right- DoTestPage
+DoTestPage *-- TestInfo
+
+TestPage -- TestController
+DoTestPage -- TestController
+TestInfo -- TestController
+
+TestController -- TestStatDAO
+TestController -- TestQuestionDAO
+TestController -- TestAttemptDAO
+TestController -- TestAnswerDAO
+TestController -- FileStorageService
+DAO <|-- TestStatDAO
+DAO <|-- TestQuestionDAO
+DAO <|-- TestAttemptDAO
+DAO <|-- TestAnswerDAO
+TestStatDAO -- TestStat
+TestQuestionDAO -- TestQuestion
+TestAttemptDAO -- TestAttempt
+TestAnswerDAO -- TestAnswer
+
+Test <|-- TestStat
+Test "1" *-- "*" TestMaterial
+Test "1" *-- "*" TestQuestion
+Question <|-- TestQuestion
+Question "1" *-- "*" AnswerOption
+Question "1" *-- "*" AcceptedAnswer
+TestQuestion "*" o-- "0..1" TestMaterial
+TestQuestion "*" o-- "0..1" Vocabulary
+TestAttempt "*" o-- "1" Learner
+TestAttempt "*" o-- "1" Test
+TestAttempt "1" *-- "*" TestAnswer
+TestAnswer "*" o-- "1" TestQuestion
+TestAnswer "*" o-- "0..1" AnswerOption
+@enduml

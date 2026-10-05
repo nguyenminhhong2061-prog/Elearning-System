@@ -1,0 +1,143 @@
+@startuml db-2-bai-tap
+!include _style-er.iuml
+
+entity tbl_user <<ngoai>>
+entity tbl_test <<ngoai>>
+entity tbl_test_material <<ngoai>>
+entity tbl_vocabulary <<ngoai>>
+entity tbl_knowledge_chunk <<ngoai>>
+entity tbl_chat_session <<ngoai>>
+entity tbl_test_answer <<ngoai>>
+
+entity tbl_exercise_lesson {
+  {field} id : BIGINT  [PK]
+  {field} skill : VARCHAR(20)
+  {field} title : VARCHAR(200)
+  {field} description : TEXT  [N]
+  {field} topic : VARCHAR(100)  [N]
+  {field} level : VARCHAR(2)
+  {field} difficulty : VARCHAR(10)
+  {field} estimated_duration : INTEGER  [N]
+  {field} status : VARCHAR(20)
+}
+entity tbl_reading_passage {
+  {field} id : BIGINT  [PK]
+  {field} title : VARCHAR(200)
+  {field} content : TEXT
+  {field} lesson_id : BIGINT  [FK]
+}
+entity tbl_listening_passage {
+  {field} id : BIGINT  [PK]
+  {field} title : VARCHAR(200)
+  {field} audio : VARCHAR(255)
+  {field} duration : INTEGER  [N]
+  {field} transcript : TEXT
+  {field} translation : TEXT  [N]
+  {field} lesson_id : BIGINT  [FK, U]
+}
+entity tbl_listening_segment {
+  {field} id : BIGINT  [PK]
+  {field} order_no : INTEGER
+  {field} start_time : INTEGER
+  {field} end_time : INTEGER
+  {field} speaker : VARCHAR(100)  [N]
+  {field} transcript : TEXT
+  {field} translation : TEXT  [N]
+  {field} listening_passage_id : BIGINT  [FK]
+}
+entity tbl_pronunciation_item {
+  {field} id : BIGINT  [PK]
+  {field} sample_text : VARCHAR(500)
+  {field} ipa : VARCHAR(500)
+  {field} sample_audio : VARCHAR(255)
+  {field} notes : VARCHAR(500)  [N]
+  {field} lesson_id : BIGINT  [FK]
+}
+entity tbl_pronunciation_attempt {
+  {field} id : BIGINT  [PK]
+  {field} recording : VARCHAR(255)
+  {field} accuracy_score : REAL
+  {field} fluency_score : REAL
+  {field} overall_score : REAL
+  {field} ai_feedback : TEXT  [N]
+  {field} practiced_time : TIMESTAMP
+  {field} learner_id : BIGINT  [FK]
+  {field} item_id : BIGINT  [FK]
+}
+entity tbl_question {
+  {field} id : BIGINT  [PK]
+  {field} kind : VARCHAR(20)
+  {field} type : VARCHAR(20)
+  {field} content : TEXT
+  {field} score : REAL
+  {field} hint : TEXT  [N]
+  {field} explanation : TEXT  [N]
+  {field} lesson_id : BIGINT  [FK, N]
+  {field} reading_passage_id : BIGINT  [FK, N]
+  {field} skill : VARCHAR(20)  [N]
+  {field} test_id : BIGINT  [FK, N]
+  {field} material_id : BIGINT  [FK, N]
+  {field} vocabulary_id : BIGINT  [FK, N]
+}
+entity tbl_answer_option {
+  {field} id : BIGINT  [PK]
+  {field} content : VARCHAR(500)
+  {field} is_correct : BOOLEAN
+  {field} question_id : BIGINT  [FK]
+}
+entity tbl_accepted_answer {
+  {field} id : BIGINT  [PK]
+  {field} content : VARCHAR(255)
+  {field} question_id : BIGINT  [FK]
+}
+entity tbl_sample_answer {
+  {field} id : BIGINT  [PK]
+  {field} content : TEXT
+  {field} question_id : BIGINT  [FK]
+}
+entity tbl_exercise_attempt {
+  {field} id : BIGINT  [PK]
+  {field} status : VARCHAR(20)
+  {field} max_score : REAL
+  {field} start_time : TIMESTAMP
+  {field} end_time : TIMESTAMP  [N]
+  {field} learner_id : BIGINT  [FK]
+  {field} lesson_id : BIGINT  [FK]
+}
+entity tbl_exercise_answer {
+  {field} id : BIGINT  [PK]
+  {field} answer_text : TEXT  [N]
+  {field} is_correct : BOOLEAN  [N]
+  {field} score : REAL  [N]
+  {field} ai_feedback : TEXT  [N]
+  {field} exercise_attempt_id : BIGINT  [FK]
+  {field} question_id : BIGINT  [FK]
+  {field} selected_option_id : BIGINT  [FK, N]
+}
+
+tbl_exercise_lesson ||--o{ tbl_reading_passage
+tbl_exercise_lesson ||--o| tbl_listening_passage
+tbl_listening_passage ||--o{ tbl_listening_segment
+tbl_exercise_lesson ||--o{ tbl_pronunciation_item
+tbl_user ||--o{ tbl_pronunciation_attempt
+tbl_pronunciation_item ||--o{ tbl_pronunciation_attempt
+tbl_exercise_lesson |o--o{ tbl_question
+tbl_reading_passage |o--o{ tbl_question
+tbl_test |o--o{ tbl_question
+tbl_test_material |o--o{ tbl_question
+tbl_vocabulary |o--o{ tbl_question
+tbl_question ||--o{ tbl_answer_option
+tbl_question ||--o{ tbl_accepted_answer
+tbl_question ||--o{ tbl_sample_answer
+tbl_user ||--o{ tbl_exercise_attempt
+tbl_exercise_lesson ||--o{ tbl_exercise_attempt
+tbl_exercise_attempt ||--o{ tbl_exercise_answer
+tbl_question ||--o{ tbl_exercise_answer
+tbl_answer_option |o--o{ tbl_exercise_answer
+tbl_exercise_lesson |o--o{ tbl_knowledge_chunk
+tbl_question |o--o{ tbl_knowledge_chunk
+tbl_exercise_lesson |o--o{ tbl_chat_session
+tbl_question |o--o{ tbl_chat_session
+tbl_question ||--o{ tbl_test_answer
+tbl_answer_option |o--o{ tbl_test_answer
+@enduml

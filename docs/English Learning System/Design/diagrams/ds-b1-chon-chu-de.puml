@@ -1,0 +1,106 @@
+@startuml ds-b1-chon-chu-de
+!include _style-ds.iuml
+
+actor "Người học" as NH
+box "Frontend (React)" #FAFAFA
+  boundary LearnerHomePage
+  boundary LearnerLayout
+  boundary VocabularyPage
+  boundary TopicDetailPage
+  boundary FlashcardPage
+end box
+box "Backend (Spring Boot)" #FAFAFA
+  control FlashcardController
+  control LearnerVocabularyDAO
+  control TopicStatDAO
+  control CustomListStatDAO
+  entity LearnerVocabulary
+  entity Vocabulary
+  entity TopicStat
+  entity CustomListStat
+end box
+
+activate LearnerHomePage
+LearnerHomePage -> LearnerHomePage : loadDueList()
+LearnerHomePage -> FlashcardController ++ : GET /api/flashcard/due-words
+FlashcardController -> FlashcardController : getDueList()
+FlashcardController -> LearnerVocabularyDAO ++ : gọi
+LearnerVocabularyDAO -> LearnerVocabularyDAO : getDueList()
+loop mỗi từ đến hạn (itinerary, passport)
+  LearnerVocabularyDAO -> LearnerVocabulary ++ : gọi
+  LearnerVocabulary -> LearnerVocabulary : LearnerVocabulary()
+  LearnerVocabulary -> Vocabulary ++ : gọi
+  Vocabulary -> Vocabulary : Vocabulary()
+  Vocabulary --> LearnerVocabulary -- : trả về
+  LearnerVocabulary --> LearnerVocabularyDAO -- : trả về
+end
+LearnerVocabularyDAO --> FlashcardController -- : trả về 2 từ
+FlashcardController --> LearnerHomePage -- : 200, JSON 2 từ
+LearnerHomePage --> NH : hiển thị thẻ "Từ cần ôn hôm nay · 2"
+deactivate LearnerHomePage
+
+NH -> LearnerLayout ++ : chọn mục "Từ vựng" trên thanh bên
+LearnerLayout -> LearnerLayout : handleSelectMenuItem()
+LearnerLayout -> VocabularyPage ++ : chuyển trang
+deactivate LearnerLayout
+VocabularyPage -> VocabularyPage : loadData()
+VocabularyPage -> FlashcardController ++ : GET /api/flashcard/topics
+FlashcardController -> FlashcardController : getTopicStats()
+FlashcardController -> TopicStatDAO ++ : gọi
+TopicStatDAO -> TopicStatDAO : getTopicStats()
+loop mỗi chủ đề (4 chủ đề)
+  TopicStatDAO -> TopicStat ++ : gọi
+  TopicStat -> TopicStat : TopicStat(), setter (cả thuộc tính kế thừa từ Topic)
+  TopicStat --> TopicStatDAO -- : trả về
+end
+TopicStatDAO --> FlashcardController -- : trả về 4 chủ đề (Du lịch 12/40, Công việc 20/35, Gia đình 30/30, Thức ăn 25/45)
+FlashcardController --> VocabularyPage -- : 200, JSON 4 chủ đề
+VocabularyPage -> FlashcardController ++ : GET /api/flashcard/custom-lists
+FlashcardController -> FlashcardController : getCustomListStats()
+FlashcardController -> CustomListStatDAO ++ : gọi
+CustomListStatDAO -> CustomListStatDAO : getCustomListStats()
+CustomListStatDAO -> CustomListStat ++ : gọi
+CustomListStat -> CustomListStat : CustomListStat(), setter (cả thuộc tính kế thừa từ CustomList)
+CustomListStat --> CustomListStatDAO -- : trả về
+CustomListStatDAO --> FlashcardController -- : trả về 1 danh sách ("Từ khó tuần này" 2/6)
+FlashcardController --> VocabularyPage -- : 200, JSON 1 danh sách
+ref over VocabularyPage, FlashcardController, LearnerVocabularyDAO : GET /api/flashcard/due-words: lấy 2 từ đến hạn như bước 2–13
+VocabularyPage --> NH : hiển thị "Đã học 87 / 150 từ · 4 chủ đề", tab "Chủ đề có sẵn", "Danh sách của tôi (1)"
+
+NH -> VocabularyPage : click thẻ chủ đề "Du lịch"
+VocabularyPage -> VocabularyPage : handleSelectTopic()
+VocabularyPage -> TopicDetailPage ++ : chuyển trang (truyền chủ đề Du lịch)
+deactivate VocabularyPage
+TopicDetailPage -> TopicDetailPage : loadTopic()
+TopicDetailPage -> FlashcardController ++ : GET /api/flashcard/topics?topicId=… (Du lịch)
+FlashcardController -> FlashcardController : getTopicStats()
+FlashcardController -> TopicStatDAO ++ : gọi
+TopicStatDAO -> TopicStatDAO : getTopicStats()
+TopicStatDAO -> TopicStat ++ : gọi
+TopicStat -> TopicStat : TopicStat(), setter
+TopicStat --> TopicStatDAO -- : trả về
+TopicStatDAO --> FlashcardController -- : trả về Du lịch (đã học 12/40, 2 từ đến hạn)
+FlashcardController --> TopicDetailPage -- : 200, JSON 1 chủ đề
+TopicDetailPage -> TopicDetailPage : loadWords()
+TopicDetailPage -> FlashcardController ++ : GET /api/flashcard/topics/{id}/words?page=0
+FlashcardController -> FlashcardController : getWordsByTopic()
+FlashcardController -> LearnerVocabularyDAO ++ : gọi
+LearnerVocabularyDAO -> LearnerVocabularyDAO : getWordsByTopic()
+loop mỗi từ (20 từ đầu, A1 → C2)
+  LearnerVocabularyDAO -> LearnerVocabulary ++ : gọi
+  LearnerVocabulary -> LearnerVocabulary : LearnerVocabulary()
+  LearnerVocabulary -> Vocabulary ++ : gọi
+  Vocabulary -> Vocabulary : Vocabulary()
+  Vocabulary --> LearnerVocabulary -- : trả về
+  LearnerVocabulary --> LearnerVocabularyDAO -- : trả về
+end
+LearnerVocabularyDAO --> FlashcardController -- : trả về 20 từ kèm trạng thái học của Lan
+FlashcardController --> TopicDetailPage -- : 200, JSON 20 từ
+TopicDetailPage --> NH : hiển thị trang chủ đề, nút "Học 30 từ →"
+
+NH -> TopicDetailPage : click "Học 30 từ →"
+TopicDetailPage -> TopicDetailPage : handleStudy()
+TopicDetailPage -> FlashcardPage ++ : chuyển trang (truyền chủ đề Du lịch)
+deactivate TopicDetailPage
+deactivate FlashcardPage
+@enduml

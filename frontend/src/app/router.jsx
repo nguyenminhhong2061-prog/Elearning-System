@@ -1,8 +1,10 @@
 import { Route, Routes } from 'react-router'
+import { ROLES } from '@/api/constants'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AuthLayout } from '@/components/layout/AuthLayout'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
 import { RouteBoundary } from '@/components/layout/RouteBoundary'
+import { AdminLayout } from '@/features/admin/components/AdminLayout'
 import { GuestRoute } from '@/features/auth/components/GuestRoute'
 import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute'
 import { lazyPage } from '@/lib/lazyPage'
@@ -31,10 +33,20 @@ const TestResultPage = lazyPage(() => import('@/features/tests/pages/TestResultP
 
 const PlanPage = lazyPage(() => import('@/features/plan/pages/PlanPage'), 'PlanPage')
 
+const AdminOverviewPage = lazyPage(() => import('@/features/admin/pages/AdminOverviewPage'), 'AdminOverviewPage')
+const AdminTopicsPage = lazyPage(() => import('@/features/admin/pages/AdminTopicsPage'), 'AdminTopicsPage')
+const AdminTopicWordsPage = lazyPage(() => import('@/features/admin/pages/AdminTopicWordsPage'), 'AdminTopicWordsPage')
+const AdminLessonsPage = lazyPage(() => import('@/features/admin/pages/AdminLessonsPage'), 'AdminLessonsPage')
+const AdminLessonEditorPage = lazyPage(() => import('@/features/admin/pages/AdminLessonEditorPage'), 'AdminLessonEditorPage')
+const AdminTestsPage = lazyPage(() => import('@/features/admin/pages/AdminTestsPage'), 'AdminTestsPage')
+const AdminTestEditorPage = lazyPage(() => import('@/features/admin/pages/AdminTestEditorPage'), 'AdminTestEditorPage')
+const AdminUsersPage = lazyPage(() => import('@/features/admin/pages/AdminUsersPage'), 'AdminUsersPage')
+const AdminUserDetailPage = lazyPage(() => import('@/features/admin/pages/AdminUserDetailPage'), 'AdminUserDetailPage')
+
 /**
  * Every route of the app is registered here. To add a module's pages, declare each page with lazyPage above, put
- * its route inside the <AppLayout> group (or under <ProtectedRoute roles={[ROLES.ADMIN]}> for admin-only pages) and
- * keep the sidebar entry in components/layout/navItems.js in step. A new layout must wrap its <Outlet /> in
+ * its route inside the <AppLayout> group (or the /admin group for admin pages) and keep the sidebar entry in
+ * components/layout/navItems.js (admin: features/admin/components/AdminLayout.jsx) in step. A new layout must wrap its <Outlet /> in
  * <RouteBoundary>, like AppLayout; the boundary here only catches what falls outside every layout.
  */
 export function AppRoutes() {
@@ -49,8 +61,8 @@ export function AppRoutes() {
           </Route>
         </Route>
 
-        {/* Signed-in users only: everyone else is sent to /login. */}
-        <Route element={<ProtectedRoute />}>
+        {/* Learners only: everyone else is sent to /login, admins to their own area. */}
+        <Route element={<ProtectedRoute roles={[ROLES.LEARNER]} redirectTo="/admin" />}>
           <Route element={<AppLayout />}>
             <Route index element={<HomePage />} />
             <Route path="account/change-password" element={<ChangePasswordPage />} />
@@ -82,6 +94,24 @@ export function AppRoutes() {
 
             {/* Module D, D2: study plan (API contract: docs/api/plans.md). */}
             <Route path="plan" element={<PlanPage />} />
+          </Route>
+        </Route>
+
+        {/* Module E: the admin area (API contract: docs/api/admin.md). Learners see the "forbidden" page. */}
+        <Route path="admin" element={<ProtectedRoute roles={[ROLES.ADMIN]} />}>
+          <Route element={<AdminLayout />}>
+            <Route index element={<AdminOverviewPage />} />
+            <Route path="vocabulary" element={<AdminTopicsPage />} />
+            <Route path="vocabulary/topics/:topicId" element={<AdminTopicWordsPage />} />
+            <Route path="lessons" element={<AdminLessonsPage />} />
+            <Route path="lessons/new" element={<AdminLessonEditorPage />} />
+            <Route path="lessons/:lessonId" element={<AdminLessonEditorPage />} />
+            <Route path="tests" element={<AdminTestsPage />} />
+            <Route path="tests/new" element={<AdminTestEditorPage />} />
+            <Route path="tests/:testId" element={<AdminTestEditorPage />} />
+            <Route path="users" element={<AdminUsersPage />} />
+            <Route path="users/:userId" element={<AdminUserDetailPage />} />
+            <Route path="account/change-password" element={<ChangePasswordPage />} />
           </Route>
         </Route>
 

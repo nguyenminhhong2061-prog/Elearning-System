@@ -264,8 +264,10 @@ class VocabularyApiTests {
                 .andExpect(jsonPath("$.difficultyLevel").value("A2"))
                 .andExpect(jsonPath("$.learningStatus").value("NEW"));
 
+        // Nobody uses the word, so it is deleted for good (scenario 21; a word in use is hidden, see AdminVocabularyApiTests).
         asAdmin(delete("/api/vocabulary/{id}", id))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result").value("DELETED"));
 
         asAdmin(get("/api/vocabulary/{id}", id))
                 .andExpect(status().isNotFound());

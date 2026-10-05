@@ -1,0 +1,137 @@
+@startuml ds-d3-cham-bao-cao
+!include _style-ds.iuml
+
+actor "Người học" as NH
+box "Frontend (React)" #FAFAFA
+  boundary DoTestPage
+  boundary TestReportPage
+  control AuthContext
+  boundary LearnerLayout
+  boundary LearnerHomePage
+end box
+box "Backend (Spring Boot)" #FAFAFA
+  control TestController
+  control TestAttemptDAO
+  control DailyProgressDAO
+  boundary AIService
+  control TestAnswerDAO
+  control LearnerDAO
+  control TestReportDAO
+  entity TestAnswer
+  entity TestAttempt
+  entity TestReport
+end box
+actor "Dịch vụ AI" as AI
+
+activate DoTestPage
+NH -> DoTestPage : click "Nộp bài" (câu 23)
+DoTestPage -> DoTestPage : handleSubmit()
+DoTestPage --> NH : hộp thoại "Nộp bài kiểm tra?" (đã trả lời tất cả các câu)
+NH -> DoTestPage : click "Nộp bài" trong hộp thoại
+DoTestPage -> TestController ++ : POST /api/test-attempts/{id}/submit (thời điểm bắt đầu làm bài)
+TestController -> TestController : submitAttempt()
+TestController -> TestAttemptDAO ++ : gọi
+TestAttemptDAO -> TestAttemptDAO : getAttempt()
+TestAttemptDAO -> TestAttempt ++ : gọi
+TestAttempt -> TestAttempt : TestAttempt()
+TestAttempt --> TestAttemptDAO -- : trả về
+TestAttemptDAO --> TestController -- : trả về lượt của Lan, đang làm
+TestController -> TestAttemptDAO ++ : gọi
+TestAttemptDAO -> TestAttemptDAO : submitAttempt()
+TestAttemptDAO -> TestAttempt ++ : gọi
+TestAttempt -> TestAttempt : setter (thời điểm nộp, trạng thái đã nộp)
+loop mỗi câu trả lời (23 câu)
+  TestAttempt -> TestAnswer ++ : gọi
+  TestAnswer -> TestAnswer : TestAnswer()
+  TestAnswer --> TestAttempt -- : trả về
+end
+TestAttempt --> TestAttemptDAO -- : trả về
+TestAttemptDAO --> TestController -- : trả về lượt đã nộp (nghe đúng 7/10, đọc đúng 8/10)
+TestController -> DailyProgressDAO ++ : gọi
+DailyProgressDAO -> DailyProgressDAO : updateProgress()
+DailyProgressDAO --> TestController -- : trả về
+TestController --> DoTestPage -- : 200, JSON lượt đã nộp
+DoTestPage -> TestReportPage ++ : chuyển trang (truyền lượt đã nộp)
+deactivate DoTestPage
+TestReportPage --> NH : hiển thị "Đang chấm phần Nói, Viết"
+
+TestReportPage -> TestReportPage : gradeAttempt()
+TestReportPage -> TestController ++ : POST /api/test-attempts/{id}/grade
+TestController -> TestController : gradeAttempt()
+TestController -> TestAttemptDAO ++ : gọi
+TestAttemptDAO -> TestAttemptDAO : getAttempt()
+TestAttemptDAO -> TestAttempt ++ : gọi
+TestAttempt -> TestAttempt : TestAttempt()
+TestAttempt --> TestAttemptDAO -- : trả về
+TestAttemptDAO --> TestController -- : trả về lượt của Lan, đã nộp
+loop mỗi câu nói và câu viết (3 câu)
+  TestController -> AIService ++ : gọi
+  AIService -> AIService : gradeAnswer()
+  AIService -> AI : gửi câu trả lời và đề bài
+  AI --> AIService : trả về điểm và nhận xét
+  AIService -> TestAnswer ++ : gọi
+  TestAnswer -> TestAnswer : setter (điểm, nhận xét)
+  TestAnswer --> AIService -- : trả về
+  AIService --> TestController -- : trả về câu đã chấm (nói 1: 6.0; nói 2: 7.0; viết: 6.5)
+  TestController -> TestAnswerDAO ++ : gọi
+  TestAnswerDAO -> TestAnswerDAO : saveAnswer()
+  TestAnswerDAO --> TestController -- : trả về true
+end
+TestController -> TestAttemptDAO ++ : gọi
+TestAttemptDAO -> TestAttemptDAO : calculateScores()
+TestAttemptDAO -> TestAttempt ++ : gọi
+TestAttempt -> TestAttempt : setter (điểm từng kỹ năng, tổng điểm)
+TestAttempt --> TestAttemptDAO -- : trả về
+TestAttemptDAO --> TestController -- : trả về nghe 7.0, nói 6.5, đọc 8.0, viết 6.5, tổng 7.0
+TestController -> AIService ++ : gọi
+AIService -> AIService : classifyLevel()
+AIService -> AI : gửi điểm bốn kỹ năng và trình độ hiện tại A2
+AI --> AIService : trả về trình độ và lộ trình đề xuất
+AIService -> TestAttempt ++ : gọi
+TestAttempt -> TestAttempt : setter (trình độ đề xuất, lộ trình đề xuất)
+TestAttempt --> AIService -- : trả về
+AIService --> TestController -- : trả về B1, lộ trình 12 tuần
+TestController -> TestAttemptDAO ++ : gọi
+TestAttemptDAO -> TestAttemptDAO : saveResult()
+TestAttemptDAO --> TestController -- : trả về true (trạng thái đã chấm)
+opt trình độ đề xuất B1 khác trình độ hiện tại A2
+  TestController -> LearnerDAO ++ : gọi
+  LearnerDAO -> LearnerDAO : updateLevel()
+  LearnerDAO --> TestController -- : trả về true
+end
+TestController --> TestReportPage -- : 200, JSON lượt đã chấm
+
+TestReportPage -> TestReportPage : loadReport()
+TestReportPage -> TestController ++ : GET /api/test-attempts/{id}/report
+TestController -> TestController : getReport()
+TestController -> TestAttemptDAO ++ : gọi
+TestAttemptDAO -> TestAttemptDAO : getAttempt()
+TestAttemptDAO -> TestAttempt ++ : gọi
+TestAttempt -> TestAttempt : TestAttempt()
+TestAttempt --> TestAttemptDAO -- : trả về
+TestAttemptDAO --> TestController -- : trả về lượt của Lan, đã chấm
+TestController -> TestReportDAO ++ : gọi
+TestReportDAO -> TestReportDAO : getReport()
+TestReportDAO -> TestReport ++ : gọi
+TestReport -> TestReport : TestReport(), setter (cả thuộc tính kế thừa từ TestAttempt)
+loop mỗi câu trả lời (23 câu)
+  TestReport -> TestAnswer ++ : gọi
+  TestAnswer -> TestAnswer : TestAnswer()
+  TestAnswer --> TestReport -- : trả về
+end
+TestReport --> TestReportDAO -- : trả về
+TestReportDAO --> TestController -- : trả về báo cáo (trình độ trước A2, tổng 7.0, đề xuất B1)
+TestController --> TestReportPage -- : 200, JSON báo cáo
+TestReportPage -> AuthContext ++ : gọi
+AuthContext -> AuthContext : updateUser()
+AuthContext --> TestReportPage -- : trả về (trình độ hiện tại B1)
+TestReportPage --> NH : hiển thị báo cáo: 7.0/10, B1, "Lộ trình đề xuất", điểm kỹ năng
+deactivate TestReportPage
+
+NH -> LearnerLayout ++ : chọn mục "Tiến độ" trên thanh bên
+LearnerLayout -> LearnerLayout : handleSelectMenuItem()
+LearnerLayout -> LearnerHomePage ++ : chuyển trang
+deactivate LearnerLayout
+LearnerHomePage --> NH : hiển thị trang "Tiến độ"; khối "Trình độ hiện tại" ghi B1
+deactivate LearnerHomePage
+@enduml

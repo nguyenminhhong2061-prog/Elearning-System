@@ -50,12 +50,22 @@ Quan hệ: users 1-n user_level_history. Module dùng: Tiến độ, Kiểm tra 
 ## topics
 
 - id BIGINT UNSIGNED PK, name, description, image_url
+- updated_at TIMESTAMPTZ nullable: lần cuối admin thêm hoặc sửa (cột "Cập nhật"); NULL với chủ đề seed chưa sửa
+- UNIQUE (lower(btrim(name))): không hai chủ đề trùng tên, không phân biệt hoa thường (kịch bản 22)
+- Chủ đề còn từ (kể cả từ đã ẩn) thì không xóa được: backend trả 409
+- (`updated_at` và chỉ mục: migration `V202610041000`, 04/10/2026)
 
 ## vocabulary
 
 - id BIGINT UNSIGNED PK, topic_id FK→topics.id nullable, created_by FK→users.id nullable
 - word, meaning, example_sentence, phonetic, audio_url, image_url
 - difficulty_level ENUM CEFR (A1–C2)
+- status ENUM(visible, hidden) DEFAULT visible: xóa một từ đã có người học, nằm trong danh sách riêng hoặc có câu hỏi
+  kiểm tra tham chiếu thì chỉ **ẩn** (kịch bản 21); từ ẩn không còn xuất hiện với người học, tiến độ cũ giữ nguyên
+- updated_at TIMESTAMPTZ nullable: lần cuối admin thêm, sửa hoặc ẩn
+- UNIQUE (topic_id, lower(btrim(word))) cho từ hệ thống chưa ẩn có chủ đề: một chủ đề không có hai từ trùng (kịch bản
+  19, 20)
+- (`status`, `updated_at` và chỉ mục: migration `V202610041000`, 04/10/2026)
 
 ## user_vocabulary (Spaced Repetition)
 

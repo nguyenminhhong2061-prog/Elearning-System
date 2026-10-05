@@ -7,17 +7,19 @@ import { SessionErrorScreen } from './SessionErrorScreen'
 
 /**
  * Layout route that only lets signed-in users through; everyone else is sent to the login page and brought
- * back afterwards. With `roles`, users whose role is not listed see the "forbidden" page instead. That check is
- * only for a tidy interface: the backend is what really enforces roles.
+ * back afterwards. With `roles`, users whose role is not listed see the "forbidden" page instead, or are sent to
+ * `redirectTo` when it is given. That check is only for a tidy interface: the backend is what really enforces roles.
  *
  * @example
  * <Route element={<ProtectedRoute />}>...</Route>
  * <Route element={<ProtectedRoute roles={[ROLES.ADMIN]} />}>...</Route>
+ * <Route element={<ProtectedRoute roles={[ROLES.LEARNER]} redirectTo="/admin" />}>...</Route>
  *
  * @param {object} props
  * @param {string[]} [props.roles] allowed roles (use the ROLES constants); everyone signed in when omitted
+ * @param {string} [props.redirectTo] where users with another role go instead of the "forbidden" page
  */
-export function ProtectedRoute({ roles }) {
+export function ProtectedRoute({ roles, redirectTo }) {
   const { status, user, endReason, retry } = useAuth()
   const location = useLocation()
 
@@ -31,6 +33,6 @@ export function ProtectedRoute({ roles }) {
     return <Navigate to={paths.login} replace state={from ? { from } : null} />
   }
 
-  if (roles && !roles.includes(user.role)) return <ForbiddenPage />
+  if (roles && !roles.includes(user.role)) return redirectTo ? <Navigate to={redirectTo} replace /> : <ForbiddenPage />
   return <Outlet />
 }

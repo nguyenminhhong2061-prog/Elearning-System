@@ -39,16 +39,25 @@ export async function readRaw(req) {
   return Buffer.concat(chunks)
 }
 
-/** The signed-in user's id, read from the JWT the real backend issued (the mock does not check the signature). */
-export function userIdFromToken(authorization) {
+/** The claims of the JWT the real backend issued (the mock does not check the signature), or null. */
+function claimsFromToken(authorization) {
   const token = /^Bearer (.+)$/.exec(authorization ?? '')?.[1]
   if (!token) return null
   try {
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'))
-    return payload.sub ?? null
+    return JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'))
   } catch {
     return null
   }
+}
+
+/** The signed-in user's id, read from the JWT. */
+export function userIdFromToken(authorization) {
+  return claimsFromToken(authorization)?.sub ?? null
+}
+
+/** The signed-in user's role ("LEARNER" or "ADMIN"), read from the JWT's `role` claim. */
+export function roleFromToken(authorization) {
+  return claimsFromToken(authorization)?.role ?? null
 }
 
 function parseCount(value, fallback) {

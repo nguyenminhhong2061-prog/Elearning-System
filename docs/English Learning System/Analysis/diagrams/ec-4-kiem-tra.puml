@@ -1,0 +1,65 @@
+@startuml ec-4-kiem-tra
+!include _style.iuml
+
+class Learner <<ngoai>>
+class Vocabulary <<ngoai>>
+class LevelHistory <<ngoai>>
+abstract class Question <<ngoai>>
+class AnswerOption <<ngoai>>
+class AcceptedAnswer <<ngoai>>
+
+class Test {
+  -title
+  -type
+  -skill
+  -instruction
+  -openDate
+  -closeDate
+  -status
+}
+class TestMaterial {
+  -type
+  -title
+  -audio
+  -text
+}
+class TestQuestion {
+  -skill
+}
+class TestAttempt {
+  -startTime
+  -submitTime
+  -status
+  -totalScore
+  -listeningScore
+  -speakingScore
+  -readingScore
+  -writingScore
+  -suggestedLevel
+  -suggestedRoadmap
+}
+class TestAnswer {
+  -answerText
+  -recording
+  -isCorrect
+  -score
+  -aiFeedback
+}
+
+Test "1" *-- "*" TestMaterial
+Test "1" *-- "*" TestQuestion
+TestMaterial "0..1" -- "*" TestQuestion
+Question <|-- TestQuestion
+Question "1" *-- "*" AnswerOption
+Question "1" *-- "*" AcceptedAnswer
+Vocabulary "0..1" -- "*" TestQuestion
+
+Learner "1" -- "*" TestAttempt
+Test "1" -- "*" TestAttempt
+TestAttempt "1" *-- "*" TestAnswer
+TestQuestion "1" -- "*" TestAnswer
+AnswerOption "0..1" -- "*" TestAnswer : được chọn <
+
+Learner "1" -- "*" LevelHistory
+TestAttempt "0..1" -- "0..1" LevelHistory : sinh ra >
+@enduml

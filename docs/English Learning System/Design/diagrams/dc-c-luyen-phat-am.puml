@@ -1,0 +1,166 @@
+@startuml dc-c-luyen-phat-am
+!include _style-dc.iuml
+
+package "Frontend (React)" {
+  class LearnerLayout {
+    +handleSelectMenuItem(path : string) : void
+  }
+  class ExercisePage {
+    -skill : string
+    -lessonStats : LessonStat[]
+    -user : Learner
+    +loadLessons() : void
+    +handleChangeTab(skill : string) : void
+    +handleSelectLesson(lesson : LessonStat) : void
+  }
+  class PracticePronunciationPage {
+    -lesson : ExerciseLesson
+    -items : PronunciationItem[]
+    -index : number
+    -recorder : MediaRecorder
+    -recording : Blob
+    -result : PronunciationAttempt
+    -attempts : PronunciationAttempt[]
+    -startTime : Date
+    +loadItems() : void
+    +handlePlaySample() : void
+    +handleRecord() : void
+    +handleStop() : void
+    +handlePlayRecording() : void
+    +handleSkip() : void
+    +handleNextItem() : void
+    +handleFinish() : void
+    +handleAskChatbot() : void
+  }
+  class PronunciationSummary {
+    -items : PronunciationItem[]
+    -attempts : PronunciationAttempt[]
+    +handleBackToList() : void
+  }
+}
+
+package "Backend (Spring Boot)" {
+  class ExerciseController {
+    -lessonStatDAO : LessonStatDAO
+    +getLessonStats(skill : ExerciseSkill) : List<LessonStat>
+  }
+  class PronunciationController {
+    -pronunciationItemDAO : PronunciationItemDAO
+    -pronunciationAttemptDAO : PronunciationAttemptDAO
+    -dailyProgressDAO : DailyProgressDAO
+    -aiService : AIService
+    -fileStorage : FileStorageService
+    +getItemsByLesson(lessonId : Long) : List<PronunciationItem>
+    +assessPronunciation(itemId : Long, recording : MultipartFile) : PronunciationAttempt
+    +finishLesson(lessonId : Long, startTime : LocalDateTime) : List<PronunciationAttempt>
+  }
+  class AIService {
+    -restClient : RestClient
+    +assessPronunciation(recording : String, item : PronunciationItem) : PronunciationAttempt
+  }
+  class FileStorageService {
+    -storageDir : String
+    +storeAudio(content : byte[], contentType : String) : String
+  }
+  abstract class DAO {
+    #jdbcTemplate : JdbcTemplate
+    +DAO(jdbcTemplate : JdbcTemplate)
+  }
+  class LessonStatDAO {
+    +getLessonStats(learnerId : Long, skill : ExerciseSkill) : List<LessonStat>
+  }
+  class PronunciationItemDAO {
+    +getItemsByLesson(lessonId : Long) : List<PronunciationItem>
+    +getItemById(itemId : Long) : PronunciationItem
+  }
+  class PronunciationAttemptDAO {
+    +addAttempt(attempt : PronunciationAttempt) : boolean
+    +getAttemptsByLesson(learnerId : Long, lessonId : Long) : List<PronunciationAttempt>
+  }
+  class DailyProgressDAO {
+    +updateProgress(learnerId : Long, date : LocalDate, minutes : int) : void
+  }
+
+  class ExerciseLesson {
+    -id : Long
+    -skill : ExerciseSkill
+    -title : String
+    -description : String
+    -topic : String
+    -level : CefrLevel
+    -difficulty : Difficulty
+    -estimatedDuration : int
+    -status : LessonStatus
+    -readingPassages : List<ReadingPassage>
+    -listeningPassage : ListeningPassage
+    -pronunciationItems : List<PronunciationItem>
+    -questions : List<ExerciseQuestion>
+  }
+  class LessonStat {
+    -itemCount : int
+    -practicedCount : int
+    -bestPercent : Float
+    -attemptCount : int
+    -answeredCount : int
+  }
+  class PronunciationItem {
+    -id : Long
+    -sampleText : String
+    -ipa : String
+    -sampleAudio : String
+    -notes : String
+  }
+  class PronunciationAttempt {
+    -id : Long
+    -attemptNo : int
+    -recording : String
+    -accuracyScore : float
+    -fluencyScore : float
+    -overallScore : float
+    -aiFeedback : String
+    -practicedTime : LocalDateTime
+    -learner : Learner
+    -item : PronunciationItem
+  }
+  class DailyProgress {
+    -id : Long
+    -date : LocalDate
+    -wordsLearned : int
+    -exercisesCompleted : int
+    -testsCompleted : int
+    -studyMinutes : int
+    -learner : Learner
+  }
+  class Learner <<ngoai>>
+}
+
+LearnerLayout -right- ExercisePage
+ExercisePage -right- PracticePronunciationPage
+PracticePronunciationPage *-- PronunciationSummary
+PronunciationSummary -- ExercisePage
+
+ExercisePage -- ExerciseController
+PracticePronunciationPage -- PronunciationController
+
+ExerciseController -- LessonStatDAO
+PronunciationController -- PronunciationItemDAO
+PronunciationController -- PronunciationAttemptDAO
+PronunciationController -- DailyProgressDAO
+PronunciationController -- AIService
+PronunciationController -- FileStorageService
+DAO <|-- LessonStatDAO
+DAO <|-- PronunciationItemDAO
+DAO <|-- PronunciationAttemptDAO
+DAO <|-- DailyProgressDAO
+LessonStatDAO -- LessonStat
+PronunciationItemDAO -- PronunciationItem
+PronunciationAttemptDAO -- PronunciationAttempt
+DailyProgressDAO -- DailyProgress
+AIService ..> PronunciationAttempt
+
+ExerciseLesson <|-- LessonStat
+ExerciseLesson "1" *-- "*" PronunciationItem
+PronunciationAttempt "*" o-- "1" PronunciationItem
+PronunciationAttempt "*" o-- "1" Learner
+DailyProgress "*" o-- "1" Learner
+@enduml
