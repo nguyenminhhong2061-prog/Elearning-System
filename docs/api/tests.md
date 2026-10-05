@@ -9,7 +9,7 @@
 > từng câu hỏi** và theo bậc AI chấm cho phần Nói, Viết (mục "Đánh giá trình độ"); AI chấm thật qua Groq, không còn
 > bản chấm tạm. JSON chỉ **thêm** trường (`review[].level`, `aiCriteria`, `aiComment`), không đổi trường cũ.
 >
-> **Đổi lần 2 ngày 03/10/2026 (backend đã làm, frontend chưa):** một bài nghe hoặc đoạn đọc có **nhiều câu hỏi**
+> **Đổi lần 2 ngày 03/10/2026 (backend và frontend đã làm, frontend xong ngày 04/10):** một bài nghe hoặc đoạn đọc có **nhiều câu hỏi**
 > (`passages`, `passageId`); mỗi bài nghe **nghe tối đa 2 lần** mỗi lượt; đề **tổng hợp chỉ làm một lần**, đề định kỳ làm
 > lại được (`retakeAllowed`); kết quả của lượt đang làm trả `409`. Việc giao diện cần sửa: mục "Việc frontend cần làm".
 
@@ -338,8 +338,7 @@ ngay) và một đề `COMPREHENSIVE` (đủ 4 kỹ năng, phần Nói/Viết c�
 
 ## Việc frontend cần làm (theo thay đổi lần 2 ngày 03/10/2026)
 
-Backend đã chạy theo các luật trên; giao diện hiện tại vẫn chạy được với đề cũ (không có ngữ liệu), nhưng cần sửa các
-chỗ sau trước khi dùng đề có `passages`:
+**Đã làm ngày 04/10/2026** (`frontend/src/features/tests/`); danh sách dưới đây ghi lại giao diện đã đổi những gì:
 
 1. **Màn làm bài:** nhóm các câu cùng `passageId`, hiện bài nghe hoặc đoạn đọc một lần phía trên nhóm câu. Hiện nay
    câu thuộc ngữ liệu sẽ hiện mà không có bài nghe, đoạn đọc của nó.

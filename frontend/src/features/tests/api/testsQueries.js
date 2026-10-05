@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { testsKeys } from './keys'
-import { getAttemptResult, getTest, getTests, submitAttempt } from './testsApi'
+import { ATTEMPT_STATUS, GRADING_POLL_MS } from '../constants'
+import { getAttemptResult, getTest, getTests, recordPassagePlay, submitAttempt } from './testsApi'
 
 export function useTests() {
   return useQuery({ queryKey: testsKeys.list(), queryFn: getTests })
@@ -11,12 +12,24 @@ export function useTest(id) {
   return useQuery({ queryKey: testsKeys.detail(id), queryFn: () => getTest(id), enabled: id !== null })
 }
 
-/** @param {number | null} attemptId */
+/**
+ * The result of an attempt. While the AI is still grading it (SUBMITTED) the result is fetched again every few
+ * seconds, so the page fills in by itself.
+ * @param {number | null} attemptId
+ */
 export function useTestResult(attemptId) {
   return useQuery({
     queryKey: testsKeys.result(attemptId),
     queryFn: () => getAttemptResult(attemptId),
     enabled: attemptId !== null,
+    refetchInterval: (query) => (query.state.data?.status === ATTEMPT_STATUS.SUBMITTED ? GRADING_POLL_MS : false),
+  })
+}
+
+/** POST .../passages/{passageId}/plays: counts one play of a recording before it is played. */
+export function useRecordPassagePlay() {
+  return useMutation({
+    mutationFn: ({ attemptId, passageId }) => recordPassagePlay(attemptId, passageId),
   })
 }
 

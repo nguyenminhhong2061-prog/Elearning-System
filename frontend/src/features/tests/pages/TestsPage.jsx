@@ -8,6 +8,10 @@ import { describeDeadline } from '../answers'
 import { useTests } from '../api/testsQueries'
 import { TEST_TYPES, TEST_TYPE_LABELS } from '../constants'
 
+/** A test taken only once (a comprehensive test) that the learner has already submitted: only its result is left. */
+const takenOnce = (test) =>
+  test.retakeAllowed === false && test.progress.attemptCount > 0 && !test.progress.inProgress
+
 /** The learner's standing on a test, under its title. */
 function progressLine(test) {
   const { progress } = test
@@ -15,14 +19,25 @@ function progressLine(test) {
     return `Đang làm dở · đã trả lời ${progress.inProgress.answeredCount}/${test.questionCount} câu`
   }
   if (progress.attemptCount === 0) return 'Chưa làm lần nào'
+  if (takenOnce(test)) {
+    return progress.bestScorePercent === null ? 'Đã nộp bài · đang chấm' : `Đã làm · ${progress.bestScorePercent}/100`
+  }
   const best = progress.bestScorePercent === null ? '' : ` · cao nhất ${progress.bestScorePercent}/100`
   return `Đã làm ${progress.attemptCount} lần${best}`
 }
 
 function actionLabel(test) {
   if (test.progress.inProgress) return 'Làm tiếp'
+  if (takenOnce(test)) return 'Xem kết quả'
   if (test.progress.attemptCount > 0) return 'Làm lại'
   return 'Bắt đầu'
+}
+
+function actionTarget(test) {
+  if (takenOnce(test) && test.progress.lastAttemptId != null) {
+    return `/tests/${test.id}/result/${test.progress.lastAttemptId}`
+  }
+  return `/tests/${test.id}`
 }
 
 // The design's test cards: dark for a periodic test, the teal gradient for the comprehensive one.
@@ -49,7 +64,7 @@ function TestCard({ test }) {
         <p className={cx('text-label', style.detail)}>{details.join(' · ')}</p>
       </div>
       <Link
-        to={`/tests/${test.id}`}
+        to={actionTarget(test)}
         aria-label={`${actionLabel(test)}: ${test.title}`}
         className={cx(
           'self-start rounded-lg px-5 py-2.75 text-label font-semibold text-white transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand',
