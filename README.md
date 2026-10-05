@@ -210,10 +210,13 @@ $env:JWT_SECRET = "chuoi-bi-mat-khi-dev-dai-it-nhat-32-ky-tu-0123456789"
   Lần chạy đầu Maven tải thư viện nên lâu hơn. Flyway tự tạo bảng và dữ liệu mẫu.
 - Vì sao đặt `JWT_SECRET`: nếu để trống, mỗi lần khởi động backend sinh một khóa mới, token cũ mất hiệu lực và
   bạn bị đăng xuất. Biến chỉ có tác dụng trong cửa sổ terminal vừa đặt, mở cửa sổ mới thì đặt lại.
-- Giá trị mặc định trong `application.properties` đã khớp `docker-compose.yml` (database, user, mật khẩu đều là
-  `datn`, cổng 5433), nên không cần tạo file `.env`.
+- Nếu không đặt cấu hình khác, giá trị trong `application.properties` khớp `docker-compose.yml` (database `datn`,
+  cổng 5433). Backend chỉ đọc các biến `R2_*` từ `.env` ở repo root; các biến khác vẫn cần đặt trong terminal hoặc
+  *Environment variables* của IntelliJ.
+- Audio nghe được backend stream từ R2 khi `.env` có `R2_ENABLED=true` và thông tin S3 chỉ-đọc; object key bài mẫu là
+  `media/listening/airport.mp3`. Tạo token chỉ có quyền đọc và giới hạn bucket `learning-audio`.
 - **Trợ lý AI (chatbot, module B) cần khóa Groq.** Không đặt thì mọi thứ khác vẫn chạy, riêng trợ lý AI báo "không
-  thể trả lời lúc này". Muốn thử chatbot thật, đặt thêm trước `./mvnw spring-boot:run` (lấy khóa ở
+  thể trả lời lúc này". Muốn thử chatbot thật, đặt trước `./mvnw spring-boot:run` (lấy khóa ở
   https://console.groq.com/keys; **không commit khóa**, không gửi vào nhóm chat):
 
   ```bash
@@ -224,8 +227,7 @@ $env:JWT_SECRET = "chuoi-bi-mat-khi-dev-dai-it-nhat-32-ky-tu-0123456789"
   $env:GROQ_API_KEY = "gsk_..."          # PowerShell
   ```
 
-  Backend **không tự đọc file `.env`** (file đó dành cho `docker compose` và để ghi nhớ giá trị): biến nào cũng phải
-  đặt trong terminal như trên, hoặc trong *Environment variables* của IntelliJ.
+  Backend không nạp các biến Groq từ `.env`; đặt `GROQ_API_KEY` trong terminal hoặc *Environment variables* của IntelliJ.
 
 **Terminal 2: frontend** (giống nhau ở Git Bash và PowerShell)
 
