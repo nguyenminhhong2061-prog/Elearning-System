@@ -25,6 +25,17 @@ export const ATTEMPT_STATUS = Object.freeze({
   GRADED: 'GRADED',
 })
 
+/** How often the result of an attempt the AI is still grading is fetched again. */
+export const GRADING_POLL_MS = 10_000
+
+/** The criteria the AI rates a spoken or written answer on, in the order they are shown. */
+export const AI_CRITERIA = Object.freeze([
+  { key: 'task', label: 'Đáp ứng đề bài' },
+  { key: 'coherence', label: 'Mạch lạc' },
+  { key: 'vocabulary', label: 'Từ vựng' },
+  { key: 'grammar', label: 'Ngữ pháp' },
+])
+
 /** The four tested skills, in the same order as the progress radar. */
 export const SKILL_ORDER = Object.freeze(['listening', 'reading', 'writing', 'speaking'])
 

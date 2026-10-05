@@ -12,6 +12,7 @@
  * @property {number} attemptCount
  * @property {number | null} bestScorePercent
  * @property {string | null} lastCompletedAt
+ * @property {number | null} lastAttemptId the latest submitted attempt, to open its result
  * @property {{ attemptId: number, answeredCount: number, lastActivityAt: string } | null} inProgress
  */
 
@@ -24,6 +25,7 @@
  * @property {TestSkill | null} skill
  * @property {string | null} startDate
  * @property {string | null} endDate
+ * @property {boolean} retakeAllowed false for a test taken only once (a comprehensive test)
  * @property {number} questionCount
  * @property {TestProgress} progress
  */
@@ -35,8 +37,27 @@
  */
 
 /**
+ * What several questions are asked about: a recording to listen to (audioUrl, maxPlays) or a text to read (content).
+ * @typedef {object} TestPassage
+ * @property {number} id
+ * @property {string | null} title
+ * @property {string | null} content
+ * @property {string | null} audioUrl
+ * @property {number | null} maxPlays how many times the recording may be played in one attempt
+ */
+
+/**
+ * How many times a recording has been played in an attempt.
+ * @typedef {object} PassagePlay
+ * @property {number} passageId
+ * @property {number} playCount
+ * @property {number} maxPlays
+ */
+
+/**
  * @typedef {object} TestQuestion
  * @property {number} id
+ * @property {number | null} passageId the passage the question is about, null when it stands alone
  * @property {TestQuestionType} type
  * @property {TestSkill | null} skill
  * @property {string} content
@@ -53,8 +74,11 @@
  * @property {TestSkill | null} skill
  * @property {string | null} startDate
  * @property {string | null} endDate
+ * @property {boolean} retakeAllowed
+ * @property {TestPassage[]} passages
  * @property {TestQuestion[]} questions
  * @property {boolean} hasInProgress
+ * @property {number | null} lastAttemptId the learner's latest submitted attempt
  */
 
 /**
@@ -74,7 +98,9 @@
 /**
  * @typedef {object} ReviewItem
  * @property {number} questionId
+ * @property {number | null} passageId
  * @property {TestQuestionType} type
+ * @property {import('@/api/types').CefrLevel | null} level the level the question tests
  * @property {boolean | null} correct null for AI-graded questions
  * @property {number | null} selectedOptionId
  * @property {string | null} answerText
@@ -82,6 +108,9 @@
  * @property {string | null} correctAnswer
  * @property {number} points
  * @property {number} scoreEarned
+ * @property {Record<'task' | 'coherence' | 'vocabulary' | 'grammar', number> | null} aiCriteria the AI's band 0-6 per
+ *   criterion (1 = A1 ... 6 = C2), null for auto-graded questions and while the AI has not graded yet
+ * @property {string | null} aiComment
  */
 
 /**
@@ -102,6 +131,7 @@
  * @property {import('@/api/types').CefrLevel | null} suggestedLevel
  * @property {string | null} suggestedRoadmap
  * @property {Record<'listening' | 'reading' | 'writing' | 'speaking', SkillScore>} skills
+ * @property {Array<Omit<TestPassage, 'maxPlays'> & { transcript: string | null }>} passages with the transcripts
  * @property {ReviewItem[]} review
  */
 

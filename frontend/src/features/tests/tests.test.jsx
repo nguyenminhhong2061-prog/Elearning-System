@@ -1,11 +1,12 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '@/app/App'
 import { tokenStorage } from '@/api/tokenStorage'
 import { installFakeBackend, learner } from '@/test/fakeBackend'
 import '@/test/preloadPages'
+import { GRADING_POLL_MS } from './constants'
 
 // Data shaped exactly as docs/api/tests.md describes it.
 const PERIODIC = {
@@ -15,8 +16,9 @@ const PERIODIC = {
   skill: null,
   startDate: null,
   endDate: null,
+  retakeAllowed: true,
   questionCount: 2,
-  progress: { attemptCount: 0, bestScorePercent: null, lastCompletedAt: null, inProgress: null },
+  progress: { attemptCount: 0, bestScorePercent: null, lastCompletedAt: null, lastAttemptId: null, inProgress: null },
 }
 
 const COMPREHENSIVE = {
@@ -26,8 +28,9 @@ const COMPREHENSIVE = {
   skill: null,
   startDate: null,
   endDate: null,
+  retakeAllowed: false,
   questionCount: 2,
-  progress: { attemptCount: 1, bestScorePercent: 62, lastCompletedAt: '2026-09-20T08:30:00Z', inProgress: null },
+  progress: { attemptCount: 1, bestScorePercent: 62, lastCompletedAt: '2026-09-20T08:30:00Z', lastAttemptId: 7, inProgress: null },
 }
 
 const DETAIL = {
@@ -37,10 +40,14 @@ const DETAIL = {
   skill: null,
   startDate: null,
   endDate: null,
+  retakeAllowed: true,
+  passages: [],
   hasInProgress: false,
+  lastAttemptId: null,
   questions: [
     {
       id: 11,
+      passageId: null,
       type: 'MULTIPLE_CHOICE',
       skill: 'READING',
       content: 'She ___ (live) in Hanoi for five years.',
@@ -53,6 +60,7 @@ const DETAIL = {
     },
     {
       id: 12,
+      passageId: null,
       type: 'FILL_BLANK',
       skill: 'WRITING',
       content: 'I have never ___ (see) such a beach.',
@@ -80,6 +88,7 @@ const PERIODIC_RESULT = {
   suggestedLevel: 'C2',
   suggestedRoadmap: 'Tập trung luyện cả bốn kỹ năng 15 phút mỗi ngày.',
   skills: { reading: { score: 100, level: 'C2' }, writing: { score: 100, level: 'C2' } },
+  passages: [],
   review: [
     {
       questionId: 11,
@@ -155,12 +164,21 @@ describe('tests list', () => {
     expect(await screen.findByRole('heading', { name: PERIODIC.title })).toBeInTheDocument()
     expect(screen.getByText('2 câu · Còn 3 ngày · Chưa làm lần nào')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: `Bắt đầu: ${PERIODIC.title}` })).toHaveAttribute('href', '/tests/100')
-    expect(screen.getByText('2 câu · Đã làm 1 lần · cao nhất 62/100')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: `Làm lại: ${COMPREHENSIVE.title}` })).toHaveAttribute('href', '/tests/200')
+    // A comprehensive test is taken once: what is left of a submitted one is its result.
+    expect(screen.getByText('2 câu · Đã làm · 62/100')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: `Xem kết quả: ${COMPREHENSIVE.title}` })).toHaveAttribute('href', '/tests/200/result/7')
+  })
+
+  it('offers a periodic test again after it has been taken', async () => {
+    const taken = { ...PERIODIC, progress: { ...PERIODIC.progress, attemptCount: 2, bestScorePercent: 80, lastAttemptId: 9 } }
+    renderSignedIn('/tests', { 'GET /api/tests': () => ({ data: [taken] }) })
+
+    expect(await screen.findByText('2 câu · Đã làm 2 lần · cao nhất 80/100')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: `Làm lại: ${PERIODIC.title}` })).toHaveAttribute('href', '/tests/100')
   })
 })
 
-const NEW_ATTEMPT = { attemptId: 57, resumed: false, status: 'IN_PROGRESS', answers: [] }
+const NEW_ATTEMPT = { attemptId: 57, resumed: false, status: 'IN_PROGRESS', answers: [], passagePlays: [] }
 
 function takingRoutes(extra = {}) {
   return {
@@ -406,4 +424,190 @@ describe('taking a test', () => {
     // Opened later (not straight after submitting): no note about the level.
     expect(screen.queryByText(/Trình độ của bạn/)).not.toBeInTheDocument()
   })
+})
+
+// A test whose first two questions are about one recording and whose third is about a text.
+const PASSAGE_DETAIL = {
+  ...DETAIL,
+  passages: [
+    { id: 3, title: 'At the airport', content: null, audioUrl: '/media/listening/airport.mp3', maxPlays: 2 },
+    { id: 4, title: 'The museum', content: 'The museum opens at 9 a.m. every day except Monday.', audioUrl: null, maxPlays: null },
+  ],
+  questions: [
+    { id: 31, passageId: 3, type: 'LISTENING', skill: 'LISTENING', content: 'Which flight is boarding?', points: 1, audioUrl: null, options: [{ id: 311, content: 'VN209' }, { id: 312, content: 'VN290' }] },
+    { id: 32, passageId: 3, type: 'LISTENING', skill: 'LISTENING', content: 'Which gate should passengers go to?', points: 1, audioUrl: null, options: [{ id: 321, content: 'Gate 5' }, { id: 322, content: 'Gate 9' }] },
+    { id: 33, passageId: 4, type: 'READING', skill: 'READING', content: 'When is the museum closed?', points: 1, audioUrl: null, options: [{ id: 331, content: 'Monday' }, { id: 332, content: 'Sunday' }] },
+  ],
+}
+
+describe('passages and the listening limit', () => {
+  // jsdom does not play media: the player only needs play() to resolve. The stubs stay for the whole file, because
+  // the player pauses when it is unmounted, after the test's own cleanup.
+  vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockResolvedValue()
+  vi.spyOn(window.HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
+  beforeEach(() => window.HTMLMediaElement.prototype.play.mockClear())
+
+  it('shows the passage above its questions and counts each play with the server', async () => {
+    const user = userEvent.setup()
+    let playCount = 0
+    renderSignedIn('/tests/100', {
+      'GET /api/tests/100': () => ({ data: PASSAGE_DETAIL }),
+      'POST /api/tests/100/attempts': () => ({ status: 201, data: NEW_ATTEMPT }),
+      'POST /api/test-attempts/57/passages/3/plays': () => ({ data: { passageId: 3, playCount: ++playCount, maxPlays: 2 } }),
+    })
+
+    expect(await screen.findByText('Mỗi bài nghe được nghe tối đa 2 lần.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Bắt đầu' }))
+
+    const listening = await screen.findByRole('region', { name: 'Bài nghe' })
+    expect(within(listening).getByText('Bài nghe: At the airport')).toBeInTheDocument()
+    // The browser's own controls would let the learner replay freely.
+    expect(listening.querySelector('audio')).not.toHaveAttribute('controls')
+
+    // The play starts only once the server has counted it.
+    await user.click(within(listening).getByRole('button', { name: 'Nghe (còn 2 lần)' }))
+    expect(await within(listening).findByRole('button', { name: 'Đang phát…' })).toBeDisabled()
+    expect(callsTo('POST /api/test-attempts/57/passages/3/plays')).toHaveLength(1)
+    expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1)
+
+    // The next question is about the same recording: the player stays, still playing.
+    await user.click(screen.getByRole('button', { name: /Câu tiếp theo/ }))
+    expect(await screen.findByText('Which gate should passengers go to?')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Bài nghe' })).getByRole('button', { name: 'Đang phát…' })).toBeDisabled()
+
+    fireEvent.ended(document.querySelector('audio'))
+    await user.click(await screen.findByRole('button', { name: 'Nghe (còn 1 lần)' }))
+    fireEvent.ended(document.querySelector('audio'))
+    expect(await screen.findByRole('button', { name: 'Đã hết lượt nghe' })).toBeDisabled()
+    expect(callsTo('POST /api/test-attempts/57/passages/3/plays')).toHaveLength(2)
+
+    // The last question is about a text.
+    await user.click(screen.getByRole('button', { name: /Câu tiếp theo/ }))
+    const reading = await screen.findByRole('region', { name: 'Đoạn đọc' })
+    expect(within(reading).getByText('The museum opens at 9 a.m. every day except Monday.')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Bài nghe' })).not.toBeInTheDocument()
+  })
+
+  it('gives no plays back when an attempt is resumed, and trusts the server when it refuses a play', async () => {
+    const user = userEvent.setup()
+    renderSignedIn('/tests/100', {
+      'GET /api/tests/100': () => ({ data: { ...PASSAGE_DETAIL, hasInProgress: true } }),
+      'POST /api/tests/100/attempts': () => ({
+        data: { ...NEW_ATTEMPT, resumed: true, passagePlays: [{ passageId: 3, playCount: 1, maxPlays: 2 }] },
+      }),
+      'POST /api/test-attempts/57/passages/3/plays': () => ({ status: 409, data: { status: 409, message: 'No plays left' } }),
+    })
+
+    await user.click(await screen.findByRole('button', { name: 'Làm tiếp' }))
+    await user.click(await screen.findByRole('button', { name: 'Nghe (còn 1 lần)' }))
+
+    expect(await screen.findByRole('button', { name: 'Đã hết lượt nghe' })).toBeDisabled()
+    expect(window.HTMLMediaElement.prototype.play).not.toHaveBeenCalled()
+  })
+})
+
+describe('a test taken only once', () => {
+  const ONCE_DETAIL = { ...DETAIL, id: 200, title: COMPREHENSIVE.title, type: 'COMPREHENSIVE', retakeAllowed: false }
+
+  it('asks before starting, because there is no second attempt', async () => {
+    const user = userEvent.setup()
+    renderSignedIn('/tests/200', {
+      'GET /api/tests/200': () => ({ data: ONCE_DETAIL }),
+      'POST /api/tests/200/attempts': () => ({ status: 201, data: NEW_ATTEMPT }),
+    })
+
+    expect(await screen.findByText('Bài này chỉ làm được một lần: sau khi nộp bạn không làm lại được.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Bắt đầu' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Bắt đầu bài kiểm tra?' })
+    expect(callsTo('POST /api/tests/200/attempts')).toHaveLength(0)
+
+    await user.click(within(dialog).getByRole('button', { name: 'Bắt đầu làm bài' }))
+    expect(await screen.findByText(/Câu 1\/2/)).toBeInTheDocument()
+    expect(callsTo('POST /api/tests/200/attempts')).toHaveLength(1)
+  })
+
+  it('opens the result instead of the test once it has been submitted', async () => {
+    renderSignedIn('/tests/200', {
+      'GET /api/tests/200': () => ({ data: { ...ONCE_DETAIL, lastAttemptId: 58 } }),
+      'GET /api/test-attempts/58': () => ({ data: { ...PERIODIC_RESULT, attemptId: 58, testId: 200, title: COMPREHENSIVE.title, type: 'COMPREHENSIVE' } }),
+    })
+
+    expect(await screen.findByText('100/100')).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent('/tests/200/result/58')
+    // Its result offers no second attempt either.
+    expect(screen.queryByRole('link', { name: 'Làm lại' })).not.toBeInTheDocument()
+  })
+
+  it('says so when the server refuses to start it again', async () => {
+    const user = userEvent.setup()
+    renderSignedIn('/tests/200', {
+      'GET /api/tests/200': () => ({ data: ONCE_DETAIL }),
+      'POST /api/tests/200/attempts': () => ({ status: 409, data: { status: 409, message: 'This test can only be taken once: 200' } }),
+    })
+
+    await user.click(await screen.findByRole('button', { name: 'Bắt đầu' }))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Bắt đầu làm bài' }))
+
+    expect(await screen.findByText('Bài kiểm tra này chỉ làm được một lần và bạn đã làm rồi.')).toBeInTheDocument()
+  })
+})
+
+describe('the review of a result', () => {
+  it('shows each passage with its transcript, the level of the questions and what the AI said', async () => {
+    const writing = { id: 34, passageId: null, type: 'WRITING', skill: 'WRITING', content: 'Describe your last holiday.', points: 6, audioUrl: null, options: [] }
+    const result = {
+      ...PERIODIC_RESULT,
+      passages: [
+        { id: 3, title: 'At the airport', content: null, audioUrl: '/media/listening/airport.mp3', transcript: 'Flight VN209 is now boarding at Gate 5.' },
+        { id: 4, title: 'The museum', content: 'The museum opens at 9 a.m. every day except Monday.', audioUrl: null, transcript: null },
+      ],
+      review: [
+        { questionId: 31, passageId: 3, type: 'LISTENING', level: 'A2', correct: true, selectedOptionId: 311, answerText: null, correctOptionId: 311, correctAnswer: 'VN209', points: 1, scoreEarned: 1, aiCriteria: null, aiComment: null },
+        { questionId: 32, passageId: 3, type: 'LISTENING', level: 'B1', correct: false, selectedOptionId: 322, answerText: null, correctOptionId: 321, correctAnswer: 'Gate 5', points: 1, scoreEarned: 0, aiCriteria: null, aiComment: null },
+        { questionId: 33, passageId: 4, type: 'READING', level: null, correct: true, selectedOptionId: 331, answerText: null, correctOptionId: 331, correctAnswer: 'Monday', points: 1, scoreEarned: 1, aiCriteria: null, aiComment: null },
+        { questionId: 34, passageId: null, type: 'WRITING', level: 'B1', correct: null, selectedOptionId: null, answerText: 'Last summer I go to Da Nang.', correctOptionId: null, correctAnswer: null, points: 6, scoreEarned: 3, aiCriteria: { task: 4, coherence: 3, vocabulary: 3, grammar: 0 }, aiComment: 'Ý rõ ràng; cần ôn lại thì quá khứ đơn.' },
+      ],
+    }
+    renderSignedIn('/tests/100/result/57', {
+      'GET /api/tests/100': () => ({ data: { ...PASSAGE_DETAIL, questions: [...PASSAGE_DETAIL.questions, writing] } }),
+      'GET /api/test-attempts/57': () => ({ data: result }),
+    })
+
+    // One block per passage, however many questions it has; the recording is free to replay now.
+    expect(await screen.findAllByText('Bài nghe: At the airport')).toHaveLength(1)
+    expect(document.querySelector('audio')).toHaveAttribute('controls')
+    expect(screen.getByText('Lời thoại')).toBeInTheDocument()
+    expect(screen.getByText('Flight VN209 is now boarding at Gate 5.')).toBeInTheDocument()
+    expect(screen.getByText('Đoạn đọc: The museum')).toBeInTheDocument()
+
+    expect(screen.getByLabelText('Bậc A2')).toBeInTheDocument()
+    expect(screen.getAllByLabelText('Bậc B1')).toHaveLength(2)
+
+    const feedback = screen.getByText('Nhận xét của AI').parentElement
+    expect(feedback).toHaveTextContent('Đáp ứng đề bài: B2')
+    expect(feedback).toHaveTextContent('Mạch lạc: B1')
+    expect(feedback).toHaveTextContent('Ngữ pháp: chưa đạt A1')
+    expect(feedback).toHaveTextContent('Ý rõ ràng; cần ôn lại thì quá khứ đơn.')
+    expect(screen.getByText('3/6 điểm')).toBeInTheDocument()
+
+    // A periodic test may be taken again.
+    expect(screen.getByRole('link', { name: 'Làm lại' })).toHaveAttribute('href', '/tests/100')
+  })
+
+  it('fills in by itself once the AI has finished grading', async () => {
+    let graded = false
+    const done = { ...PENDING_RESULT, status: 'GRADED', scorePercent: 46, suggestedLevel: 'B1', skills: { ...PENDING_RESULT.skills, speaking: { score: 38, level: 'A2' } } }
+    renderSignedIn('/tests/200/result/58', {
+      'GET /api/tests/200': () => ({ data: { ...DETAIL, id: 200, title: COMPREHENSIVE.title, type: 'COMPREHENSIVE', retakeAllowed: false } }),
+      'GET /api/test-attempts/58': () => ({ data: graded ? done : PENDING_RESULT }),
+    })
+
+    expect(await screen.findByText(/Trang này tự cập nhật/)).toBeInTheDocument()
+    graded = true
+
+    expect(await screen.findByText('46/100', {}, { timeout: GRADING_POLL_MS + 3000 })).toBeInTheDocument()
+    expect(screen.getByText('38 · A2')).toBeInTheDocument()
+    // The level the test has just set is read again for the sidebar.
+    expect(callsTo('GET /api/users/me').length).toBeGreaterThan(1)
+  }, GRADING_POLL_MS + 10_000)
 })

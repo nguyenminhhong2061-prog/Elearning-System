@@ -18,7 +18,8 @@ export async function getTest(id) {
  * POST /api/tests/{id}/attempts: starts or resumes an attempt.
  * @param {number} testId
  * @param {{ restart?: boolean }} [options]
- * @returns {Promise<{ attemptId: number, resumed: boolean, status: import('../types').TestAttemptStatus, answers: import('../types').SavedAnswer[] }>}
+ * Rejects with status 409 when the test is taken only once and the learner has already submitted it.
+ * @returns {Promise<{ attemptId: number, resumed: boolean, status: import('../types').TestAttemptStatus, answers: import('../types').SavedAnswer[], passagePlays: import('../types').PassagePlay[] }>}
  */
 export async function startAttempt(testId, { restart = false } = {}) {
   const { data } = await httpClient.post(`/api/tests/${testId}/attempts`, null, { params: { restart } })
@@ -35,13 +36,23 @@ export async function saveAnswer(attemptId, questionId, answer) {
   await httpClient.put(`/api/test-attempts/${attemptId}/answers/${questionId}`, answer)
 }
 
+/**
+ * POST /api/test-attempts/{attemptId}/passages/{passageId}/plays: counts one play of a recording, asked before each
+ * play. Rejects with status 409 when the attempt has no play of it left.
+ * @returns {Promise<import('../types').PassagePlay>}
+ */
+export async function recordPassagePlay(attemptId, passageId) {
+  const { data } = await httpClient.post(`/api/test-attempts/${attemptId}/passages/${passageId}/plays`)
+  return data
+}
+
 /** POST /api/test-attempts/{attemptId}/submit. @returns {Promise<import('../types').TestResult>} */
 export async function submitAttempt(attemptId) {
   const { data } = await httpClient.post(`/api/test-attempts/${attemptId}/submit`)
   return data
 }
 
-/** GET /api/test-attempts/{attemptId}. @returns {Promise<import('../types').TestResult>} */
+/** GET /api/test-attempts/{attemptId}. Rejects with status 409 while the attempt is not submitted. @returns {Promise<import('../types').TestResult>} */
 export async function getAttemptResult(attemptId) {
   const { data } = await httpClient.get(`/api/test-attempts/${attemptId}`)
   return data

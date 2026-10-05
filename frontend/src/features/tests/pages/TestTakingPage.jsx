@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { Navigate, useNavigate, useParams } from 'react-router'
 import { describeApiError } from '@/api/errorMessages'
 import { useLogoutGuard } from '@/components/layout/logoutGuard'
 import { Page } from '@/components/layout/Page'
@@ -15,6 +15,7 @@ import { cx } from '@/lib/cx'
 import { answerPayload, answersFromSaved, firstUnansweredIndex, isChoice, testParts, unansweredQuestions } from '../answers'
 import { startAttempt } from '../api/testsApi'
 import { useSubmitAttempt, useTest } from '../api/testsQueries'
+import { PassageView } from '../components/PassageView'
 import { QuestionView } from '../components/QuestionView'
 import { ATTEMPT_STATUS, QUESTION_TYPES, SKILL_LABELS, SKILL_ORDER, TEST_TYPE_LABELS, TEST_TYPES } from '../constants'
 import { useAnswerSaver } from '../useAnswerSaver'
@@ -157,6 +158,10 @@ function AttemptRunner({ test, attempt }) {
   const [answers, setAnswers] = useState(() => answersFromSaved(attempt.answers))
   const [currentIndex, setCurrentIndex] = useState(() => firstUnansweredIndex(questions, answers))
   const [confirming, setConfirming] = useState(false)
+  // passageId -> how many times its recording has been played in this attempt (the server keeps the count).
+  const [plays, setPlays] = useState(() =>
+    Object.fromEntries((attempt.passagePlays ?? []).map((play) => [play.passageId, play.playCount])),
+  )
   const saver = useAnswerSaver(attempt.attemptId, attempt.answers)
   const submit = useSubmitAttempt()
   // Signing out in the middle asks first; the attempt stays in progress with the answers saved (scenario 3, 4a).
@@ -170,6 +175,7 @@ function AttemptRunner({ test, attempt }) {
   useLogoutGuard(submit.isSuccess ? null : logoutGuard)
 
   const question = questions[currentIndex]
+  const passage = (test.passages ?? []).find((item) => item.id === question.passageId) ?? null
   const unanswered = unansweredQuestions(questions, answers)
   const isLast = currentIndex === questions.length - 1
 
@@ -228,6 +234,17 @@ function AttemptRunner({ test, attempt }) {
 
       {saver.status === 'error' && (
         <Alert variant="error">{describeApiError(saver.error, 'Không lưu được câu trả lời. Vui lòng thử lại.')}</Alert>
+      )}
+
+      {/* Keyed by the passage, not the question: it stays (and keeps playing) across the questions it belongs to. */}
+      {passage && (
+        <PassageView
+          key={passage.id}
+          attemptId={attempt.attemptId}
+          passage={passage}
+          playCount={plays[passage.id] ?? 0}
+          onPlayed={(passageId, playCount) => setPlays((current) => ({ ...current, [passageId]: playCount }))}
+        />
       )}
 
       <QuestionView
@@ -333,11 +350,14 @@ function PartTable({ questions }) {
 
 /**
  * The test's introduction (scenarios 14 and 15, step 6 and 4): what it contains, then "Bắt đầu" or, for an unfinished
- * attempt, "Làm tiếp" only: a test is not restarted from scratch.
+ * attempt, "Làm tiếp" only: a test is not restarted from scratch. A test taken only once asks before it starts.
  */
 function StartCard({ test, starting, error, onStart }) {
+  const [confirming, setConfirming] = useState(false)
   const choiceCount = test.questions.filter(isChoice).length
   const typedCount = test.questions.length - choiceCount
+  const onlyOnce = test.retakeAllowed === false
+  const maxPlays = (test.passages ?? []).find((passage) => passage.audioUrl)?.maxPlays ?? null
   return (
     <Card className="flex flex-col gap-5">
       <div className="flex flex-col gap-2">
@@ -351,10 +371,21 @@ function StartCard({ test, starting, error, onStart }) {
         <ul className="flex list-disc flex-col gap-1 pl-5 text-label text-muted">
           <li>Câu trả lời được lưu ngay khi bạn chọn hoặc gõ; rời trang rồi quay lại vẫn làm tiếp được.</li>
           <li>Câu bỏ trống khi nộp bài được tính 0 điểm.</li>
+          {maxPlays !== null && <li>Mỗi bài nghe được nghe tối đa {maxPlays} lần.</li>}
           {test.type === TEST_TYPES.COMPREHENSIVE && <li>Kết quả bài này xác định lại trình độ CEFR của bạn.</li>}
+          {onlyOnce && <li>Bài này chỉ làm được một lần: sau khi nộp bạn không làm lại được.</li>}
         </ul>
       </div>
-      {error && <Alert variant="error">{describeApiError(error, 'Không bắt đầu được bài kiểm tra.')}</Alert>}
+      {error && (
+        <Alert variant="error">
+          {describeApiError(
+            error,
+            error.status === 409
+              ? 'Bài kiểm tra này chỉ làm được một lần và bạn đã làm rồi.'
+              : 'Không bắt đầu được bài kiểm tra.',
+          )}
+        </Alert>
+      )}
       {test.hasInProgress ? (
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap gap-3">
@@ -369,7 +400,7 @@ function StartCard({ test, starting, error, onStart }) {
         </div>
       ) : (
         <div className="flex flex-wrap gap-3">
-          <Button onClick={() => onStart(false)} loading={starting === 'resume'}>
+          <Button onClick={() => (onlyOnce ? setConfirming(true) : onStart(false))} loading={starting === 'resume'}>
             Bắt đầu
           </Button>
           <ButtonLink to="/tests" variant="outline">
@@ -377,6 +408,25 @@ function StartCard({ test, starting, error, onStart }) {
           </ButtonLink>
         </div>
       )}
+      <Dialog open={confirming} onClose={() => setConfirming(false)} title="Bắt đầu bài kiểm tra?">
+        <p className="text-body text-ink-soft">
+          Bài này chỉ làm được một lần. Bạn có thể rời trang rồi quay lại làm tiếp, nhưng sau khi nộp thì không làm lại
+          được.
+        </p>
+        <div className="flex flex-wrap justify-end gap-3">
+          <Button variant="outline" onClick={() => setConfirming(false)}>
+            Để sau
+          </Button>
+          <Button
+            onClick={() => {
+              setConfirming(false)
+              onStart(false)
+            }}
+          >
+            Bắt đầu làm bài
+          </Button>
+        </div>
+      </Dialog>
     </Card>
   )
 }
@@ -436,6 +486,11 @@ export function TestTakingPage() {
         )}
       </Page>
     )
+  }
+
+  // A test taken only once and already submitted has nothing to start: its page is its result.
+  if (!attempt && test.data.retakeAllowed === false && test.data.lastAttemptId != null && !test.data.hasInProgress) {
+    return <Navigate to={`/tests/${testId}/result/${test.data.lastAttemptId}`} replace />
   }
 
   if (!attempt) {

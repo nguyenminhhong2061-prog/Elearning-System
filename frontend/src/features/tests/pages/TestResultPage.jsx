@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import { Page } from '@/components/layout/Page'
 import { Alert } from '@/components/ui/Alert'
@@ -12,7 +12,7 @@ import { useAuth } from '@/features/auth/context/useAuth'
 import { cx } from '@/lib/cx'
 import { formatDate, todayInVietnam } from '@/lib/dates'
 import { useTest, useTestResult } from '../api/testsQueries'
-import { ATTEMPT_STATUS, SKILL_LABELS, SKILL_ORDER, TEST_TYPE_LABELS, TEST_TYPES } from '../constants'
+import { AI_CRITERIA, ATTEMPT_STATUS, SKILL_LABELS, SKILL_ORDER, TEST_TYPE_LABELS, TEST_TYPES } from '../constants'
 
 function parseId(value) {
   return /^\d+$/.test(value ?? '') ? Number(value) : null
@@ -28,7 +28,7 @@ function Headline({ result, pending }) {
         </Tag>
         <p className="text-sm text-ink-soft">
           Phần trắc nghiệm, điền từ đã chấm xong. Phần {pending.map((key) => SKILL_LABELS[key]).join(', ')} do AI chấm, điểm tổng và trình độ hiện khi chấm
-          xong.
+          xong. Trang này tự cập nhật, bạn không cần tải lại.
         </p>
       </div>
     )
@@ -73,35 +73,93 @@ function SkillBreakdown({ result }) {
   )
 }
 
-/** The tag of a reviewed question. Speaking and free writing are scored by the AI, not right or wrong. */
+/**
+ * The tag of a reviewed question. Speaking and free writing are scored by the AI, not right or wrong; while the
+ * attempt is still being graded, an answer the AI has not reached yet says so.
+ */
 function reviewTag(item, stillGrading) {
   if (item.correct === true) return { tone: 'success', label: 'Đúng' }
   if (item.correct === false) return { tone: 'danger', label: 'Sai' }
-  if (stillGrading) return { tone: 'warning', label: 'Đang chấm' }
+  if (stillGrading && !item.aiCriteria && item.answerText) return { tone: 'warning', label: 'Đang chấm' }
   return { tone: 'brand', label: `${Number(item.scoreEarned)}/${item.points} điểm` }
 }
 
-function ReviewList({ questions, review, stillGrading }) {
+/** The AI's band of a criterion as a level: 1 is A1 ... 6 is C2, 0 is below anything it could rate. */
+function bandLabel(band) {
+  if (band == null) return '—'
+  return CEFR_LEVELS[band - 1] ?? 'chưa đạt A1'
+}
+
+/** What the AI examiner said about a spoken or written answer: a level per criterion and a short comment. */
+function AiFeedback({ item }) {
+  if (!item.aiCriteria) return null
+  return (
+    <div className="mt-3 flex flex-col gap-1.5 rounded-lg bg-canvas p-3 text-label">
+      <p className="font-semibold text-ink">Nhận xét của AI</p>
+      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-ink-soft">
+        {AI_CRITERIA.map(({ key, label }) => (
+          <li key={key}>
+            {label}: <span className="font-semibold text-ink">{bandLabel(item.aiCriteria[key])}</span>
+          </li>
+        ))}
+      </ul>
+      {item.aiComment && <p className="text-ink-soft">{item.aiComment}</p>}
+    </div>
+  )
+}
+
+/** The passage the questions below it were about. After submission its recording plays freely, with the transcript. */
+function ReviewPassage({ passage }) {
+  return (
+    <li className="flex flex-col gap-2 rounded-[10px] border border-brand-tint-line bg-brand-tint p-4">
+      <h3 className="text-label font-semibold text-brand-dark">
+        {passage.audioUrl ? 'Bài nghe' : 'Đoạn đọc'}
+        {passage.title ? `: ${passage.title}` : ''}
+      </h3>
+      {passage.audioUrl && (
+        <audio controls src={passage.audioUrl} className="w-full">
+          Trình duyệt của bạn không phát được âm thanh này.
+        </audio>
+      )}
+      {passage.content && <p className="text-sm whitespace-pre-line text-ink">{passage.content}</p>}
+      {passage.transcript && (
+        <details className="text-sm text-ink">
+          <summary className="cursor-pointer font-semibold text-brand-dark">Lời thoại</summary>
+          <p className="mt-1.5 whitespace-pre-line">{passage.transcript}</p>
+        </details>
+      )}
+    </li>
+  )
+}
+
+function ReviewList({ questions, passages, review, stillGrading }) {
   const byId = new Map(questions.map((question) => [question.id, question]))
+  const passageById = new Map(passages.map((passage) => [passage.id, passage]))
   return (
     <ul className="flex flex-col gap-3">
-      {review.map((item, index) => {
+      {review.flatMap((item, index) => {
         const question = byId.get(item.questionId)
         const selected =
           item.selectedOptionId == null
             ? item.answerText
             : (question?.options.find((option) => option.id === item.selectedOptionId)?.content ?? '—')
         const { tone, label } = reviewTag(item, stillGrading)
-        return (
+        // A passage is shown once, above the first of its questions.
+        const passage = item.passageId != null && item.passageId !== review[index - 1]?.passageId
+          ? passageById.get(item.passageId)
+          : null
+        return [
+          passage && <ReviewPassage key={`passage-${passage.id}-${item.questionId}`} passage={passage} />,
           <li key={item.questionId} className="rounded-[10px] border border-line bg-white p-4">
             <div className="flex items-start justify-between gap-3">
               <p className="text-sm text-ink">
                 <span className="font-semibold text-muted">Câu {index + 1}. </span>
                 {question?.content ?? `Câu hỏi #${item.questionId}`}
               </p>
-              <Tag variant={tone} className="flex-none">
-                {label}
-              </Tag>
+              <div className="flex flex-none items-center gap-1.5">
+                {item.level && <Tag aria-label={`Bậc ${item.level}`}>{item.level}</Tag>}
+                <Tag variant={tone}>{label}</Tag>
+              </div>
             </div>
             <dl className="mt-3 flex flex-col gap-1 text-label">
               <div className="flex gap-2">
@@ -117,8 +175,9 @@ function ReviewList({ questions, review, stillGrading }) {
                 </div>
               )}
             </dl>
-          </li>
-        )
+            <AiFeedback item={item} />
+          </li>,
+        ]
       })}
     </ul>
   )
@@ -155,13 +214,25 @@ export function TestResultPage() {
   const test = useTest(testId)
   const location = useLocation()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   // Set by the taking screen right after submitting. It is kept for this visit only: the browser stores history state
   // across reloads, so it is removed from the history entry and a reload or a later visit shows no "level" note.
   const [{ justSubmitted = false, levelBefore = null }] = useState(() => location.state ?? {})
   useEffect(() => {
     if (location.state) navigate(location.pathname, { replace: true, state: null })
   }, [location.state, location.pathname, navigate])
+
+  // The AI finished grading while this page was open: a comprehensive test has just set the learner's level.
+  const status = result.data?.status
+  const wasGrading = useRef(false)
+  useEffect(() => {
+    if (status === ATTEMPT_STATUS.SUBMITTED) {
+      wasGrading.current = true
+    } else if (status === ATTEMPT_STATUS.GRADED && wasGrading.current) {
+      wasGrading.current = false
+      refreshUser().catch(() => {})
+    }
+  }, [status, refreshUser])
 
   if (attemptId === null) {
     return (
@@ -235,6 +306,7 @@ export function TestResultPage() {
           {test.isSuccess ? (
             <ReviewList
               questions={test.data.questions}
+              passages={data.passages ?? []}
               review={data.review}
               stillGrading={data.status === ATTEMPT_STATUS.SUBMITTED}
             />
@@ -248,7 +320,8 @@ export function TestResultPage() {
         <ButtonLink to="/tests" variant="outline">
           ← Về danh sách bài kiểm tra
         </ButtonLink>
-        <ButtonLink to={`/tests/${data.testId}`}>Làm lại</ButtonLink>
+        {/* Only a test that may be taken again (and is still open) offers it: a comprehensive test is taken once. */}
+        {test.data?.retakeAllowed === true && <ButtonLink to={`/tests/${data.testId}`}>Làm lại</ButtonLink>}
         {applyRoadmap ? (
           <ButtonLink to="/plan" state={{ fromTest: applyRoadmap }} variant="outline">
             Áp dụng lộ trình vào kế hoạch học →
