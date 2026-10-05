@@ -1,7 +1,9 @@
 package com.example.datn.modules.vocabulary.entity;
 
 import com.example.datn.common.enums.CefrLevel;
+import com.example.datn.modules.vocabulary.enums.VocabularyStatus;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -9,6 +11,9 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.ColumnDefault;
+
+import java.time.Instant;
 
 @Entity
 @Table(name = "vocabulary")
@@ -45,6 +50,14 @@ public class Vocabulary {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 2)
     private CefrLevel difficultyLevel;
+
+    @Convert(converter = VocabularyStatusConverter.class)
+    @ColumnDefault("'visible'")
+    @Column(nullable = false, length = 20)
+    private VocabularyStatus status = VocabularyStatus.VISIBLE;
+
+    // When an admin last added or changed the word; null for the seeded words never edited since.
+    private Instant updatedAt;
 
     protected Vocabulary() {
     }
@@ -110,12 +123,34 @@ public class Vocabulary {
         return difficultyLevel;
     }
 
+    public VocabularyStatus getStatus() {
+        return status;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public boolean isHidden() {
+        return status == VocabularyStatus.HIDDEN;
+    }
+
     /**
      * System words (created_by NULL) are visible to everyone; a word a learner typed in is visible only to that
-     * learner (docs/api/custom-lists.md).
+     * learner (docs/api/custom-lists.md). A word an admin hid is visible to nobody (scenario 21).
      */
     public boolean isVisibleTo(Long userId) {
-        return createdBy == null || createdBy.equals(userId);
+        return !isHidden() && (createdBy == null || createdBy.equals(userId));
+    }
+
+    /** Scenario 21, step 8: learners stop meeting the word; their progress on it stays. */
+    public void hide(Instant now) {
+        this.status = VocabularyStatus.HIDDEN;
+        this.updatedAt = now;
+    }
+
+    public void touch(Instant now) {
+        this.updatedAt = now;
     }
 
     public void update(

@@ -36,10 +36,23 @@ public class VocabularyExceptionHandler {
         return badRequest(exception.getMessage());
     }
 
-    @ExceptionHandler({ConcurrentReviewException.class, WordAlreadyInListException.class, DuplicateListNameException.class})
+    @ExceptionHandler({
+            ConcurrentReviewException.class,
+            WordAlreadyInListException.class,
+            DuplicateListNameException.class,
+            DuplicateTopicNameException.class,
+            DuplicateWordException.class,
+            TopicHasWordsException.class})
     public ResponseEntity<ApiErrorResponse> handleConflict(RuntimeException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ApiErrorResponse(Instant.now(), 409, exception.getMessage()));
+    }
+
+    /** The request is well formed but the data cannot serve it, such as a word whose topic has too few other words. */
+    @ExceptionHandler(NotEnoughDistractorsException.class)
+    public ResponseEntity<ApiErrorResponse> handleUnprocessable(RuntimeException exception) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT)
+                .body(new ApiErrorResponse(Instant.now(), 422, exception.getMessage()));
     }
 
     /** A body that is not valid JSON or has a value of the wrong type, such as {@code "result": "MAYBE"}. */

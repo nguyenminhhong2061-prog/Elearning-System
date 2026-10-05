@@ -13,7 +13,7 @@
 >
 > | Phần | Backend | Tình trạng |
 > |---|---|---|
-> | Chủ đề, từ vựng | Hồng (module A `vocabulary`) | Thêm/sửa/xóa chủ đề và từ **đã có**; các endpoint `/api/admin/topics`, `/api/admin/vocabulary`, `/api/admin/media` và luật mới là đề xuất |
+> | Chủ đề, từ vựng | Hồng (module A `vocabulary`) | **Đã làm** (05/10/2026): `/api/admin/topics`, `/api/admin/vocabulary`, `/api/admin/vocabulary/{id}/test-question` và các luật mới (ẩn từ đang được dùng, chặn trùng, chặn xóa chủ đề còn từ). Chưa làm: `/api/admin/media`. `questionCount`, `openTests` luôn `0`, `[]` cho đến khi module C cài `common.test.WordQuestionLookup` |
 > | Người dùng | Hồng (module `user`) | Đề xuất |
 > | Bài tập | Đạt (module B `exercise`) | Đề xuất |
 > | Đề kiểm tra | Nhân (module C `test`) | Đề xuất |
@@ -110,7 +110,7 @@ một chủ đề khác (không phân biệt hoa thường, sau khi cắt khoả
 ### `DELETE /api/topics/{id}` (đã có) — luật mới
 
 **Mới:** chủ đề còn từ (kể cả từ đã ẩn) → `409` với `message` "Topic still has N words"; giao diện đọc `wordCount`
-để hiện hộp thoại chặn trước khi gọi. Hiện backend vẫn xóa và đặt `topic_id = NULL` cho các từ: phải sửa.
+để hiện hộp thoại chặn trước khi gọi.
 
 ### `GET /api/admin/vocabulary?topicId=2&q=&level=&missing=&page=0&size=10`
 
@@ -146,8 +146,7 @@ Từ đã có người học, nằm trong danh sách riêng hoặc có câu hỏ
 (kể cả khi đến hạn), trò chơi, tìm kiếm, danh sách riêng của người học và danh sách admin (chi tiết ở mục "Từ bị admin ẩn"
 của `learning.md`); trạng thái học, lượt ôn cũ và nội dung câu hỏi kiểm tra giữ nguyên. Từ chưa ai dùng thì xóa hẳn.
 
-`200` `{ "result": "HIDDEN" }` hoặc `{ "result": "DELETED" }`. Hiện backend luôn xóa hẳn và xóa dây chuyền tiến độ học
-(`ON DELETE CASCADE`): phải sửa trước khi mở chức năng này.
+`200` `{ "result": "HIDDEN" }` hoặc `{ "result": "DELETED" }`. Từ đã ẩn: sửa hoặc xóa lại → `404`.
 
 ### `POST /api/admin/media?kind=AUDIO|IMAGE`
 
@@ -385,9 +384,9 @@ hoặc lưu thời điểm khóa và từ chối token cấp trước đó); đ�
 
 | Bảng | Thay đổi | Dùng cho |
 |---|---|---|
-| `vocabulary` | `status VARCHAR(20) NOT NULL DEFAULT 'visible'` (`visible`/`hidden`, chữ thường như các enum khác của DB hiện tại) | Ẩn thay cho xóa (kịch bản 21); `tbl_vocabulary.status` của thiết kế |
+| `vocabulary` | `status VARCHAR(20) NOT NULL DEFAULT 'visible'` (`visible`/`hidden`, chữ thường như các enum khác của DB hiện tại), `updated_at TIMESTAMPTZ NULL`, chỉ mục unique `(topic_id, lower(btrim(word)))` cho từ hệ thống chưa ẩn — **đã có** (`V202610041000`) | Ẩn thay cho xóa (kịch bản 21), cột "Cập nhật", chặn từ trùng (kịch bản 19, 20); `tbl_vocabulary.status` của thiết kế |
 | `exercise_lessons` | giá trị `archived` của `publication_status` đổi thành `hidden` | Cùng tên với thiết kế (`tbl_exercise_lesson.status`) |
-| `topics` | `updated_at TIMESTAMPTZ NULL` | Cột "Cập nhật" |
+| `topics` | `updated_at TIMESTAMPTZ NULL`, chỉ mục unique `lower(btrim(name))` — **đã có** (`V202610041000`) | Cột "Cập nhật", chặn tên trùng (kịch bản 22) |
 | `tests` | Mới: `status VARCHAR(20) NOT NULL DEFAULT 'DRAFT'` (`DRAFT`/`VISIBLE`/`HIDDEN`, chữ hoa như `tests.type`), `instruction TEXT NULL`. Đã có `skill VARCHAR(100)` (dùng cho `skillText`; thiết kế để 200). `start_date`, `end_date` thành `NOT NULL` cho cả đề tổng hợp | Trạng thái, ẩn đề, hướng dẫn (KB 24); như `tbl_test` |
 | `test_materials` (mới) | `id`, `test_id → tests ON DELETE CASCADE`, `type` (`LISTENING`/`READING`), `title`, `audio_url`, `text`; CHECK nghe có audio, đọc có text | Tài liệu dùng chung (KB 24 nhánh 5a); như `tbl_test_material` |
 | `test_questions` | `material_id BIGINT NULL → test_materials`; `question_type` còn `MULTIPLE_CHOICE`, `FILL_BLANK`, `SPEAKING`, `ESSAY`: chuyển `LISTENING`, `READING` → `MULTIPLE_CHOICE` (hoặc `FILL_BLANK` nếu không có lựa chọn), `WRITING` → `FILL_BLANK` nếu có đáp án chấp nhận, không thì `ESSAY`; kỹ năng đã nằm ở cột `skill` | Loại câu theo thiết kế |
