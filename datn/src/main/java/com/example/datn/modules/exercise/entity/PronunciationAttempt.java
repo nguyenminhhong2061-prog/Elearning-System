@@ -6,6 +6,9 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+import tools.jackson.databind.JsonNode;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -39,11 +42,40 @@ public class PronunciationAttempt {
     private BigDecimal completenessScore;
     @Column(precision = 5, scale = 2)
     private BigDecimal overallScore;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
-    private String assessmentDetails;
+    private JsonNode assessmentDetails;
     private Instant assessedAt;
 
     protected PronunciationAttempt() {}
+
+    public PronunciationAttempt(
+            Long attemptId,
+            Long lessonId,
+            Long pronunciationItemId,
+            int tryNumber,
+            String provider,
+            String recognizedText,
+            BigDecimal accuracyScore,
+            BigDecimal fluencyScore,
+            BigDecimal completenessScore,
+            BigDecimal overallScore,
+            JsonNode assessmentDetails,
+            Instant assessedAt) {
+        this.attemptId = attemptId;
+        this.lessonId = lessonId;
+        this.pronunciationItemId = pronunciationItemId;
+        this.tryNumber = tryNumber;
+        this.provider = provider;
+        this.recognizedText = recognizedText;
+        this.accuracyScore = accuracyScore;
+        this.fluencyScore = fluencyScore;
+        this.completenessScore = completenessScore;
+        this.overallScore = overallScore;
+        this.assessmentDetails = assessmentDetails;
+        this.assessedAt = assessedAt;
+    }
+
     public Long getId() { return id; }
     public Long getAttemptId() { return attemptId; }
     public Long getLessonId() { return lessonId; }

@@ -207,12 +207,18 @@ export const ASSESSMENT = {
   itemId: 801,
   tryNumber: 1,
   overallScore: 86,
-  accuracyScore: 90,
-  fluencyScore: 78,
-  completenessScore: 92,
+  phonemeAccuracyScore: 90,
+  wordAccuracyScore: 82,
   recognizedText: 'sustainability',
-  words: [{ word: 'sustainability', accuracyScore: 55, errorType: 'MISPRONUNCIATION' }],
-  tips: ['Nhấn mạnh âm tiết "bil" rõ hơn.'],
+  errors: [{
+    word: 'sustainability',
+    expectedIpa: 'səsteɪnəbɪləti',
+    heardIpa: 'səsteɪnəbɪləti',
+    confidence: 72,
+    errorType: 'MISPRONUNCIATION',
+    phones: [{ expected: 'ɪ', heard: 'i', confidence: 72 }],
+  }],
+  tips: ['Kiểm tra lại phát âm từ sustainability.'],
 }
 
 export const ATTEMPT_ID = 55

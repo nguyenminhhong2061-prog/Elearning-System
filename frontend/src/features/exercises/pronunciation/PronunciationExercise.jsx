@@ -215,7 +215,7 @@ export function PronunciationExercise({ lesson, attemptId, progress, nextLesson,
     body = (
       <>
         {/* A single word is already on the card in large type; colouring it again below adds nothing. */}
-        <AssessmentView assessment={assessment} showWords={assessment.words.length > 1} />
+        <AssessmentView assessment={assessment} />
         <div className="flex w-full flex-wrap gap-2">
           {recordingUrl && (
             <button type="button" onClick={() => new Audio(recordingUrl).play().catch(() => {})} className={`${DARK_OUTLINE} w-full`}>
