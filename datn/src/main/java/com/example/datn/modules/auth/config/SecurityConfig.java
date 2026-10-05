@@ -60,6 +60,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
                         // Native <audio> requests cannot attach the bearer token used by the API client.
                         .requestMatchers(HttpMethod.GET, "/media/**").permitAll()
+                        .requestMatchers(HttpMethod.HEAD, "/media/**").permitAll()
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(handling -> handling

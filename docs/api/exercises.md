@@ -175,7 +175,7 @@ Sắp xếp "cơ bản đến nâng cao" (B1): `cefr_level` A1 → C2, rồi `so
   ```json
   {
     "title": "Hội thoại tại sân bay",
-    "audioUrl": "/media/listening/airport.mp3",
+    "audioUrl": "/media/r2/media/listening/airport.mp3",
     "durationMs": 110000,
     "segments": [
       { "id": 501, "order": 1, "startMs": 0, "endMs": 6200, "speaker": "Hành khách", "transcript": "Excuse me, could you tell me where the check-in counter for flight VN209 is?" }
@@ -184,8 +184,9 @@ Sắp xếp "cơ bản đến nâng cao" (B1): `cefr_level` A1 → C2, rồi `so
   ```
 
   `segments` là phụ đề (người học bật "Hiện phụ đề" mới thấy); **không** kèm bản dịch (`translation_vi` chỉ trả sau khi
-  nộp bài, để đối chiếu). `speaker` có thể `null`. `audioUrl` phải phát được trực tiếp bằng thẻ `<audio>` (cùng origin
-  hoặc có CORS), hỗ trợ HTTP Range để tua.
+  nộp bài, để đối chiếu). `speaker` có thể `null`. Khi bật R2 proxy, `audioUrl` trỏ tới `/media/r2/<object-key>`;
+  endpoint GET/HEAD chỉ đọc audio trong `media/listening/`, hỗ trợ HTTP Range để thẻ `<audio>` tua được và không cần JWT.
+  Khi tắt R2 proxy, backend giữ nguyên URI local hoặc URL công khai đã lưu.
 - `pronunciationItems` (chỉ `PRONUNCIATION`, còn lại `[]`), theo `sort_order`:
 
   ```json
@@ -397,9 +398,9 @@ Backend gửi file cho dịch vụ AI, lưu một dòng `pronunciation_attempts`
    `common.persistence`), module `modules/exercise`. Thay đổi ngày 02/10 ở mục cuối.
 2. Seed nội dung mẫu bằng migration Flyway đặt tên theo thời gian (`V<yyyyMMddHHmm>__seed_exercises.sql`). Dữ liệu giả
    trong `frontend/mock/exerciseFixtures.js` dùng làm mẫu được.
-3. File audio: đặt trong `src/main/resources/static/media/…` (Spring phục vụ luôn, hỗ trợ Range) hoặc một kho lưu trữ
-   ngoài. Nếu đặt trong `static/`, cần mở quyền `permitAll` cho `/media/**` trong `SecurityConfig` (thẻ `<audio>` không gửi
-   được header `Authorization`).
+3. File audio: có thể đặt trong `src/main/resources/static/media/…` hoặc bucket R2 `learning-audio`. Với R2, backend
+   dùng token S3 chỉ-đọc để stream qua `/media/r2/**`; giới hạn khóa object vào prefix `media/listening/`, và mở GET/HEAD
+   `permitAll` vì thẻ `<audio>` không gửi được header `Authorization`.
 4. Chấm điểm là hàm thuần (so khớp đáp án, tính phần trăm), dễ viết unit test. Luật "làm tiếp được" (kỹ năng, 7 ngày,
    `updated_at` của bài) cũng nên là một hàm thuần nhận thời điểm hiện tại, để test không phụ thuộc đồng hồ.
    "Hoạt động cuối" là giá trị lớn nhất của `question_responses.answered_at`, `pronunciation_attempts.assessed_at` và
