@@ -1,0 +1,25 @@
+' Kiểu dùng chung cho các biểu đồ tuần tự (phân tích).
+' Lớp giao diện dùng biểu tượng boundary, lớp thực thể dùng biểu tượng entity,
+' AIService là boundary với actor bên ngoài "Dịch vụ AI".
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam sequence {
+  ArrowColor black
+  LifeLineBorderColor #555555
+  LifeLineBackgroundColor white
+  ParticipantBorderColor black
+  ParticipantBackgroundColor white
+  ActorBorderColor black
+  ActorBackgroundColor white
+  GroupBorderColor #555555
+  GroupBackgroundColor #F2F2F2
+}
+skinparam BoundaryBorderColor black
+skinparam BoundaryBackgroundColor white
+skinparam EntityBorderColor black
+skinparam EntityBackgroundColor white
+skinparam NoteBorderColor #888888
+skinparam NoteBackgroundColor #FFFFF0
+hide footbox
+autonumber

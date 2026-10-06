@@ -1,0 +1,135 @@
+@startuml dc-b2-hoc-the
+!include _style-dc.iuml
+
+package "Frontend (React)" {
+  class FlashcardPage {
+    -topic : Topic
+    -customList : CustomList
+    -words : Vocabulary[]
+    -index : number
+    -ratings : string[]
+    -flipped : boolean
+    -startTime : Date
+    -summary : FlashcardSummary
+    +loadWords() : void
+    +handlePlayAudio() : void
+    +handleFlip() : void
+    +handleRate(rating : string) : void
+    +handleFinish() : void
+  }
+  class SessionSummary {
+    -summary : FlashcardSummary
+    +handleContinue() : void
+    +handleBackToTopic() : void
+  }
+  class TopicDetailPage <<ngoai>>
+}
+
+package "Backend (Spring Boot)" {
+  class FlashcardController {
+    -vocabularyDAO : VocabularyDAO
+    -learnerVocabularyDAO : LearnerVocabularyDAO
+    -flashcardSummaryDAO : FlashcardSummaryDAO
+    -dailyProgressDAO : DailyProgressDAO
+    +getWordsToStudy(topicId : Long, customListId : Long) : List<Vocabulary>
+    +reviewWord(vocabularyId : Long, rating : RecallRating) : LearnerVocabulary
+    +finishSession(topicId : Long, customListId : Long, startTime : LocalDateTime) : FlashcardSummary
+  }
+  abstract class DAO {
+    #jdbcTemplate : JdbcTemplate
+    +DAO(jdbcTemplate : JdbcTemplate)
+  }
+  class VocabularyDAO {
+    +getWordsToStudy(learnerId : Long, topicId : Long, customListId : Long, date : LocalDate) : List<Vocabulary>
+  }
+  class LearnerVocabularyDAO {
+    +reviewWord(learnerId : Long, vocabularyId : Long, rating : RecallRating, time : LocalDateTime) : LearnerVocabulary
+  }
+  class FlashcardSummaryDAO {
+    +getSessionSummary(learnerId : Long, topicId : Long, customListId : Long, startTime : LocalDateTime) : FlashcardSummary
+  }
+  class DailyProgressDAO {
+    +updateProgress(learnerId : Long, date : LocalDate, minutes : int) : void
+  }
+
+  class Vocabulary {
+    -id : Long
+    -word : String
+    -phonetic : String
+    -meaning : String
+    -example : String
+    -audio : String
+    -image : String
+    -level : CefrLevel
+    -status : ContentStatus
+    -updatedDate : LocalDate
+    -topic : Topic
+    -creator : User
+  }
+  class LearnerVocabulary {
+    -id : Long
+    -status : LearningStatus
+    -lastResult : RecallRating
+    -reviewCount : int
+    -firstLearnedDate : LocalDate
+    -lastReviewedDate : LocalDate
+    -nextReviewDate : LocalDate
+    -learner : Learner
+    -vocabulary : Vocabulary
+  }
+  class VocabularyReview {
+    -id : Long
+    -rating : RecallRating
+    -reviewedTime : LocalDateTime
+    -learnerVocabulary : LearnerVocabulary
+  }
+  class FlashcardSummary {
+    -topicName : String
+    -cardCount : int
+    -forgotCount : int
+    -vagueCount : int
+    -rememberedCount : int
+    -dueTomorrowCount : int
+  }
+  class DailyProgress {
+    -id : Long
+    -date : LocalDate
+    -wordsLearned : int
+    -exercisesCompleted : int
+    -testsCompleted : int
+    -studyMinutes : int
+    -learner : Learner
+  }
+  class Topic <<ngoai>>
+  class Learner <<ngoai>>
+  class User <<ngoai>>
+}
+
+FlashcardPage *-- SessionSummary
+SessionSummary -- TopicDetailPage
+
+FlashcardPage -- FlashcardController
+
+FlashcardController -- VocabularyDAO
+FlashcardController -- LearnerVocabularyDAO
+FlashcardController -- FlashcardSummaryDAO
+FlashcardController -- DailyProgressDAO
+DAO <|-- VocabularyDAO
+DAO <|-- LearnerVocabularyDAO
+DAO <|-- FlashcardSummaryDAO
+DAO <|-- DailyProgressDAO
+VocabularyDAO -- Vocabulary
+LearnerVocabularyDAO -- LearnerVocabulary
+LearnerVocabularyDAO -- VocabularyReview
+FlashcardSummaryDAO -- FlashcardSummary
+DailyProgressDAO -- DailyProgress
+
+Vocabulary "*" o-- "0..1" Topic
+Vocabulary "*" o-- "1" User
+LearnerVocabulary "*" o-- "1" Vocabulary
+LearnerVocabulary "*" o-- "1" Learner
+VocabularyReview "*" o-- "1" LearnerVocabulary
+DailyProgress "*" o-- "1" Learner
+FlashcardSummary ..> VocabularyReview
+FlashcardSummary ..> LearnerVocabulary
+@enduml

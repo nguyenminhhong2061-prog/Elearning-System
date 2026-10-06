@@ -32,6 +32,7 @@ public interface UserVocabularyRepository extends JpaRepository<UserVocabulary, 
             where uv.userId = :userId
               and uv.nextReviewAt <= :today
               and (v.createdBy is null or v.createdBy = :userId)
+              and v.status = com.example.datn.modules.vocabulary.enums.VocabularyStatus.VISIBLE
               and (:topicId is null or v.topicId = :topicId)
               and (:listId is null
                    or v.id in (select i.id.vocabularyId from CustomVocabularyListItem i where i.id.listId = :listId))
@@ -49,8 +50,15 @@ public interface UserVocabularyRepository extends JpaRepository<UserVocabulary, 
             @Param("vague") ReviewResult vague,
             Pageable pageable);
 
-    /** How many words of one user are due on or before {@code day}. */
-    @Query("select count(uv) from UserVocabulary uv where uv.userId = :userId and uv.nextReviewAt <= :day")
+    /** How many words of one user are due on or before {@code day}; hidden words are never due again. */
+    @Query("""
+            select count(uv)
+            from UserVocabulary uv
+            join Vocabulary v on v.id = uv.vocabularyId
+            where uv.userId = :userId
+              and uv.nextReviewAt <= :day
+              and v.status = com.example.datn.modules.vocabulary.enums.VocabularyStatus.VISIBLE
+            """)
     long countDueBy(@Param("userId") Long userId, @Param("day") LocalDate day);
 
     /** The words of one user due on or before {@code day}, the earliest due first, then alphabetically. */
@@ -60,22 +68,25 @@ public interface UserVocabularyRepository extends JpaRepository<UserVocabulary, 
             join Vocabulary v on v.id = uv.vocabularyId
             where uv.userId = :userId
               and uv.nextReviewAt <= :day
+              and v.status = com.example.datn.modules.vocabulary.enums.VocabularyStatus.VISIBLE
             order by uv.nextReviewAt, lower(v.word), v.id
             """)
     List<String> findWordsDueBy(@Param("userId") Long userId, @Param("day") LocalDate day, Pageable pageable);
 
     /**
      * The four counts of the summary in one query. Learning and mastered words are counted among the reviewed ones
-     * (last_reviewed_at set), exactly like {@link #findHistory}, so the history totals match the summary.
+     * (last_reviewed_at set), exactly like {@link #findHistory}, so the history totals match the summary. A hidden word
+     * keeps counting there but is never due again.
      */
     @Query("""
             select new com.example.datn.modules.vocabulary.repository.LearningCounts(
-                coalesce(sum(case when uv.nextReviewAt <= :today then 1 else 0 end), 0L),
+                coalesce(sum(case when uv.nextReviewAt <= :today and v.status = com.example.datn.modules.vocabulary.enums.VocabularyStatus.VISIBLE then 1 else 0 end), 0L),
                 coalesce(sum(case when uv.status = :learning and uv.lastReviewedAt is not null then 1 else 0 end), 0L),
                 coalesce(sum(case when uv.status = :mastered and uv.lastReviewedAt is not null then 1 else 0 end), 0L),
                 coalesce(sum(case when uv.lastReviewedAt >= :dayStart and uv.lastReviewedAt < :dayEnd
                                   then 1 else 0 end), 0L))
             from UserVocabulary uv
+            join Vocabulary v on v.id = uv.vocabularyId
             where uv.userId = :userId
             """)
     LearningCounts countSummary(
@@ -86,12 +97,17 @@ public interface UserVocabularyRepository extends JpaRepository<UserVocabulary, 
             @Param("dayStart") Instant dayStart,
             @Param("dayEnd") Instant dayEnd);
 
-    /** Words of one user falling due on each day between {@code from} and {@code to}; days without any are absent. */
+    /**
+     * Words of one user falling due on each day between {@code from} and {@code to}, hidden words left out; days without
+     * any are absent.
+     */
     @Query("""
             select new com.example.datn.modules.vocabulary.repository.DueDateCount(uv.nextReviewAt, count(uv))
             from UserVocabulary uv
+            join Vocabulary v on v.id = uv.vocabularyId
             where uv.userId = :userId
               and uv.nextReviewAt between :from and :to
+              and v.status = com.example.datn.modules.vocabulary.enums.VocabularyStatus.VISIBLE
             group by uv.nextReviewAt
             """)
     List<DueDateCount> countDueByDay(

@@ -1,0 +1,51 @@
+@startuml uc-kiem-tra-tong-hop
+!pragma layout smetana
+left to right direction
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor white
+  BorderColor black
+  ArrowColor black
+}
+skinparam actor {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam rectangle {
+  BackgroundColor white
+  BorderColor black
+}
+
+actor "Người học" as NH
+actor "Dịch vụ AI" as AI
+
+rectangle "Hệ thống học tiếng Anh" {
+  usecase "<i>Làm bài kiểm tra</i>" as KT
+  usecase "Kiểm tra\ntổng hợp" as KTTH
+  usecase "Đăng nhập" as DN
+  usecase "Chọn đề\nkiểm tra" as CD
+  usecase "<i>Làm phần kỹ năng</i>" as PKN
+  usecase "Làm phần nghe" as NGHE
+  usecase "Làm phần nói" as NOI
+  usecase "Làm phần đọc" as DOC
+  usecase "Làm phần viết" as VIET
+  usecase "Xem báo cáo\nkết quả" as BC
+  usecase "Áp dụng lộ trình\nđề xuất" as ALT
+}
+
+NH -- KTTH
+KTTH --|> KT
+KTTH ..> DN : <<include>>
+KT ..> CD : <<include>>
+KTTH ..> PKN : <<include>>
+PKN <|-- NGHE
+PKN <|-- NOI
+PKN <|-- DOC
+PKN <|-- VIET
+KTTH ..> BC : <<include>>
+BC <.. ALT : <<extend>>
+KTTH ----- AI
+@enduml

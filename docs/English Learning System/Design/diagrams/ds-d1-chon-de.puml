@@ -1,0 +1,86 @@
+@startuml ds-d1-chon-de
+!include _style-ds.iuml
+
+actor "Người học" as NH
+box "Frontend (React)" #FAFAFA
+  boundary LearnerLayout
+  boundary TestPage
+  boundary DoTestPage
+  boundary TestInfo
+end box
+box "Backend (Spring Boot)" #FAFAFA
+  control TestController
+  control TestStatDAO
+  control TestQuestionDAO
+  control TestAttemptDAO
+  entity TestStat
+  entity TestQuestion
+  entity AnswerOption
+  entity TestMaterial
+  entity TestAttempt
+end box
+
+NH -> LearnerLayout ++ : chọn mục "Kiểm tra" trên thanh bên
+LearnerLayout -> LearnerLayout : handleSelectMenuItem()
+LearnerLayout -> TestPage ++ : chuyển trang
+deactivate LearnerLayout
+TestPage -> TestPage : loadTests()
+TestPage -> TestController ++ : GET /api/tests
+TestController -> TestController : getOpenTests()
+TestController -> TestStatDAO ++ : gọi
+TestStatDAO -> TestStatDAO : getOpenTests()
+loop mỗi đề đang mở (3 đề)
+  TestStatDAO -> TestStat ++ : gọi
+  TestStat -> TestStat : TestStat(), setter (cả thuộc tính kế thừa từ Test)
+  TestStat --> TestStatDAO -- : trả về
+end
+TestStatDAO --> TestController -- : trả về 2 đề định kỳ, 1 đề tổng hợp (23 câu, 0 lần làm)
+TestController --> TestPage -- : 200, JSON 3 đề
+TestPage --> NH : hiển thị hai khối đề; "23 câu · Còn 25 ngày · Chưa làm lần nào"
+
+NH -> TestPage : click "Bắt đầu" ở đề "Kiểm tra tổng hợp tháng 10/2026"
+TestPage -> TestPage : handleSelectTest()
+TestPage -> DoTestPage ++ : chuyển trang (truyền đề đã chọn)
+deactivate TestPage
+DoTestPage -> DoTestPage : loadQuestions()
+DoTestPage -> TestController ++ : GET /api/tests/{id}/questions
+TestController -> TestController : getQuestionsByTest()
+TestController -> TestQuestionDAO ++ : gọi
+TestQuestionDAO -> TestQuestionDAO : getQuestionsByTest()
+loop mỗi câu hỏi của đề (23 câu)
+  TestQuestionDAO -> TestQuestion ++ : gọi
+  TestQuestion -> TestQuestion : TestQuestion()
+  opt câu trắc nghiệm (20 câu nghe, đọc)
+    loop mỗi đáp án lựa chọn
+      TestQuestion -> AnswerOption ++ : gọi
+      AnswerOption -> AnswerOption : AnswerOption()
+      AnswerOption --> TestQuestion -- : trả về
+    end
+    TestQuestion -> TestMaterial ++ : gọi
+    TestMaterial -> TestMaterial : TestMaterial()
+    TestMaterial --> TestQuestion -- : trả về bài nghe hoặc đoạn văn
+  end
+  TestQuestion --> TestQuestionDAO -- : trả về
+end
+TestQuestionDAO --> TestController -- : trả về 23 câu
+TestController --> DoTestPage -- : 200, JSON 23 câu (không kèm đáp án đúng)
+DoTestPage -> TestInfo ++ : hiện (chưa có lượt làm bài; truyền đề và các câu hỏi)
+TestInfo --> NH : hiển thị "23 câu … · Kỹ năng: Nghe, Nói, Đọc, Viết", cấu trúc đề theo phần
+
+NH -> TestInfo : click "Bắt đầu"
+TestInfo -> TestInfo : handleStart()
+TestInfo -> TestController ++ : POST /api/tests/{id}/attempts
+TestController -> TestController : startAttempt()
+TestController -> TestAttemptDAO ++ : gọi
+TestAttemptDAO -> TestAttemptDAO : startAttempt()
+TestAttemptDAO -> TestAttempt ++ : gọi
+TestAttempt -> TestAttempt : TestAttempt()
+TestAttempt --> TestAttemptDAO -- : trả về
+TestAttemptDAO --> TestController -- : trả về lượt mới ở trạng thái đang làm (Lan chưa có lượt làm dở)
+TestController --> TestInfo -- : 200, JSON lượt làm bài
+TestInfo -> DoTestPage : gọi handleStarted() (truyền lượt làm bài)
+deactivate TestInfo
+DoTestPage -> DoTestPage : handleStarted()
+DoTestPage --> NH : hiển thị câu 1 phần Nghe, bài nghe "Planning a weekend trip"
+deactivate DoTestPage
+@enduml

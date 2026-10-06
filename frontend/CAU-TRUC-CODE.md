@@ -4,8 +4,9 @@ Tài liệu này mô tả **một cách tổ chức code duy nhất** cho mọi 
 gọi file nào, và các bước làm khi thêm API, thêm trang. Mục đích là để mở bất kỳ module nào cũng đoán được ngay chỗ
 cần tìm.
 
-Đã áp dụng cho: **đăng nhập, đăng ký** (`features/auth`), **từ vựng** (`features/vocabulary`) và **trò chơi từ vựng**
-(`features/games`). Các module còn lại (`exercises`, `tests`, `progress`, `plan`) sẽ chuyển dần theo mẫu này (xem mục 7).
+Đã áp dụng cho: **đăng nhập, đăng ký** (`features/auth`), **từ vựng** (`features/vocabulary`), **trò chơi từ vựng**
+(`features/games`) và phần thư mục của **khu quản trị** (`features/admin`). Các module còn lại (`exercises`, `tests`,
+`progress`, `plan`) sẽ chuyển dần theo mẫu này (xem mục 7).
 
 Mẫu dựa trên cấu trúc "theo tính năng" (feature-based) của dự án tham khảo
 [bulletproof-react](https://github.com/alan2207/bulletproof-react/blob/master/docs/project-structure.md), rút gọn cho
@@ -340,6 +341,7 @@ Không đổi giao diện hay hành vi: 392 test cũ vẫn qua mà không phải
 | `tests` | `TestTakingPage.jsx` dài 461 dòng; `useAnswerSaver.js`, `answers.js` ở gốc |
 | `progress` | `chart.js`, `useStudyTime.js` ở gốc; khóa cache viết trong `progressQueries.js` |
 | `plan` | `PlanPage.jsx` dài 261 dòng; `plan.js` ở gốc |
+| `admin` | thư mục, tầng `api/` (5 cặp `xxxApi.js` + `xxxQueries.js` cộng `keys.js`) và URL (`paths.admin…`) đã theo mẫu; còn trang dài (`AdminOverviewPage.jsx` 403 dòng, `AdminTestEditorPage.jsx` 298, `AdminUserDetailPage.jsx` 289) sẽ tách khi sửa từng trang theo tài liệu thiết kế |
 
 Khi chuyển một module: làm đúng các bước như mục 6 (chuyển file bằng `git mv`, tách trang dài, đưa luật vào `hooks/`,
 URL vào `paths.js`), và test cũ phải chạy nguyên vẹn.

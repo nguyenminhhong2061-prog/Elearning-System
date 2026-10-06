@@ -1,0 +1,81 @@
+@startuml ec-1-tai-khoan-tu-vung
+!include _style.iuml
+
+abstract class User {
+  -fullName
+  -email
+  -password
+  -status
+  -createdDate
+  -lastActiveTime
+}
+class Learner {
+  -currentLevel
+}
+class Admin
+class LevelHistory {
+  -level
+  -changedDate
+}
+
+class Topic {
+  -name
+  -description
+  -image
+  -updatedDate
+}
+class Vocabulary {
+  -word
+  -phonetic
+  -meaning
+  -example
+  -audio
+  -image
+  -level
+  -status
+  -updatedDate
+}
+class LearnerVocabulary {
+  -status
+  -lastResult
+  -reviewCount
+  -firstLearnedDate
+  -lastReviewedDate
+  -nextReviewDate
+}
+class VocabularyReview {
+  -rating
+  -reviewedTime
+}
+class CustomList {
+  -name
+  -createdDate
+}
+class CustomListItem
+class GamePlay {
+  -gameType
+  -correctCount
+  -questionCount
+  -score
+  -duration
+  -playedDate
+}
+
+User <|-- Learner
+User <|-- Admin
+Learner "1" -- "*" LevelHistory
+
+User "1" -- "*" Vocabulary : tạo >
+Topic "0..1" o-- "*" Vocabulary
+Learner "1" -- "*" LearnerVocabulary
+Vocabulary "1" -- "*" LearnerVocabulary
+LearnerVocabulary "1" *-- "*" VocabularyReview
+
+Learner "1" -- "*" CustomList
+CustomList "1" *-- "*" CustomListItem
+Vocabulary "1" -- "*" CustomListItem
+
+Learner "1" -- "*" GamePlay
+Topic "0..1" -- "*" GamePlay
+CustomList "0..1" -- "*" GamePlay
+@enduml

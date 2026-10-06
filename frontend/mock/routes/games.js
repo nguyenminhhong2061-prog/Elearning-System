@@ -1,6 +1,6 @@
 import { addDays, todayInVietnam } from '../../src/lib/dates.js'
 import { HttpError } from '../http.js'
-import { allUsers, findWord, topics, visibleWords } from '../store.js'
+import { allUsers, findWord, notHidden, topics, visibleWords } from '../store.js'
 import { findList } from './lists.js'
 
 // docs/api/games.md (version 2, scenario 8): a round is dealt when it starts from the words of the topic or personal
@@ -74,7 +74,7 @@ function wordSource(user, searchParams) {
   if (listId) {
     const list = findList(user, Number(listId))
     if (!list) throw new HttpError(404, 'List not found')
-    const words = list.wordIds.map((id) => findWord(user, id)).filter(Boolean)
+    const words = list.wordIds.map((id) => findWord(user, id)).filter(notHidden)
     return { topicId: null, listId: list.id, pool: distinctMeanings(words) }
   }
   const words = visibleWords(user).filter((word) => word.createdBy === null && word.topicId !== null)

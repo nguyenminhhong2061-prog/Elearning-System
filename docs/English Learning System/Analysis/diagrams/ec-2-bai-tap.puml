@@ -1,0 +1,106 @@
+@startuml ec-2-bai-tap
+!include _style.iuml
+
+class Learner <<ngoai>>
+
+class ExerciseLesson {
+  -skill
+  -title
+  -description
+  -topic
+  -level
+  -difficulty
+  -estimatedDuration
+  -status
+}
+class ReadingPassage {
+  -title
+  -content
+}
+class ListeningPassage {
+  -title
+  -audio
+  -duration
+  -transcript
+  -translation
+}
+class ListeningSegment {
+  -orderNo
+  -startTime
+  -endTime
+  -speaker
+  -transcript
+  -translation
+}
+class PronunciationItem {
+  -sampleText
+  -ipa
+  -sampleAudio
+  -notes
+}
+class PronunciationAttempt {
+  -attemptNo
+  -recording
+  -accuracyScore
+  -fluencyScore
+  -overallScore
+  -aiFeedback
+  -practicedTime
+}
+
+abstract class Question {
+  -type
+  -content
+  -score
+}
+class ExerciseQuestion {
+  -hint
+  -explanation
+}
+class AnswerOption {
+  -content
+  -isCorrect
+}
+class AcceptedAnswer {
+  -content
+}
+class SampleAnswer {
+  -content
+}
+
+class ExerciseAttempt {
+  -status
+  -maxScore
+  -score
+  -percent
+  -startTime
+  -endTime
+}
+class ExerciseAnswer {
+  -answerText
+  -isCorrect
+  -score
+  -aiFeedback
+}
+
+ExerciseLesson "1" *-- "*" ReadingPassage
+ExerciseLesson "1" *-- "0..1" ListeningPassage
+ListeningPassage "1" *-- "*" ListeningSegment
+ExerciseLesson "1" *-- "*" PronunciationItem
+ExerciseLesson "1" *-- "*" ExerciseQuestion
+
+Question <|-- ExerciseQuestion
+Question "1" *-- "*" AnswerOption
+Question "1" *-- "*" AcceptedAnswer
+ExerciseQuestion "1" *-- "*" SampleAnswer
+ReadingPassage "0..1" -- "*" ExerciseQuestion
+
+Learner "1" -- "*" PronunciationAttempt
+PronunciationItem "1" -- "*" PronunciationAttempt
+
+Learner "1" -- "*" ExerciseAttempt
+ExerciseLesson "1" -- "*" ExerciseAttempt
+ExerciseAttempt "1" *-- "*" ExerciseAnswer
+ExerciseQuestion "1" -- "*" ExerciseAnswer
+AnswerOption "0..1" -- "*" ExerciseAnswer : được chọn <
+@enduml

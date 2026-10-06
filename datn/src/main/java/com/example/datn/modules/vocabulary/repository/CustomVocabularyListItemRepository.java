@@ -17,7 +17,7 @@ public interface CustomVocabularyListItemRepository
 
     /**
      * Word, learned and due counts of the given lists for their owner, in one grouped query. Only words the owner
-     * can see are counted. Lists without words are absent from the result.
+     * can see are counted (not the hidden ones). Lists without words are absent from the result.
      */
     @Query("""
             select new com.example.datn.modules.vocabulary.repository.ListWordCounts(
@@ -30,6 +30,7 @@ public interface CustomVocabularyListItemRepository
             left join UserVocabulary uv on uv.vocabularyId = v.id and uv.userId = :userId
             where i.id.listId in :listIds
               and (v.createdBy is null or v.createdBy = :userId)
+              and v.status = com.example.datn.modules.vocabulary.enums.VocabularyStatus.VISIBLE
             group by i.id.listId
             """)
     List<ListWordCounts> countByList(

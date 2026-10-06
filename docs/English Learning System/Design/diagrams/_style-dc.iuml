@@ -1,0 +1,27 @@
+' Kiểu dùng chung cho các biểu đồ lớp thiết kế (dc-*.puml).
+' Hai gói Frontend (React) và Backend (Spring Boot) tách hai phía của mô hình MVC.
+' Lớp thực thể chỉ được tham chiếu qua thuộc tính đối tượng gắn <<ngoai>>: tô xám, ẩn thành viên.
+' Lớp của framework (Spring, React) gắn <<khung>>: nền xám nhạt, như JFrame/ActionListener của mẫu.
+!pragma layout smetana
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam class {
+  BackgroundColor white
+  BorderColor black
+  ArrowColor black
+}
+skinparam package {
+  BorderColor #777777
+  FontColor #555555
+}
+skinparam classBackgroundColor<<ngoai>> #E6E6E6
+skinparam classFontColor<<ngoai>> #555555
+skinparam classBackgroundColor<<khung>> #F2F2F2
+hide circle
+hide empty members
+hide <<ngoai>> stereotype
+hide <<ngoai>> members
+hide <<khung>> stereotype

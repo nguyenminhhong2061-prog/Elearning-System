@@ -1,0 +1,146 @@
+@startuml cd-b-hoc-flashcard
+!include _style.iuml
+show methods
+hide empty methods
+
+class LearnerHomeView {
+  -outDueNotice
+  -subVocabulary
+}
+class VocabularyView {
+  -outSummary
+  -outsubDueNotice
+  -subGames
+  -subTopicTab
+  -subCustomListTab
+  -subHistoryTab
+  -outsubListTopic
+  -outsubListCustomList
+}
+class TopicDetailView {
+  -subBack
+  -outTopic
+  -outListWord
+  -subMoreWords
+  -subStudy
+}
+class FlashcardView {
+  -outTitle
+  -outProgress
+  -outCardIndex
+  -subFinish
+  -outWord
+  -subPlayAudio
+  -subFlip
+  -outPhonetic
+  -outMeaning
+  -outImage
+  -outExample
+  -subForgot
+  -subVague
+  -subRemembered
+}
+class SessionSummaryView {
+  -outTopic
+  -outCardCount
+  -outRatingCount
+  -outDueTomorrow
+  -subContinue
+  -subBackToTopic
+}
+
+class Learner {
+  -currentLevel
+}
+class Topic {
+  -name
+  -description
+  -image
+  -updatedDate
+}
+class TopicStat {
+  -learnedCount
+  -totalCount
+  -dueCount
+  +getTopicStats()
+}
+class CustomList {
+  -name
+  -createdDate
+}
+class CustomListStat {
+  -learnedCount
+  -totalCount
+  +getCustomListStats()
+}
+class Vocabulary {
+  -word
+  -phonetic
+  -meaning
+  -example
+  -audio
+  -image
+  -level
+  -status
+  +getWordsToStudy()
+}
+class LearnerVocabulary {
+  -status
+  -lastResult
+  -reviewCount
+  -firstLearnedDate
+  -lastReviewedDate
+  -nextReviewDate
+  +getDueList()
+  +getWordsByTopic()
+  +reviewWord()
+}
+class VocabularyReview {
+  -rating
+  -reviewedTime
+}
+class FlashcardSummary {
+  -topicName
+  -cardCount
+  -forgotCount
+  -vagueCount
+  -rememberedCount
+  -dueTomorrowCount
+  +getSessionSummary()
+}
+class DailyProgress {
+  -date
+  -wordsLearned
+  -exercisesCompleted
+  -testsCompleted
+  -studyMinutes
+  +updateProgress()
+}
+
+LearnerHomeView -right- VocabularyView
+VocabularyView -right- TopicDetailView
+TopicDetailView -right- FlashcardView
+FlashcardView -right- SessionSummaryView
+SessionSummaryView -- TopicDetailView
+
+LearnerHomeView -- Learner
+LearnerHomeView -- LearnerVocabulary
+VocabularyView -- TopicStat
+VocabularyView -- CustomListStat
+VocabularyView -- LearnerVocabulary
+TopicDetailView -- TopicStat
+TopicDetailView -- LearnerVocabulary
+FlashcardView -- Vocabulary
+FlashcardView -- LearnerVocabulary
+FlashcardView -- DailyProgress
+SessionSummaryView -- FlashcardSummary
+
+Topic <|-- TopicStat
+CustomList <|-- CustomListStat
+Topic "0..1" o-- "*" Vocabulary
+Learner "1" -- "*" LearnerVocabulary
+Vocabulary "1" -- "*" LearnerVocabulary
+LearnerVocabulary "1" *-- "*" VocabularyReview
+FlashcardSummary ..> VocabularyReview
+Learner "1" -- "*" DailyProgress
+@enduml

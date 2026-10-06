@@ -92,6 +92,7 @@ frontend/
     │   │                      # components/ (ProtectedRoute, GuestRoute)
     │   ├── vocabulary/        # module A: chủ đề, học thẻ, nhắc ôn, lịch sử, danh sách riêng
     │   ├── games/             # module A (A4): trò chơi từ vựng và bảng xếp hạng
+    │   ├── admin/             # module E (giao diện): khu quản trị /admin/*, chạy với dữ liệu giả; API theo docs/api/admin.md
     │   ├── exercises/         # module B (giao diện): đọc hiểu (reading/), viết (writing/), nghe (listening/),
     │                          # phát âm (pronunciation/), trợ lý AI (chat/); API theo docs/api/exercises.md, chatbot.md
     │   ├── tests/             # module C (giao diện): kiểm tra định kỳ và tổng hợp; API theo docs/api/tests.md

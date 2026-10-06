@@ -1,0 +1,119 @@
+@startuml ds-e-lap-ke-hoach
+!include _style-ds.iuml
+
+actor "Người học" as NH
+box "Frontend (React)" #FAFAFA
+  boundary LearnerLayout
+  boundary PlanPage
+  boundary SuggestedRoadmap
+  boundary PlanDetail
+end box
+box "Backend (Spring Boot)" #FAFAFA
+  control StudyPlanController
+  control StudyPlanDAO
+  control TestAttemptDAO
+  boundary AIService
+  control ReminderDAO
+  control ProgressStatDAO
+  entity StudyPlan
+  entity StudyWeek
+  entity TestAttempt
+  entity Reminder
+  entity ProgressStat
+end box
+actor "Dịch vụ AI" as AI
+
+NH -> LearnerLayout ++ : chọn mục "Kế hoạch" trên thanh bên
+LearnerLayout -> LearnerLayout : handleSelectMenuItem()
+LearnerLayout -> PlanPage ++ : chuyển trang
+deactivate LearnerLayout
+PlanPage -> PlanPage : loadPlan()
+PlanPage -> StudyPlanController ++ : GET /api/study-plans/active
+StudyPlanController -> StudyPlanController : getActivePlan()
+StudyPlanController -> StudyPlanDAO ++ : gọi
+StudyPlanDAO -> StudyPlanDAO : getActivePlan()
+StudyPlanDAO --> StudyPlanController -- : trả về rỗng (Lan chưa có kế hoạch đang thực hiện)
+StudyPlanController --> PlanPage -- : 204
+PlanPage -> PlanPage : loadLatestResult()
+PlanPage -> StudyPlanController ++ : GET /api/study-plans/latest-result
+StudyPlanController -> StudyPlanController : getLatestResult()
+StudyPlanController -> TestAttemptDAO ++ : gọi
+TestAttemptDAO -> TestAttemptDAO : getLatestResult()
+TestAttemptDAO -> TestAttempt ++ : gọi
+TestAttempt -> TestAttempt : TestAttempt()
+TestAttempt --> TestAttemptDAO -- : trả về
+TestAttemptDAO --> StudyPlanController -- : trả về lượt ngày 06/10/2026 (nghe 7.0, nói 6.5, đọc 8.0, viết 6.5)
+StudyPlanController --> PlanPage -- : 200, JSON lượt kiểm tra
+PlanPage --> NH : hiển thị thẻ trình độ B1 kèm radar, khối "Đặt mục tiêu học tập"
+
+NH -> PlanPage : chọn "Mục tiêu khác", nhập mục tiêu, B2, 12/10/2026–03/01/2027, click "Gợi ý lộ trình"
+PlanPage -> PlanPage : handleSuggest()
+PlanPage -> StudyPlanController ++ : POST /api/study-plans/suggestions (kế hoạch chưa lưu)
+StudyPlanController -> StudyPlan ++ : gọi (Spring đóng gói JSON)
+StudyPlan -> StudyPlan : StudyPlan(), setter
+StudyPlan --> StudyPlanController -- : trả về
+StudyPlanController -> StudyPlanController : suggestRoadmap()
+ref over StudyPlanController, TestAttemptDAO, TestAttempt : getLatestResult(): lượt kiểm tra ngày 06/10/2026, như bước 14–19
+StudyPlanController -> AIService ++ : gọi
+AIService -> AIService : suggestRoadmap()
+AIService -> AI : gửi mục tiêu, trình độ B1 → B2, 12 tuần, kết quả kiểm tra gần nhất
+AI --> AIService : trả về lộ trình theo tuần
+loop mỗi tuần (12 tuần)
+  AIService -> StudyWeek ++ : gọi
+  StudyWeek -> StudyWeek : StudyWeek()
+  StudyWeek --> AIService -- : trả về
+end
+AIService --> StudyPlanController -- : trả về 12 tuần
+StudyPlanController --> PlanPage -- : 200, JSON 12 tuần
+PlanPage -> SuggestedRoadmap ++ : hiện (truyền kế hoạch kèm 12 tuần)
+SuggestedRoadmap --> NH : hiển thị "12/10/2026 – 03/01/2027 · 12 tuần"
+
+loop tuần 1 và tuần 2
+  NH -> SuggestedRoadmap : sửa mục tiêu số từ mới từ 50 xuống 40
+  SuggestedRoadmap -> SuggestedRoadmap : handleChangeWeek()
+end
+NH -> SuggestedRoadmap : click "Áp dụng kế hoạch"
+SuggestedRoadmap -> SuggestedRoadmap : handleApply()
+SuggestedRoadmap -> StudyPlanController ++ : POST /api/study-plans (kế hoạch kèm 12 tuần)
+StudyPlanController -> StudyPlan ++ : gọi (Spring đóng gói JSON)
+StudyPlan -> StudyPlan : StudyPlan(), setter
+loop mỗi tuần (12 tuần)
+  StudyPlan -> StudyWeek ++ : gọi
+  StudyWeek -> StudyWeek : StudyWeek(), setter
+  StudyWeek --> StudyPlan -- : trả về
+end
+StudyPlan --> StudyPlanController -- : trả về
+StudyPlanController -> StudyPlanController : addPlan()
+StudyPlanController -> StudyPlanDAO ++ : gọi
+StudyPlanDAO -> StudyPlanDAO : addPlan()
+StudyPlanDAO --> StudyPlanController -- : trả về true (kế hoạch và 12 tuần đã có id)
+loop mỗi tuần (12 tuần)
+  StudyPlanController -> Reminder ++ : gọi
+  Reminder -> Reminder : Reminder() (8:00 thứ Hai đầu tuần, loại kế hoạch)
+  Reminder --> StudyPlanController -- : trả về
+end
+StudyPlanController -> ReminderDAO ++ : gọi
+ReminderDAO -> ReminderDAO : addReminders()
+ReminderDAO --> StudyPlanController -- : trả về true
+StudyPlanController --> SuggestedRoadmap -- : 200, JSON kế hoạch đã lưu
+SuggestedRoadmap -> PlanPage : gọi handleApplied() (truyền kế hoạch đã lưu)
+deactivate SuggestedRoadmap
+PlanPage -> PlanPage : handleApplied()
+PlanPage --> NH : thông báo "Đã áp dụng kế hoạch mới. Chúc bạn học tốt!"
+PlanPage -> PlanDetail ++ : hiện (truyền kế hoạch đã lưu)
+deactivate PlanPage
+PlanDetail -> PlanDetail : loadProgress()
+PlanDetail -> StudyPlanController ++ : GET /api/study-plans/progress (12/10/2026–03/01/2027, theo tuần)
+StudyPlanController -> StudyPlanController : getProgressStats()
+StudyPlanController -> ProgressStatDAO ++ : gọi
+ProgressStatDAO -> ProgressStatDAO : getProgressStats()
+loop mỗi tuần (12 tuần)
+  ProgressStatDAO -> ProgressStat ++ : gọi
+  ProgressStat -> ProgressStat : ProgressStat()
+  ProgressStat --> ProgressStatDAO -- : trả về
+end
+ProgressStatDAO --> StudyPlanController -- : trả về 12 tuần (tiến độ đều bằng 0)
+StudyPlanController --> PlanDetail -- : 200, JSON 12 tuần
+PlanDetail --> NH : hiển thị "Kế hoạch của bạn" (B1 → B2, "Đang thực hiện", tuần hiện tại "chưa bắt đầu")
+deactivate PlanDetail
+@enduml

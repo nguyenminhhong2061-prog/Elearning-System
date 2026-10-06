@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { HttpError } from '../http.js'
+import { SYSTEM_WORDS } from '../store.js'
 import { MOCK_WORDS } from '../vocabularyFixtures.js'
 import { learningRoutes } from './learning.js'
 
@@ -111,5 +112,19 @@ describe('sessions and their summary (scenarios 5 and 6)', () => {
     // Forgotten again: due tomorrow; the "Nhớ rõ" word was overdue and is still due.
     expect(summary.dueTomorrow).toEqual({ date: '2026-09-26', count: 2, words: [rememberedWord.word, vagueWord.word] })
     expect(() => handle(state, 'GET', '/api/learning/session-summary')).toThrow(HttpError)
+  })
+
+  it('leaves a word hidden by an admin out of sessions and reviews, but keeps its history (scenario 21, step 8)', () => {
+    const hidden = SYSTEM_WORDS.find((word) => word.id === forgotWord.id)
+    hidden.status = 'HIDDEN'
+    try {
+      const state = learner()
+      expect(handle(state, 'GET', '/api/learning/session').cards.map((card) => card.word)).toEqual([vagueWord.word, rememberedWord.word])
+      expect(handle(state, 'GET', '/api/learning/session', { query: { topicId: '1' } }).cards.map((card) => card.word)).not.toContain(forgotWord.word)
+      expect(handle(state, 'GET', '/api/learning/summary')).toMatchObject({ dueToday: 2, learningCount: 4 })
+      expect(words(handle(state, 'GET', '/api/learning/history'))).toContain(forgotWord.word)
+    } finally {
+      hidden.status = 'VISIBLE'
+    }
   })
 })

@@ -1,0 +1,55 @@
+@startuml ec-5-tien-do-ke-hoach
+!include _style.iuml
+
+class Learner <<ngoai>>
+class Test <<ngoai>>
+class TestAttempt <<ngoai>>
+
+class DailyProgress {
+  -date
+  -wordsLearned
+  -exercisesCompleted
+  -testsCompleted
+  -studyMinutes
+}
+class Badge {
+  -name
+  -description
+  -icon
+  -conditionType
+  -threshold
+}
+class LearnerBadge {
+  -achievedDate
+}
+class StudyPlan {
+  -goal
+  -targetLevel
+  -startDate
+  -endDate
+  -status
+}
+class StudyWeek {
+  -weekNo
+  -description
+  -targetWords
+  -targetExercises
+  -status
+}
+class Reminder {
+  -type
+  -remindTime
+  -content
+  -isSent
+}
+
+Learner "1" -- "*" DailyProgress
+Learner "1" -- "*" LearnerBadge
+Badge "1" -- "*" LearnerBadge
+Learner "1" -- "*" StudyPlan
+StudyPlan "1" *-- "*" StudyWeek
+TestAttempt "0..1" -- "*" StudyPlan : gợi ý >
+Learner "1" -- "*" Reminder
+StudyWeek "0..1" -- "0..1" Reminder
+Test "0..1" -- "*" Reminder
+@enduml

@@ -1,7 +1,7 @@
 import { addDays } from '../../src/lib/dates.js'
 import { HttpError, paginate } from '../http.js'
 import { applyReview } from '../scheduler.js'
-import { findWord, isDue, isReviewedToday, sessionCards, toCard, topics, visibleWords } from '../store.js'
+import { findWord, isDue, isReviewedToday, notHidden, sessionCards, toCard, topics, visibleWords } from '../store.js'
 
 // docs/api/learning.md
 
@@ -48,7 +48,7 @@ function sessionSource(user, searchParams, findList) {
     if (!list) throw new HttpError(404, 'List not found')
     return {
       source: { type: 'LIST', id: list.id, name: list.name },
-      pool: list.wordIds.map((id) => findWord(user, id)).filter(Boolean),
+      pool: list.wordIds.map((id) => findWord(user, id)).filter(notHidden),
     }
   }
   return { source: { type: 'DUE', id: null, name: null }, pool: visibleWords(user), dueOnly: true }
@@ -101,7 +101,7 @@ export function learningRoutes({ findList } = {}) {
 
         const tomorrow = addDays(today, 1)
         const due = [...user.learning.entries()]
-          .filter(([, state]) => state.nextReviewAt <= tomorrow)
+          .filter(([id, state]) => state.nextReviewAt <= tomorrow && notHidden(findWord(user, id)))
           .map(([id, state]) => ({ word: findWord(user, id)?.word, nextReviewAt: state.nextReviewAt }))
           .filter((entry) => entry.word !== undefined)
           .sort((a, b) => a.nextReviewAt.localeCompare(b.nextReviewAt) || a.word.localeCompare(b.word, 'en'))
@@ -122,14 +122,16 @@ export function learningRoutes({ findList } = {}) {
       pattern: /^\/api\/learning\/summary$/,
       handle: ({ user, today }) => {
         const states = [...user.learning.values()]
+        // Hidden words still count as learned or mastered, but are never due again.
+        const dueStates = [...user.learning.entries()].filter(([id]) => notHidden(findWord(user, id))).map(([, state]) => state)
         return {
-          dueToday: states.filter((state) => isDue(state, today)).length,
+          dueToday: dueStates.filter((state) => isDue(state, today)).length,
           learningCount: states.filter((state) => state.status === 'LEARNING').length,
           masteredCount: states.filter((state) => state.status === 'MASTERED').length,
           reviewedToday: states.filter((state) => isReviewedToday(state, today)).length,
           upcoming: Array.from({ length: 7 }, (_, index) => {
             const date = addDays(today, index + 1)
-            return { date, count: states.filter((state) => state.nextReviewAt === date).length }
+            return { date, count: dueStates.filter((state) => state.nextReviewAt === date).length }
           }),
         }
       },

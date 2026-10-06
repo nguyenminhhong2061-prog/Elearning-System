@@ -1,0 +1,167 @@
+@startuml dc-e-lap-ke-hoach
+!include _style-dc.iuml
+
+package "Frontend (React)" {
+  class LearnerLayout {
+    +handleSelectMenuItem(path : string) : void
+  }
+  class PlanPage {
+    -user : Learner
+    -activePlan : StudyPlan
+    -latestResult : TestAttempt
+    -sourceAttempt : TestAttempt
+    -goal : string
+    -targetLevel : string
+    -startDate : string
+    -endDate : string
+    -preview : StudyPlan
+    +loadPlan() : void
+    +loadLatestResult() : void
+    +handleSelectSuggestedGoal(goal : object) : void
+    +handleSuggest() : void
+    +handleApplied(plan : StudyPlan) : void
+  }
+  class SuggestedRoadmap {
+    -plan : StudyPlan
+    +handleChangeWeek(weekNo : number, field : string, value : number) : void
+    +handleApply() : void
+  }
+  class PlanDetail {
+    -plan : StudyPlan
+    -progressStats : ProgressStat[]
+    -scheduleOpen : boolean
+    +loadProgress() : void
+    +handleToggleSchedule() : void
+    +handleAdjustPlan() : void
+  }
+}
+
+package "Backend (Spring Boot)" {
+  class StudyPlanController {
+    -studyPlanDAO : StudyPlanDAO
+    -testAttemptDAO : TestAttemptDAO
+    -reminderDAO : ReminderDAO
+    -progressStatDAO : ProgressStatDAO
+    -aiService : AIService
+    +getActivePlan() : StudyPlan
+    +getLatestResult() : TestAttempt
+    +suggestRoadmap(plan : StudyPlan) : List<StudyWeek>
+    +addPlan(plan : StudyPlan) : StudyPlan
+    +getProgressStats(startDate : LocalDate, endDate : LocalDate, unit : ChronoUnit) : List<ProgressStat>
+  }
+  class AIService {
+    -restClient : RestClient
+    +suggestRoadmap(plan : StudyPlan, currentLevel : CefrLevel, latestResult : TestAttempt) : List<StudyWeek>
+  }
+  abstract class DAO {
+    #jdbcTemplate : JdbcTemplate
+    +DAO(jdbcTemplate : JdbcTemplate)
+  }
+  class StudyPlanDAO {
+    +getActivePlan(learnerId : Long, date : LocalDate) : StudyPlan
+    +addPlan(plan : StudyPlan) : boolean
+  }
+  class TestAttemptDAO {
+    +getLatestResult(learnerId : Long) : TestAttempt
+  }
+  class ReminderDAO {
+    +addReminders(reminders : List<Reminder>) : boolean
+  }
+  class ProgressStatDAO {
+    +getProgressStats(learnerId : Long, startDate : LocalDate, endDate : LocalDate, unit : ChronoUnit) : List<ProgressStat>
+  }
+
+  class StudyPlan {
+    -id : Long
+    -goal : String
+    -targetLevel : CefrLevel
+    -startDate : LocalDate
+    -endDate : LocalDate
+    -status : PlanStatus
+    -learner : Learner
+    -sourceAttempt : TestAttempt
+    -weeks : List<StudyWeek>
+  }
+  class StudyWeek {
+    -id : Long
+    -weekNo : int
+    -description : String
+    -targetWords : int
+    -targetExercises : int
+    -status : WeekStatus
+  }
+  class Reminder {
+    -id : Long
+    -type : ReminderType
+    -remindTime : LocalDateTime
+    -content : String
+    -isSent : boolean
+    -learner : Learner
+    -test : Test
+    -studyWeek : StudyWeek
+  }
+  class TestAttempt {
+    -id : Long
+    -startTime : LocalDateTime
+    -submitTime : LocalDateTime
+    -status : AttemptStatus
+    -totalScore : Float
+    -listeningScore : Float
+    -speakingScore : Float
+    -readingScore : Float
+    -writingScore : Float
+    -suggestedLevel : CefrLevel
+    -suggestedRoadmap : String
+    -learner : Learner
+    -test : Test
+    -answers : List<TestAnswer>
+  }
+  class ProgressStat {
+    -periodName : String
+    -wordsLearned : int
+    -exercisesCompleted : int
+    -avgTestScore : Float
+    -studyMinutes : int
+  }
+  class Learner <<ngoai>>
+  class Test <<ngoai>>
+  class TestAnswer <<ngoai>>
+  class DailyProgress <<ngoai>>
+}
+
+LearnerLayout -right- PlanPage
+PlanPage *-- SuggestedRoadmap
+PlanPage *-- PlanDetail
+
+PlanPage -- StudyPlanController
+SuggestedRoadmap -- StudyPlanController
+PlanDetail -- StudyPlanController
+
+StudyPlanController -- StudyPlanDAO
+StudyPlanController -- TestAttemptDAO
+StudyPlanController -- ReminderDAO
+StudyPlanController -- ProgressStatDAO
+StudyPlanController -- AIService
+StudyPlanController ..> Reminder
+DAO <|-- StudyPlanDAO
+DAO <|-- TestAttemptDAO
+DAO <|-- ReminderDAO
+DAO <|-- ProgressStatDAO
+StudyPlanDAO -- StudyPlan
+TestAttemptDAO -- TestAttempt
+ReminderDAO -- Reminder
+ProgressStatDAO -- ProgressStat
+AIService ..> StudyWeek
+
+StudyPlan "*" o-- "1" Learner
+StudyPlan "*" o-- "0..1" TestAttempt
+StudyPlan "1" *-- "*" StudyWeek
+Reminder "*" o-- "1" Learner
+Reminder "*" o-- "0..1" Test
+Reminder "0..1" o-- "0..1" StudyWeek
+TestAttempt "*" o-- "1" Learner
+TestAttempt "*" o-- "1" Test
+TestAttempt "1" *-- "*" TestAnswer
+ProgressStat ..> DailyProgress
+ProgressStat ..> TestAttempt
+@enduml

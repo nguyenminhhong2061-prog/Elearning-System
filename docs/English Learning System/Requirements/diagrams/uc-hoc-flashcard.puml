@@ -1,0 +1,45 @@
+@startuml uc-hoc-flashcard
+!pragma layout smetana
+left to right direction
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor white
+  BorderColor black
+  ArrowColor black
+}
+skinparam actor {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam rectangle {
+  BackgroundColor white
+  BorderColor black
+}
+
+actor "Người học" as NH
+
+rectangle "Hệ thống học tiếng Anh" {
+  usecase "<i>Học từ vựng</i>" as HTV
+  usecase "Học flashcard\ntheo chủ đề" as HFC
+  usecase "Ôn tập từ\nđến hạn" as OT
+  usecase "Đăng nhập" as DN
+  usecase "<i>Chọn chủ đề</i>" as CCD
+  usecase "Chọn chủ đề\ncó sẵn" as CCDS
+  usecase "Chọn danh sách\ntừ riêng" as CDSR
+  usecase "Học thẻ và\nđánh giá mức nhớ" as DG
+}
+
+NH -- HFC
+NH -- OT
+HFC --|> HTV
+OT --|> HTV
+HFC ..> DN : <<include>>
+OT ..> DN : <<include>>
+HFC ..> CCD : <<include>>
+HTV ..> DG : <<include>>
+CCDS --|> CCD
+CDSR --|> CCD
+@enduml

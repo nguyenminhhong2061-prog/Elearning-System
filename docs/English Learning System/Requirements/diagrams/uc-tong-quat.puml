@@ -1,0 +1,108 @@
+@startuml uc-tong-quat
+!pragma layout smetana
+left to right direction
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor white
+  BorderColor black
+  ArrowColor black
+}
+skinparam actor {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam rectangle {
+  BackgroundColor white
+  BorderColor black
+}
+
+actor "Thành viên" as TV
+actor "Người học" as NH
+actor "Admin" as AD
+actor "Dịch vụ AI" as AI
+
+rectangle "Hệ thống học tiếng Anh" {
+  usecase "Đăng ký" as DK
+  usecase "Đăng nhập" as DN
+  usecase "Đăng xuất" as DX
+  usecase "Đổi mật khẩu" as DMK
+
+  usecase "<i>Học từ vựng</i>" as HTV
+  usecase "Học flashcard\ntheo chủ đề" as HFC
+  usecase "Ôn tập từ\nđến hạn" as OT
+  usecase "Quản lý danh\nsách từ riêng" as DSR
+  usecase "Chơi trò chơi\ntừ vựng" as TC
+
+  usecase "<i>Làm bài tập</i>" as BT
+  usecase "Làm bài\nđọc hiểu" as DH
+  usecase "Làm bài viết" as VIET
+  usecase "Làm bài\nnghe hiểu" as NGHE
+  usecase "Luyện phát âm" as PA
+  usecase "Hỏi chatbot" as CB
+
+  usecase "<i>Làm bài kiểm tra</i>" as KT
+  usecase "Kiểm tra\nđịnh kỳ" as KTDK
+  usecase "Kiểm tra\ntổng hợp" as KTTH
+
+  usecase "Xem tiến độ" as TD
+  usecase "Quản lý\nkế hoạch học" as KH
+
+  usecase "Quản lý từ vựng" as QTV
+  usecase "Quản lý bài tập" as QBT
+  usecase "Quản lý đề kiểm tra" as QDKT
+  usecase "Quản lý người dùng" as QND
+  usecase "Xem thống kê" as TK
+}
+
+' --- Kế thừa actor ---
+TV <|-- NH
+TV <|-- AD
+
+' --- Thành viên ---
+TV ---- DN
+TV ---- DX
+TV ---- DMK
+
+' --- Người học ---
+NH -- DK
+NH -- HFC
+NH -- OT
+NH -- DSR
+NH -- TC
+NH -- DH
+NH -- VIET
+NH -- NGHE
+NH -- PA
+NH -- CB
+NH -- KTDK
+NH -- KTTH
+NH -- TD
+NH -- KH
+
+' --- Admin ---
+AD -- QTV
+AD -- QBT
+AD -- QDKT
+AD -- QND
+AD -- TK
+
+' --- Generalization giữa các use case ---
+HFC --|> HTV
+OT --|> HTV
+DH --|> BT
+VIET --|> BT
+NGHE --|> BT
+PA --|> BT
+KTDK --|> KT
+KTTH --|> KT
+
+' --- Dịch vụ AI (actor gián tiếp) ---
+VIET ---- AI
+PA ---- AI
+CB ---- AI
+KTTH ---- AI
+KH ---- AI
+@enduml
