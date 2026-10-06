@@ -8,7 +8,8 @@ import java.util.Map;
 
 /**
  * The graded result of one question in the review. {@code correct} is null for AI-graded questions, which have
- * {@code aiCriteria} (a band 0-6 per criterion) and {@code aiComment} instead once the examiner has graded them.
+ * {@code aiCriteria} (a band 0-6 per criterion) and {@code aiComment} instead once the examiner has graded them, and
+ * for read-aloud questions, which have {@code pronunciation} when they were answered.
  */
 public record ReviewItemResponse(
         Long questionId,
@@ -23,5 +24,6 @@ public record ReviewItemResponse(
         int points,
         BigDecimal scoreEarned,
         Map<String, Integer> aiCriteria,
-        String aiComment) {
+        String aiComment,
+        PronunciationReviewResponse pronunciation) {
 }

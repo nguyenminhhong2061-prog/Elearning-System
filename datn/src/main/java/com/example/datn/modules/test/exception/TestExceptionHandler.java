@@ -38,6 +38,13 @@ public class TestExceptionHandler {
                 .body(new ApiErrorResponse(Instant.now(), 409, exception.getMessage()));
     }
 
+    /** The pronunciation service is down or still loading its models: the learner records again later. */
+    @ExceptionHandler(PronunciationUnavailableException.class)
+    public ResponseEntity<ApiErrorResponse> handleUnavailable(PronunciationUnavailableException exception) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ApiErrorResponse(Instant.now(), 503, exception.getMessage()));
+    }
+
     /** A body that is not valid JSON or has a value of the wrong type. */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiErrorResponse> handleUnreadableBody(HttpMessageNotReadableException exception) {

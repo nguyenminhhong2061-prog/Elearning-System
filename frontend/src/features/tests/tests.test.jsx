@@ -4,9 +4,19 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '@/app/App'
 import { tokenStorage } from '@/api/tokenStorage'
+import { startRecording, toWav } from '@/features/exercises/pronunciation/recorder'
 import { installFakeBackend, learner } from '@/test/fakeBackend'
 import '@/test/preloadPages'
 import { GRADING_POLL_MS } from './constants'
+
+// jsdom has no microphone: the recorder shared with the pronunciation exercises is replaced (its own logic is
+// tested there).
+vi.mock('@/features/exercises/pronunciation/recorder', async (importOriginal) => ({
+  ...(await importOriginal()),
+  isRecordingSupported: () => true,
+  startRecording: vi.fn(),
+  toWav: vi.fn(),
+}))
 
 // Data shaped exactly as docs/api/tests.md describes it.
 const PERIODIC = {
@@ -53,6 +63,8 @@ const DETAIL = {
       content: 'She ___ (live) in Hanoi for five years.',
       points: 1,
       audioUrl: null,
+      referenceText: null,
+      maxRecordingSeconds: null,
       options: [
         { id: 101, content: 'lives' },
         { id: 102, content: 'has lived' },
@@ -66,6 +78,8 @@ const DETAIL = {
       content: 'I have never ___ (see) such a beach.',
       points: 1,
       audioUrl: null,
+      referenceText: null,
+      maxRecordingSeconds: null,
       options: [],
     },
   ],
@@ -175,6 +189,41 @@ describe('tests list', () => {
 
     expect(await screen.findByText('2 câu · Đã làm 2 lần · cao nhất 80/100')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: `Làm lại: ${PERIODIC.title}` })).toHaveAttribute('href', '/tests/100')
+  })
+
+  it('opens the history of a test from its card, each attempt leading to its result', async () => {
+    const user = userEvent.setup()
+    const taken = { ...PERIODIC, progress: { ...PERIODIC.progress, attemptCount: 2, bestScorePercent: 80, lastAttemptId: 9 } }
+    renderSignedIn('/tests', {
+      'GET /api/tests': () => ({ data: [taken, { ...PERIODIC, id: 102, title: 'Chưa làm' }, COMPREHENSIVE] }),
+      'GET /api/tests/100/attempts': () => ({
+        data: [
+          { attemptId: 9, status: 'SUBMITTED', submittedAt: '2026-10-06T14:26:00Z', scorePercent: null, suggestedLevel: null },
+          { attemptId: 7, status: 'GRADED', submittedAt: '2026-09-29T14:19:00Z', scorePercent: 80, suggestedLevel: 'B1' },
+        ],
+      }),
+    })
+
+    // Only a test with submitted attempts that can be taken again has a history button.
+    const open = await screen.findByRole('button', { name: `Lịch sử làm bài: ${PERIODIC.title}` })
+    expect(screen.queryByRole('button', { name: 'Lịch sử làm bài: Chưa làm' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: `Lịch sử làm bài: ${COMPREHENSIVE.title}` })).not.toBeInTheDocument()
+    // Nothing is fetched before the dialog opens.
+    expect(callsTo('GET /api/tests/100/attempts')).toHaveLength(0)
+
+    await user.click(open)
+
+    const dialog = await screen.findByRole('dialog', { name: 'Lịch sử làm bài' })
+    const attempts = await within(dialog).findAllByRole('link')
+    expect(attempts).toHaveLength(2)
+    // Newest first; the oldest attempt is "Lần 1". Times are Vietnam time.
+    expect(attempts[0]).toHaveAttribute('href', '/tests/100/result/9')
+    expect(attempts[0]).toHaveTextContent('Lần 2')
+    expect(attempts[0]).toHaveTextContent('21:26, 06/10/2026')
+    expect(attempts[0]).toHaveTextContent('Đang chấm')
+    expect(attempts[1]).toHaveAttribute('href', '/tests/100/result/7')
+    expect(attempts[1]).toHaveTextContent('Lần 1')
+    expect(attempts[1]).toHaveTextContent('80/100 · B1')
   })
 })
 
@@ -610,4 +659,150 @@ describe('the review of a result', () => {
     // The level the test has just set is read again for the sidebar.
     expect(callsTo('GET /api/users/me').length).toBeGreaterThan(1)
   }, GRADING_POLL_MS + 10_000)
+})
+
+// A test whose first question is read aloud (answered with a recording) and whose second is a choice question.
+const READ_ALOUD_QUESTION = {
+  id: 41,
+  passageId: null,
+  type: 'SPEAKING',
+  skill: 'SPEAKING',
+  content: 'Read the sentence aloud.',
+  points: 5,
+  audioUrl: null,
+  referenceText: 'Sustainability is a shared responsibility.',
+  maxRecordingSeconds: 15,
+  options: [],
+}
+const READ_ALOUD_DETAIL = { ...DETAIL, questions: [READ_ALOUD_QUESTION, DETAIL.questions[0]] }
+const WAV = new Blob(['wav'], { type: 'audio/wav' })
+
+describe('read-aloud speaking questions', () => {
+  beforeEach(() => {
+    startRecording.mockReset()
+    toWav.mockReset()
+    startRecording.mockResolvedValue({
+      stop: vi.fn().mockResolvedValue({ blob: new Blob(['raw']), elapsedMs: 1500 }),
+      cancel: vi.fn(),
+    })
+    toWav.mockResolvedValue({ wav: WAV, durationMs: 1200 })
+    URL.createObjectURL = vi.fn(() => 'blob:recording')
+    URL.revokeObjectURL = vi.fn()
+  })
+
+  async function recordOnce(user) {
+    await user.click(await screen.findByRole('button', { name: /^Ghi (âm|lại)$/ }))
+    await user.click(await screen.findByRole('button', { name: 'Dừng ghi âm' }))
+  }
+
+  it('records the sentence, sends the recording at once and counts the question as answered', async () => {
+    const user = userEvent.setup()
+    renderSignedIn('/tests/100', {
+      'GET /api/tests/100': () => ({ data: READ_ALOUD_DETAIL }),
+      'POST /api/tests/100/attempts': () => ({ status: 201, data: NEW_ATTEMPT }),
+      'PUT /api/test-attempts/57/answers/41/recording': () => ({ status: 204 }),
+    })
+
+    expect(await screen.findByText(/2 câu \(1 câu chọn đáp án, 1 câu ghi âm\)/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Bắt đầu' }))
+
+    // The sentence to read and a recorder, not a box to type in.
+    expect(await screen.findByLabelText('Câu cần đọc')).toHaveTextContent('Sustainability is a shared responsibility.')
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(screen.getByText(/Câu 1\/2 · đã trả lời 0\/2/)).toBeInTheDocument()
+
+    await recordOnce(user)
+
+    await waitFor(() => expect(callsTo('PUT /api/test-attempts/57/answers/41/recording')).toHaveLength(1))
+    expect(callsTo('PUT /api/test-attempts/57/answers/41/recording')[0].body).toBe(WAV)
+    expect(await screen.findByText(/Đã lưu bản ghi âm/)).toBeInTheDocument()
+    // Answered now, the learner can listen to the recording and make another one.
+    expect(screen.getByText(/Câu 1\/2 · đã trả lời 1\/2/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Câu 1 (đã trả lời)' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Bản ghi âm của bạn')).toHaveAttribute('src', 'blob:recording')
+    expect(screen.getByRole('button', { name: 'Ghi lại' })).toBeEnabled()
+    // How it was pronounced is not shown before the test is submitted.
+    expect(screen.queryByText(/Điểm phát âm/)).not.toBeInTheDocument()
+  })
+
+  it('keeps a recording the service could not assess and sends the same one again', async () => {
+    const user = userEvent.setup()
+    let failures = 1
+    renderSignedIn('/tests/100', {
+      'GET /api/tests/100': () => ({ data: READ_ALOUD_DETAIL }),
+      'POST /api/tests/100/attempts': () => ({ status: 201, data: NEW_ATTEMPT }),
+      'PUT /api/test-attempts/57/answers/41/recording': () =>
+        failures-- > 0 ? { status: 503, data: { status: 503, message: 'Pronunciation assessment service is unavailable' } } : { status: 204 },
+    })
+
+    await user.click(await screen.findByRole('button', { name: 'Bắt đầu' }))
+    await recordOnce(user)
+
+    expect(await screen.findByText(/Dịch vụ chấm phát âm chưa sẵn sàng/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Câu 1' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Gửi lại' }))
+
+    expect(await screen.findByText(/Đã lưu bản ghi âm/)).toBeInTheDocument()
+    expect(callsTo('PUT /api/test-attempts/57/answers/41/recording')).toHaveLength(2)
+    // The learner did not have to record again.
+    expect(toWav).toHaveBeenCalledTimes(1)
+  })
+
+  it('resumes a recorded question as answered and lets the learner record it again', async () => {
+    const user = userEvent.setup()
+    renderSignedIn('/tests/100', {
+      'GET /api/tests/100': () => ({ data: { ...READ_ALOUD_DETAIL, hasInProgress: true } }),
+      'POST /api/tests/100/attempts': () => ({
+        data: { ...NEW_ATTEMPT, resumed: true, answers: [{ questionId: 41, optionId: null, text: null, recorded: true }] },
+      }),
+    })
+
+    await user.click(await screen.findByRole('button', { name: 'Làm tiếp' }))
+
+    // It opens at the choice question, the first one without an answer.
+    expect(await screen.findByText(/Câu 2\/2 · đã trả lời 1\/2/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Câu 1 (đã trả lời)' }))
+    expect(await screen.findByText(/Bạn đã ghi âm câu này/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ghi lại' })).toBeEnabled()
+  })
+
+  it('shows in the result what was heard, the score and the words that were mispronounced', async () => {
+    const result = {
+      ...PERIODIC_RESULT,
+      review: [
+        {
+          questionId: 41, passageId: null, type: 'SPEAKING', level: 'B2', correct: null, selectedOptionId: null,
+          answerText: 'sustainability is a share responsibility', correctOptionId: null,
+          correctAnswer: 'Sustainability is a shared responsibility.', points: 5, scoreEarned: 3.75,
+          aiCriteria: null, aiComment: null,
+          pronunciation: {
+            score: 75, phonemeAccuracy: 90, wordAccuracy: 80,
+            errors: [
+              { word: 'shared', expectedIpa: 'ʃɛrd', heardIpa: 'ʃɛr' },
+              { word: 'a', expectedIpa: 'ə', heardIpa: '' },
+            ],
+          },
+        },
+      ],
+    }
+    renderSignedIn('/tests/100/result/57', {
+      'GET /api/tests/100': () => ({ data: READ_ALOUD_DETAIL }),
+      'GET /api/test-attempts/57': () => ({ data: result }),
+    })
+
+    expect(await screen.findByText('Hệ thống nghe được:')).toBeInTheDocument()
+    expect(screen.getByText('sustainability is a share responsibility')).toBeInTheDocument()
+    expect(screen.getByText('Câu mẫu:')).toBeInTheDocument()
+    expect(screen.getByText('Sustainability is a shared responsibility.')).toBeInTheDocument()
+
+    const feedback = screen.getByText('Chấm phát âm').parentElement
+    expect(feedback).toHaveTextContent('Điểm phát âm: 75/100')
+    expect(feedback).toHaveTextContent('Khớp âm: 90%')
+    expect(feedback).toHaveTextContent('Khớp từ: 80%')
+    expect(feedback).toHaveTextContent('“shared”: mong đợi /ʃɛrd/, nghe được /ʃɛr/')
+    expect(feedback).toHaveTextContent('“a”: chưa đọc hoặc không nghe rõ')
+    // Scored, not right or wrong.
+    expect(screen.getByText('3.75/5 điểm')).toBeInTheDocument()
+  })
 })

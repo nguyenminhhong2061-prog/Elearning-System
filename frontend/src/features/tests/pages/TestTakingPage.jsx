@@ -12,13 +12,23 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { Tag } from '@/components/ui/Tag'
 import { useAuth } from '@/features/auth/context/useAuth'
 import { cx } from '@/lib/cx'
-import { answerPayload, answersFromSaved, firstUnansweredIndex, isChoice, testParts, unansweredQuestions } from '../answers'
+import {
+  answerPayload,
+  answersFromSaved,
+  firstUnansweredIndex,
+  isAnswered,
+  isChoice,
+  isReadAloud,
+  testParts,
+  unansweredQuestions,
+} from '../answers'
 import { startAttempt } from '../api/testsApi'
 import { useSubmitAttempt, useTest } from '../api/testsQueries'
 import { PassageView } from '../components/PassageView'
 import { QuestionView } from '../components/QuestionView'
 import { ATTEMPT_STATUS, QUESTION_TYPES, SKILL_LABELS, SKILL_ORDER, TEST_TYPE_LABELS, TEST_TYPES } from '../constants'
 import { useAnswerSaver } from '../useAnswerSaver'
+import { useRecordingSaver } from '../useRecordingSaver'
 
 const SAVE_TEXT = {
   unsaved: 'Đang lưu…',
@@ -51,7 +61,7 @@ function QuestionNav({ questions, answers, currentIndex, onGo }) {
   const byPart = parts.length > 1 && parts.every((part) => part.skill && SKILL_LABELS[part.skill])
 
   function numberButton({ question, index }) {
-    const answered = Boolean(answerPayload(question, answers[question.id]))
+    const answered = isAnswered(question, answers[question.id])
     const current = index === currentIndex
     return (
       <button
@@ -90,7 +100,7 @@ function QuestionNav({ questions, answers, currentIndex, onGo }) {
   return (
     <nav aria-label="Chuyển câu hỏi" className="flex flex-wrap gap-2">
       {questions.map((question, index) => {
-        const answered = Boolean(answerPayload(question, answers[question.id]))
+        const answered = isAnswered(question, answers[question.id])
         const current = index === currentIndex
         return (
           <button
@@ -163,6 +173,10 @@ function AttemptRunner({ test, attempt }) {
     Object.fromEntries((attempt.passagePlays ?? []).map((play) => [play.passageId, play.playCount])),
   )
   const saver = useAnswerSaver(attempt.attemptId, attempt.answers)
+  // Recorded answers of read-aloud questions: a question counts as answered once the server has its recording.
+  const recordings = useRecordingSaver(attempt.attemptId, (questionId) =>
+    setAnswers((current) => ({ ...current, [questionId]: { recorded: true } })),
+  )
   const submit = useSubmitAttempt()
   // Signing out in the middle asks first; the attempt stays in progress with the answers saved (scenario 3, 4a).
   const logoutGuard = useMemo(
@@ -254,6 +268,9 @@ function AttemptRunner({ test, attempt }) {
         answer={answers[question.id]}
         onPick={pick}
         onType={type}
+        upload={recordings.uploads[question.id]}
+        onRecorded={(wav) => recordings.save(question.id, wav)}
+        onRetryRecording={() => recordings.retry(question.id)}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -261,7 +278,9 @@ function AttemptRunner({ test, attempt }) {
           ← Câu trước
         </Button>
         {isLast ? (
-          <Button onClick={openSubmit}>Nộp bài</Button>
+          <Button onClick={openSubmit} disabled={recordings.busy}>
+            Nộp bài
+          </Button>
         ) : (
           <Button onClick={() => goTo(currentIndex + 1)}>Câu tiếp theo →</Button>
         )}
@@ -270,10 +289,16 @@ function AttemptRunner({ test, attempt }) {
         <button
           type="button"
           onClick={openSubmit}
-          className="cursor-pointer self-end text-label font-semibold text-brand-dark hover:underline"
+          disabled={recordings.busy}
+          className="cursor-pointer self-end text-label font-semibold text-brand-dark hover:underline disabled:cursor-not-allowed disabled:text-muted disabled:no-underline"
         >
           Nộp bài sớm
         </button>
+      )}
+      {recordings.busy && (
+        <p aria-live="polite" className="self-end text-label text-muted">
+          Bản ghi âm đang được xử lý. Bạn nộp bài được khi xử lý xong.
+        </p>
       )}
 
       <SubmitDialog
@@ -334,7 +359,13 @@ function PartTable({ questions }) {
       </thead>
       <tbody>
         {parts.map((part) => {
-          const forms = [...new Set(part.items.map(({ question }) => QUESTION_FORMS[question.type] ?? 'tự gõ'))]
+          const forms = [
+            ...new Set(
+              part.items.map(({ question }) =>
+                isReadAloud(question) ? 'đọc theo câu mẫu (ghi âm)' : (QUESTION_FORMS[question.type] ?? 'tự gõ'),
+              ),
+            ),
+          ]
           return (
             <tr key={part.items[0].index} className="border-t border-line">
               <td className="py-1.5 pr-3 font-medium text-ink">{SKILL_LABELS[part.skill]}</td>
@@ -355,7 +386,13 @@ function PartTable({ questions }) {
 function StartCard({ test, starting, error, onStart }) {
   const [confirming, setConfirming] = useState(false)
   const choiceCount = test.questions.filter(isChoice).length
-  const typedCount = test.questions.length - choiceCount
+  const recordedCount = test.questions.filter(isReadAloud).length
+  const typedCount = test.questions.length - choiceCount - recordedCount
+  const kinds = [
+    `${choiceCount} câu chọn đáp án`,
+    typedCount > 0 && `${typedCount} câu tự gõ`,
+    recordedCount > 0 && `${recordedCount} câu ghi âm`,
+  ].filter(Boolean)
   const onlyOnce = test.retakeAllowed === false
   const maxPlays = (test.passages ?? []).find((passage) => passage.audioUrl)?.maxPlays ?? null
   return (
@@ -363,7 +400,7 @@ function StartCard({ test, starting, error, onStart }) {
       <div className="flex flex-col gap-2">
         <p className="text-body text-ink-soft">
           {test.questions.length} câu
-          {typedCount > 0 ? ` (${choiceCount} câu chọn đáp án, ${typedCount} câu tự gõ)` : ''}
+          {kinds.length > 1 ? ` (${kinds.join(', ')})` : ''}
           {skillList(test.questions) ? ` · Kỹ năng: ${skillList(test.questions)}` : ''}
         </p>
         {test.skill && <p className="text-body text-ink-soft">Nội dung: {test.skill}</p>}
@@ -372,6 +409,9 @@ function StartCard({ test, starting, error, onStart }) {
           <li>Câu trả lời được lưu ngay khi bạn chọn hoặc gõ; rời trang rồi quay lại vẫn làm tiếp được.</li>
           <li>Câu bỏ trống khi nộp bài được tính 0 điểm.</li>
           {maxPlays !== null && <li>Mỗi bài nghe được nghe tối đa {maxPlays} lần.</li>}
+          {recordedCount > 0 && (
+            <li>Câu đọc theo câu mẫu được trả lời bằng ghi âm: bạn cần micro và cho phép trình duyệt dùng micro.</li>
+          )}
           {test.type === TEST_TYPES.COMPREHENSIVE && <li>Kết quả bài này xác định lại trình độ CEFR của bạn.</li>}
           {onlyOnce && <li>Bài này chỉ làm được một lần: sau khi nộp bạn không làm lại được.</li>}
         </ul>

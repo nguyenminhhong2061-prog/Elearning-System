@@ -7,11 +7,13 @@ import com.example.datn.common.user.LevelRecorder;
 import com.example.datn.modules.test.dto.request.SaveAnswerRequest;
 import com.example.datn.modules.test.dto.response.PassagePlayResponse;
 import com.example.datn.modules.test.dto.response.PassageReviewResponse;
+import com.example.datn.modules.test.dto.response.PronunciationReviewResponse;
 import com.example.datn.modules.test.dto.response.ReviewItemResponse;
 import com.example.datn.modules.test.dto.response.SavedAnswerResponse;
 import com.example.datn.modules.test.dto.response.SkillScoreResponse;
 import com.example.datn.modules.test.dto.response.StartAttemptResponse;
 import com.example.datn.modules.test.dto.response.TestResultResponse;
+import com.example.datn.modules.test.entity.PronunciationDetails;
 import com.example.datn.modules.test.entity.Test;
 import com.example.datn.modules.test.entity.TestAttempt;
 import com.example.datn.modules.test.entity.TestAttemptAnswer;
@@ -167,6 +169,9 @@ public class TestAttemptService {
                 .orElseThrow(() -> new InvalidTestAnswerException("Question not found: " + questionId));
         if (!question.getTestId().equals(attempt.getTestId())) {
             throw new InvalidTestAnswerException("Question does not belong to this test");
+        }
+        if (question.isReadAloud()) {
+            throw new InvalidTestAnswerException("Expected a recording for this question");
         }
 
         List<TestQuestionOption> options = optionRepository.findByQuestionIdInOrderByIdAsc(List.of(questionId));
@@ -343,6 +348,8 @@ public class TestAttemptService {
                     .findFirst()
                     .map(TestQuestionAcceptedAnswer::getAnswerText)
                     .orElse(accepted.get(0).getAnswerText());
+        } else if (question.isReadAloud()) {
+            correctAnswer = question.getReferenceText();
         }
 
         Boolean correct = answer == null ? (options.isEmpty() && accepted.isEmpty() ? null : false) : answer.getCorrect();
@@ -360,13 +367,35 @@ public class TestAttemptService {
                 question.getPoints(),
                 answer == null ? BigDecimal.ZERO : answer.getScoreEarned(),
                 answer == null ? null : answer.getAiCriteria(),
-                answer == null ? null : answer.getAiComment());
+                answer == null ? null : answer.getAiComment(),
+                pronunciationReview(answer));
+    }
+
+    private static PronunciationReviewResponse pronunciationReview(TestAttemptAnswer answer) {
+        if (answer == null || !answer.isRecording()) {
+            return null;
+        }
+        PronunciationDetails details = answer.getPronunciationDetails();
+        if (details == null) {
+            return new PronunciationReviewResponse(answer.getPronunciationScore(), null, null, List.of());
+        }
+        return new PronunciationReviewResponse(
+                answer.getPronunciationScore(),
+                details.phonemeAccuracy(),
+                details.wordAccuracy(),
+                details.errors().stream()
+                        .map(error -> new PronunciationReviewResponse.WordErrorResponse(
+                                error.word(), error.expectedIpa(), error.heardIpa()))
+                        .toList());
     }
 
     private List<SavedAnswerResponse> savedAnswers(Long attemptId) {
         return answerRepository.findByAttemptId(attemptId).stream()
-                .map(answer -> new SavedAnswerResponse(
-                        answer.getQuestionId(), answer.getSelectedOptionId(), answer.getAnswerContent()))
+                // What was heard in a recording stays hidden until the attempt is submitted.
+                .map(answer -> answer.isRecording()
+                        ? new SavedAnswerResponse(answer.getQuestionId(), null, null, true)
+                        : new SavedAnswerResponse(
+                                answer.getQuestionId(), answer.getSelectedOptionId(), answer.getAnswerContent(), false))
                 .toList();
     }
 

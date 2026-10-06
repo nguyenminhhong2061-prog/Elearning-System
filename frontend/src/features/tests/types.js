@@ -31,6 +31,16 @@
  */
 
 /**
+ * One submitted attempt in the history of a test (GET /api/tests/{id}/attempts).
+ * @typedef {object} AttemptSummary
+ * @property {number} attemptId
+ * @property {TestAttemptStatus} status SUBMITTED while the AI is still grading, else GRADED
+ * @property {string | null} submittedAt
+ * @property {number | null} scorePercent null while still being graded
+ * @property {import('@/api/types').CefrLevel | null} suggestedLevel null while still being graded
+ */
+
+/**
  * @typedef {object} TestOption
  * @property {number} id
  * @property {string} content
@@ -63,6 +73,8 @@
  * @property {string} content
  * @property {number} points
  * @property {string | null} audioUrl
+ * @property {string | null} referenceText the sentence of a read-aloud question, answered with a recording
+ * @property {number | null} maxRecordingSeconds how long that recording may be
  * @property {TestOption[]} options
  */
 
@@ -87,6 +99,7 @@
  * @property {number} questionId
  * @property {number | null} optionId
  * @property {string | null} text
+ * @property {boolean} recorded a recorded answer: only its existence is known until the attempt is submitted
  */
 
 /**
@@ -111,6 +124,16 @@
  * @property {Record<'task' | 'coherence' | 'vocabulary' | 'grammar', number> | null} aiCriteria the AI's band 0-6 per
  *   criterion (1 = A1 ... 6 = C2), null for auto-graded questions and while the AI has not graded yet
  * @property {string | null} aiComment
+ * @property {PronunciationReview | null} pronunciation how a read-aloud answer was pronounced
+ */
+
+/**
+ * @typedef {object} PronunciationReview
+ * @property {number} score 0-100
+ * @property {number | null} phonemeAccuracy the share of sounds that match the sentence, 0-100
+ * @property {number | null} wordAccuracy the share of words that match, 0-100
+ * @property {Array<{ word: string, expectedIpa: string, heardIpa: string }>} errors heardIpa is empty for a word that
+ *   was left out
  */
 
 /**

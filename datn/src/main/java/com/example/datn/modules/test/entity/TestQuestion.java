@@ -18,6 +18,9 @@ import jakarta.persistence.Table;
 @Table(name = "test_questions")
 public class TestQuestion {
 
+    /** The longest recording of a read-aloud answer the screen makes. */
+    public static final int MAX_RECORDING_SECONDS = 15;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -53,6 +56,10 @@ public class TestQuestion {
     // The passage (recording or text) the question is asked about; null for a question that stands alone.
     @Column(name = "passage_id")
     private Long passageId;
+
+    // The sentence a read-aloud speaking question asks the learner to read; null for every other question.
+    @Column(name = "reference_text", columnDefinition = "TEXT")
+    private String referenceText;
 
     protected TestQuestion() {
     }
@@ -117,5 +124,20 @@ public class TestQuestion {
 
     public Long getPassageId() {
         return passageId;
+    }
+
+    public String getReferenceText() {
+        return referenceText;
+    }
+
+    /** A speaking question answered by recording its reference sentence and scored on pronunciation. */
+    public boolean isReadAloud() {
+        return referenceText != null;
+    }
+
+    /** Makes this a read-aloud question of the given sentence. */
+    public TestQuestion asReadAloud(String referenceText) {
+        this.referenceText = referenceText;
+        return this;
     }
 }

@@ -1,6 +1,8 @@
 package com.example.datn.modules.test;
 
+import com.example.datn.modules.test.entity.PronunciationDetails;
 import com.example.datn.modules.test.service.AiAssessment;
+import com.example.datn.modules.test.service.PronunciationAssessor;
 import com.example.datn.modules.test.service.TestAiGateway;
 import com.example.datn.support.AbstractPostgresIntegrationTest;
 import com.jayway.jsonpath.JsonPath;
@@ -14,6 +16,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -47,11 +51,18 @@ class TestModulePostgresIntegrationTests extends AbstractPostgresIntegrationTest
     @MockitoBean
     private TestAiGateway aiGateway;
 
+    @MockitoBean
+    private PronunciationAssessor pronunciationAssessor;
+
     @BeforeEach
-    void examinerGradesEverything() {
+    void examinerAndAssessorGradeEverything() {
         when(aiGateway.assess(any(), any())).thenReturn(Optional.of(new AiAssessment(
-                Map.of("task", 3, "coherence", 3, "vocabulary", 3, "grammar", 3), "Phát âm rõ ràng.")));
+                Map.of("task", 3, "coherence", 3, "vocabulary", 3, "grammar", 3), "Ý rõ ràng.")));
         when(aiGateway.suggestRoadmap(any(), any())).thenReturn("Lộ trình đề xuất");
+        when(pronunciationAssessor.assess(any(), any())).thenReturn(new PronunciationAssessor.Assessment(
+                new BigDecimal("75.00"), "sustainability is a shared responsibility",
+                new PronunciationDetails(new BigDecimal("90.00"), new BigDecimal("100.00"),
+                        List.of(new PronunciationDetails.WordError("shared", "ʃɛrd", "ʃɛd")))));
     }
 
     @Test
@@ -103,14 +114,90 @@ class TestModulePostgresIntegrationTests extends AbstractPostgresIntegrationTest
                 Integer.class, account.userId(), attemptId);
         assertThat(historyRows).isEqualTo(1);
 
-        // The skill levels and the examiner's bands are stored as JSONB.
+        // The skill levels are stored as JSONB. The seeded speaking question is read aloud at B2: 75 passes it.
         String skillLevels = jdbcTemplate.queryForObject(
                 "select skill_levels::text from test_attempts where id = ?", String.class, attemptId);
-        assertThat(skillLevels).contains("\"noi\"").contains("B1");
+        assertThat(skillLevels).contains("\"noi\": \"B2\"");
+
+        // The recording left its score, what was heard and the details (JSONB), read back in the result.
+        Map<String, Object> recorded = jdbcTemplate.queryForMap(
+                "select answer_content, pronunciation_score, pronunciation_details::text as details"
+                        + " from test_attempt_answers where attempt_id = ? and pronunciation_score is not null",
+                attemptId);
+        assertThat(recorded.get("answer_content")).isEqualTo("sustainability is a shared responsibility");
+        assertThat((String) recorded.get("details")).contains("\"phonemeAccuracy\"").contains("shared");
+        mockMvc.perform(get("/api/test-attempts/" + attemptId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + account.token()))
+                .andExpect(jsonPath("$.skills.speaking.score").value(75))
+                .andExpect(jsonPath("$.review[?(@.questionId == 2004)].pronunciation.errors[0].heardIpa").value("ʃɛd"))
+                .andExpect(jsonPath("$.review[?(@.questionId == 2004)].correctAnswer")
+                        .value("Sustainability is a shared responsibility."));
+    }
+
+    @Test
+    void examinerBandsAreStoredAsJsonb() throws Exception {
+        Account account = registerAndLogin();
+        Long testId = jdbcTemplate.queryForObject(
+                "insert into tests (title, type) values ('Kiểm tra viết', 'PERIODIC') returning id", Long.class);
+        Long questionId = jdbcTemplate.queryForObject(
+                "insert into test_questions (test_id, question_type, skill, level, content, points)"
+                        + " values (?, 'WRITING', 'writing', 'B1', 'Describe your last holiday.', 6) returning id",
+                Long.class, testId);
+
+        long attemptId = startAttempt(account.token(), testId);
+        putAnswer(account.token(), attemptId, questionId, "{\"text\":\"Last summer I went to Da Nang.\"}");
+        mockMvc.perform(post("/api/test-attempts/" + attemptId + "/submit")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + account.token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("GRADED"))
+                .andExpect(jsonPath("$.skills.writing.level").value("B1"))
+                .andExpect(jsonPath("$.review[0].aiCriteria.grammar").value(3));
+
         String criteria = jdbcTemplate.queryForObject(
                 "select ai_criteria::text from test_attempt_answers where attempt_id = ? and ai_criteria is not null",
                 String.class, attemptId);
         assertThat(criteria).contains("\"grammar\"");
+    }
+
+    @Test
+    void seededTestsCanBeTakenAndEveryQuestionCanBeGraded() throws Exception {
+        Account account = registerAndLogin();
+
+        mockMvc.perform(get("/api/tests/101").header(HttpHeaders.AUTHORIZATION, "Bearer " + account.token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.type").value("PERIODIC"))
+                .andExpect(jsonPath("$.passages.length()").value(1))
+                .andExpect(jsonPath("$.questions.length()").value(11));
+        mockMvc.perform(get("/api/tests/201").header(HttpHeaders.AUTHORIZATION, "Bearer " + account.token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.type").value("COMPREHENSIVE"))
+                .andExpect(jsonPath("$.retakeAllowed").value(false))
+                .andExpect(jsonPath("$.passages.length()").value(5))
+                .andExpect(jsonPath("$.passages[0].maxPlays").value(2))
+                .andExpect(jsonPath("$.questions.length()").value(23));
+
+        // A choice question has exactly one correct option.
+        Integer badChoiceQuestions = jdbcTemplate.queryForObject(
+                "select count(*) from (select question_id from test_question_options"
+                        + " group by question_id having count(*) filter (where is_correct) <> 1) broken",
+                Integer.class);
+        assertThat(badChoiceQuestions).isZero();
+
+        // Every question has a way to be graded: options, accepted answers, a sentence to read, or the examiner.
+        Integer ungradable = jdbcTemplate.queryForObject(
+                "select count(*) from test_questions q where q.test_id in (101, 201)"
+                        + " and not exists (select 1 from test_question_options o where o.question_id = q.id)"
+                        + " and not exists (select 1 from test_question_accepted_answers a where a.question_id = q.id)"
+                        + " and q.reference_text is null and q.question_type not in ('WRITING', 'SPEAKING')",
+                Integer.class);
+        assertThat(ungradable).isZero();
+
+        // A question and its passage belong to the same test.
+        Integer strayPassages = jdbcTemplate.queryForObject(
+                "select count(*) from test_questions q join test_passages p on p.id = q.passage_id"
+                        + " where p.test_id <> q.test_id",
+                Integer.class);
+        assertThat(strayPassages).isZero();
     }
 
     @Test
@@ -177,13 +264,25 @@ class TestModulePostgresIntegrationTests extends AbstractPostgresIntegrationTest
             long questionId = ((Number) question.get("id")).longValue();
             String type = (String) question.get("question_type");
             if ("SPEAKING".equals(type)) {
-                putAnswer(token, attemptId, questionId, "{\"text\":\"Sustainability is a shared responsibility.\"}");
+                // The seeded speaking question is read aloud: its answer is a recording.
+                mockMvc.perform(put("/api/test-attempts/" + attemptId + "/answers/" + questionId + "/recording")
+                                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                                .contentType("audio/wav")
+                                .content(wav()))
+                        .andExpect(status().isNoContent());
             } else if ("WRITING".equals(type)) {
                 putAnswer(token, attemptId, questionId, "{\"text\":\"" + acceptedAnswer(questionId) + "\"}");
             } else {
                 putAnswer(token, attemptId, questionId, "{\"optionId\":" + correctOptionId(questionId) + "}");
             }
         }
+    }
+
+    private static byte[] wav() {
+        byte[] audio = new byte[64];
+        System.arraycopy("RIFF".getBytes(StandardCharsets.ISO_8859_1), 0, audio, 0, 4);
+        System.arraycopy("WAVE".getBytes(StandardCharsets.ISO_8859_1), 0, audio, 8, 4);
+        return audio;
     }
 
     private void putAnswer(String token, long attemptId, long questionId, String body) throws Exception {

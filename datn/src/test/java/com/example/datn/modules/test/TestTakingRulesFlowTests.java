@@ -212,6 +212,23 @@ class TestTakingRulesFlowTests {
                 .andExpect(jsonPath("$[?(@.id == " + periodicTestId + ")].progress.attemptCount").value(2))
                 .andExpect(jsonPath("$[?(@.id == " + periodicTestId + ")].progress.lastAttemptId")
                         .value((int) secondAttemptId));
+
+        // The history lists the submitted attempts, newest first, and not the one in progress.
+        start(periodicTestId, false).andExpect(status().isCreated());
+        mockMvc.perform(get("/api/tests/" + periodicTestId + "/attempts").with(TestAuth.learner(LEARNER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].attemptId").value((int) secondAttemptId))
+                .andExpect(jsonPath("$[0].status").value("GRADED"))
+                .andExpect(jsonPath("$[0].scorePercent").value(0))
+                .andExpect(jsonPath("$[0].submittedAt").exists())
+                .andExpect(jsonPath("$[1].attemptId").value((int) firstAttemptId));
+
+        // It is the learner's own history, and an unknown test has none.
+        mockMvc.perform(get("/api/tests/" + periodicTestId + "/attempts").with(TestAuth.learner(43)))
+                .andExpect(jsonPath("$.length()").value(0));
+        mockMvc.perform(get("/api/tests/999999/attempts").with(TestAuth.learner(LEARNER)))
+                .andExpect(status().isNotFound());
     }
 
     private void choiceQuestion(long testId, TestQuestionType type, TestSkill skill, String content, long passageId) {

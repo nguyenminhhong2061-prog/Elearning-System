@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router'
 import { Card } from '@/components/ui/Card'
 import { LoadError } from '@/components/ui/LoadError'
@@ -6,6 +7,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { cx } from '@/lib/cx'
 import { describeDeadline } from '../answers'
 import { useTests } from '../api/testsQueries'
+import { AttemptHistoryDialog } from '../components/AttemptHistoryDialog'
 import { TEST_TYPES, TEST_TYPE_LABELS } from '../constants'
 
 /** A test taken only once (a comprehensive test) that the learner has already submitted: only its result is left. */
@@ -55,7 +57,10 @@ const CARD = {
 }
 
 function TestCard({ test }) {
+  const [historyOpen, setHistoryOpen] = useState(false)
   const style = CARD[test.type] ?? CARD[TEST_TYPES.PERIODIC]
+  // A test taken once has a single result, already one click away ("Xem kết quả").
+  const hasHistory = test.progress.attemptCount > 0 && !takenOnce(test)
   const details = [`${test.questionCount} câu`, describeDeadline(test.endDate), progressLine(test)].filter(Boolean)
   return (
     <article className={cx('flex h-full flex-col justify-between gap-4 rounded-xl p-5 text-white', style.card)}>
@@ -63,16 +68,29 @@ function TestCard({ test }) {
         <h3 className="text-[17px] leading-6 font-semibold">{test.title}</h3>
         <p className={cx('text-label', style.detail)}>{details.join(' · ')}</p>
       </div>
-      <Link
-        to={actionTarget(test)}
-        aria-label={`${actionLabel(test)}: ${test.title}`}
-        className={cx(
-          'self-start rounded-lg px-5 py-2.75 text-label font-semibold text-white transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand',
-          style.action,
+      <div className="flex flex-wrap items-center gap-2.5">
+        <Link
+          to={actionTarget(test)}
+          aria-label={`${actionLabel(test)}: ${test.title}`}
+          className={cx(
+            'rounded-lg px-5 py-2.75 text-label font-semibold text-white transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand',
+            style.action,
+          )}
+        >
+          {actionLabel(test)}
+        </Link>
+        {hasHistory && (
+          <button
+            type="button"
+            onClick={() => setHistoryOpen(true)}
+            aria-label={`Lịch sử làm bài: ${test.title}`}
+            className="cursor-pointer rounded-lg border border-white/35 px-5 py-2.5 text-label font-semibold text-white transition-colors hover:bg-white/12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          >
+            Lịch sử làm bài
+          </button>
         )}
-      >
-        {actionLabel(test)}
-      </Link>
+      </div>
+      {hasHistory && <AttemptHistoryDialog test={test} open={historyOpen} onClose={() => setHistoryOpen(false)} />}
     </article>
   )
 }

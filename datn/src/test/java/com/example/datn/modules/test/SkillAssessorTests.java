@@ -65,6 +65,30 @@ class SkillAssessorTests {
     }
 
     @Test
+    void readAloudAnswersArePassedByLevelLikeOtherAutoGradedQuestions() {
+        // The points earned are the pronunciation score: 80% of the A2 sentence, 40% of the B1 one.
+        List<Item> items = List.of(
+                new Item(CefrLevel.A2, 5, new BigDecimal("4.00"), null, true),
+                new Item(CefrLevel.B1, 5, new BigDecimal("2.00"), null, true));
+
+        SkillAssessor.Result result = SkillAssessor.assess(items);
+
+        assertThat(result.score()).isEqualTo(60);
+        assertThat(result.level()).isEqualTo(CefrLevel.A2);
+    }
+
+    @Test
+    void pronunciationIsAFifthCriterionBesideTheExaminersFour() {
+        Item spoken = new Item(CefrLevel.B1, 6, new BigDecimal("4.00"), 4.0);
+        Item readWell = new Item(CefrLevel.C1, 5, new BigDecimal("4.50"), null, true);
+        Item readBadly = new Item(CefrLevel.A1, 5, new BigDecimal("1.00"), null, true);
+
+        // (4 x B2 + C1) / 5 = 4.2 stays B2; (4 x B2 + A1) / 5 = 3.4 falls to B1.
+        assertThat(SkillAssessor.assess(List.of(spoken, readWell)).level()).isEqualTo(CefrLevel.B2);
+        assertThat(SkillAssessor.assess(List.of(spoken, readBadly)).level()).isEqualTo(CefrLevel.B1);
+    }
+
+    @Test
     void questionsWithoutALevelFallBackToTheScoreThresholds() {
         List<Item> items = List.of(
                 new Item(null, 1, BigDecimal.ONE, null),

@@ -27,6 +27,8 @@ public class TestMapper {
                 question.getContent(),
                 question.getPoints(),
                 question.getAudioUrl(),
+                question.getReferenceText(),
+                question.isReadAloud() ? TestQuestion.MAX_RECORDING_SECONDS : null,
                 options.stream().map(this::toOption).toList());
     }
 

@@ -1,6 +1,7 @@
 package com.example.datn.modules.test.service;
 
 import com.example.datn.common.security.CurrentUser;
+import com.example.datn.modules.test.dto.response.AttemptSummaryResponse;
 import com.example.datn.modules.test.dto.response.InProgressResponse;
 import com.example.datn.modules.test.dto.response.PassageResponse;
 import com.example.datn.modules.test.dto.response.QuestionResponse;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -120,6 +122,25 @@ public class TestService {
                 .orElse(null);
 
         return mapper.toDetail(test, passages, questionResponses, hasInProgress, lastAttemptId);
+    }
+
+    /**
+     * The current learner's submitted attempts at a test, newest first. A test that has closed keeps its history, so
+     * unlike {@link #detail} this does not require the test to be open.
+     */
+    public List<AttemptSummaryResponse> attempts(Long testId) {
+        if (!testRepository.existsById(testId)) {
+            throw new TestNotFoundException(testId);
+        }
+        return attemptRepository.findByTestIdAndUserIdAndStatusIn(testId, currentUser.id(), COMPLETED).stream()
+                .sorted(Comparator.comparing(TestAttempt::getId).reversed())
+                .map(attempt -> new AttemptSummaryResponse(
+                        attempt.getId(),
+                        attempt.getStatus(),
+                        attempt.getSubmittedAt(),
+                        attempt.getStatus() == TestAttemptStatus.GRADED ? attempt.getTotalScore().intValue() : null,
+                        attempt.getSuggestedLevel()))
+                .toList();
     }
 
     Test findOpen(Long testId) {

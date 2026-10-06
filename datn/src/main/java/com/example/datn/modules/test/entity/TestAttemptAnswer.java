@@ -47,6 +47,14 @@ public class TestAttemptAnswer {
     @Column(name = "ai_comment", columnDefinition = "TEXT")
     private String aiComment;
 
+    // The pronunciation score (0-100) of a recorded read-aloud answer and what was found; null for other answers.
+    @Column(name = "pronunciation_score")
+    private BigDecimal pronunciationScore;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "pronunciation_details")
+    private PronunciationDetails pronunciationDetails;
+
     protected TestAttemptAnswer() {
     }
 
@@ -92,6 +100,19 @@ public class TestAttemptAnswer {
         return aiComment;
     }
 
+    public BigDecimal getPronunciationScore() {
+        return pronunciationScore;
+    }
+
+    public PronunciationDetails getPronunciationDetails() {
+        return pronunciationDetails;
+    }
+
+    /** The answer is a recording that has been assessed (the audio itself is not kept). */
+    public boolean isRecording() {
+        return pronunciationScore != null;
+    }
+
     public void setOption(Long selectedOptionId) {
         this.selectedOptionId = selectedOptionId;
         this.answerContent = null;
@@ -100,6 +121,14 @@ public class TestAttemptAnswer {
     public void setText(String answerContent) {
         this.answerContent = answerContent;
         this.selectedOptionId = null;
+    }
+
+    /** Replaces the answer with an assessed recording: what was heard, its score and the details. */
+    public void setRecording(String recognizedText, BigDecimal pronunciationScore, PronunciationDetails details) {
+        this.answerContent = recognizedText;
+        this.selectedOptionId = null;
+        this.pronunciationScore = pronunciationScore;
+        this.pronunciationDetails = details;
     }
 
     public void grade(Boolean correct, BigDecimal scoreEarned) {
