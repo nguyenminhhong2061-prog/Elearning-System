@@ -204,6 +204,8 @@ Module dùng: Hỏi chatbot AI hỗ trợ giải thích bài tập (B4).
 - level ENUM CEFR nullable (thêm ở migration V202610031815): bậc của câu hỏi, dùng để tính trình độ theo bậc
 - passage_id FK→test_passages.id nullable (thêm ở migration V202610032151): ngữ liệu mà câu hỏi hỏi về; NULL với câu
   đứng riêng
+- reference_text TEXT nullable (thêm ở migration V202610052251): câu mẫu của câu Nói "đọc theo câu mẫu", trả lời bằng
+  ghi âm; NULL với mọi câu khác
 
 ## test_passages (thêm ở migration V202610032151)
 
@@ -244,6 +246,9 @@ Module dùng: Hỏi chatbot AI hỗ trợ giải thích bài tập (B4).
 - answer_content TEXT, is_correct BOOLEAN nullable, score_earned DECIMAL(5,2) DEFAULT 0
 - ai_criteria JSON nullable, ai_comment TEXT nullable (thêm ở migration V202610031815): bậc 0–6 theo từng tiêu chí
   {task, coherence, vocabulary, grammar} và nhận xét của AI cho câu Nói/Viết
+- pronunciation_score DECIMAL(5,2) nullable, pronunciation_details JSON nullable (thêm ở migration V202610052251):
+  điểm phát âm 0–100 và chi tiết {phonemeAccuracy, wordAccuracy, errors} của câu đọc theo câu mẫu; văn bản nghe được
+  nằm ở answer_content, file ghi âm không lưu
 
 Module dùng: Kiểm tra định kỳ (C1), Kiểm tra tổng hợp (C2) → nguồn dữ liệu cho user_level_history.
 

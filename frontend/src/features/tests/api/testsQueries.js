@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { testsKeys } from './keys'
 import { ATTEMPT_STATUS, GRADING_POLL_MS } from '../constants'
-import { getAttemptResult, getTest, getTests, recordPassagePlay, submitAttempt } from './testsApi'
+import { getAttemptResult, getTest, getTestAttempts, getTests, recordPassagePlay, submitAttempt } from './testsApi'
 
 export function useTests() {
   return useQuery({ queryKey: testsKeys.list(), queryFn: getTests })
@@ -10,6 +10,11 @@ export function useTests() {
 /** @param {number | null} id null when the URL id is invalid: nothing is fetched */
 export function useTest(id) {
   return useQuery({ queryKey: testsKeys.detail(id), queryFn: () => getTest(id), enabled: id !== null })
+}
+
+/** The learner's submitted attempts at a test (the history dialog). @param {number} testId */
+export function useTestAttempts(testId) {
+  return useQuery({ queryKey: testsKeys.attempts(testId), queryFn: () => getTestAttempts(testId) })
 }
 
 /**
@@ -45,6 +50,7 @@ export function useSubmitAttempt() {
       queryClient.setQueryData(testsKeys.result(result.attemptId), result)
       queryClient.invalidateQueries({ queryKey: testsKeys.list(), refetchType: 'none' })
       queryClient.invalidateQueries({ queryKey: testsKeys.detail(result.testId), refetchType: 'none' })
+      queryClient.invalidateQueries({ queryKey: testsKeys.attempts(result.testId), refetchType: 'none' })
     },
   })
 }

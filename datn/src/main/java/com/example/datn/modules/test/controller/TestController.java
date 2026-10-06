@@ -1,5 +1,6 @@
 package com.example.datn.modules.test.controller;
 
+import com.example.datn.modules.test.dto.response.AttemptSummaryResponse;
 import com.example.datn.modules.test.dto.response.StartAttemptResponse;
 import com.example.datn.modules.test.dto.response.TestDetailResponse;
 import com.example.datn.modules.test.dto.response.TestListResponse;
@@ -16,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/** Lists tests and starts an attempt (docs/api/tests.md). */
+/** Lists tests, starts an attempt and lists the learner's past attempts (docs/api/tests.md). */
 @RestController
 @RequestMapping("/api/tests")
 public class TestController {
@@ -37,6 +38,11 @@ public class TestController {
     @GetMapping("/{testId}")
     public TestDetailResponse detail(@PathVariable Long testId) {
         return service.detail(testId);
+    }
+
+    @GetMapping("/{testId}/attempts")
+    public List<AttemptSummaryResponse> attempts(@PathVariable Long testId) {
+        return service.attempts(testId);
     }
 
     /** 200 when resuming an existing in-progress attempt, 201 when a new attempt is created. */

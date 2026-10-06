@@ -25,6 +25,12 @@ export const ATTEMPT_STATUS = Object.freeze({
   GRADED: 'GRADED',
 })
 
+/**
+ * How long saving a recording may take. The server assesses it before answering, and the pronunciation service can
+ * spend minutes loading its models the first time (the same limit as the pronunciation exercises).
+ */
+export const RECORDING_UPLOAD_TIMEOUT_MS = 600_000
+
 /** How often the result of an attempt the AI is still grading is fetched again. */
 export const GRADING_POLL_MS = 10_000
 

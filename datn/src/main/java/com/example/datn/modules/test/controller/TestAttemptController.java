@@ -4,6 +4,7 @@ import com.example.datn.modules.test.dto.request.SaveAnswerRequest;
 import com.example.datn.modules.test.dto.response.PassagePlayResponse;
 import com.example.datn.modules.test.dto.response.TestResultResponse;
 import com.example.datn.modules.test.service.TestAttemptService;
+import com.example.datn.modules.test.service.TestRecordingService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,15 +16,20 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Saves answers, counts plays of recordings, submits and reads the result of a test attempt (docs/api/tests.md). */
+/**
+ * Saves answers (typed, picked or recorded), counts plays of recordings, submits and reads the result of a test
+ * attempt (docs/api/tests.md).
+ */
 @RestController
 @RequestMapping("/api/test-attempts")
 public class TestAttemptController {
 
     private final TestAttemptService service;
+    private final TestRecordingService recordingService;
 
-    public TestAttemptController(TestAttemptService service) {
+    public TestAttemptController(TestAttemptService service, TestRecordingService recordingService) {
         this.service = service;
+        this.recordingService = recordingService;
     }
 
     @PutMapping("/{attemptId}/answers/{questionId}")
@@ -33,6 +39,16 @@ public class TestAttemptController {
             @PathVariable Long questionId,
             @Valid @RequestBody SaveAnswerRequest request) {
         service.saveAnswer(attemptId, questionId, request);
+    }
+
+    /** The recorded answer of a read-aloud question, as a WAV file in the body. */
+    @PutMapping(value = "/{attemptId}/answers/{questionId}/recording", consumes = "audio/wav")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveRecording(
+            @PathVariable Long attemptId,
+            @PathVariable Long questionId,
+            @RequestBody byte[] audio) {
+        recordingService.saveRecording(attemptId, questionId, audio);
     }
 
     @PostMapping("/{attemptId}/passages/{passageId}/plays")

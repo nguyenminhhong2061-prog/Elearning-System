@@ -1,7 +1,20 @@
 // Pure helpers of the test-taking screen: what the learner has answered and what the server is sent.
 
-/** A test question answered by picking one of its options (the others are typed). */
+/** A test question answered by picking one of its options (the others are typed or recorded). */
 export const isChoice = (question) => question.options.length > 0
+
+/** A speaking question answered by recording its reference sentence. */
+export const isReadAloud = (question) => Boolean(question.referenceText)
+
+/**
+ * Whether the question has an answer the server would grade: a picked option, some text, or a saved recording.
+ * @param {import('./types').TestQuestion} question
+ * @param {{ optionId?: number | null, text?: string, recorded?: boolean } | undefined} answer
+ */
+export function isAnswered(question, answer) {
+  if (isReadAloud(question)) return Boolean(answer?.recorded)
+  return answerPayload(question, answer) !== null
+}
 
 /**
  * The body of PUT /api/test-attempts/{attemptId}/answers/{questionId}, or null when nothing usable was entered.
@@ -25,7 +38,8 @@ export function answerPayload(question, answer) {
 export function answersFromSaved(saved) {
   const map = {}
   for (const item of saved) {
-    map[item.questionId] = item.optionId != null ? { optionId: item.optionId } : { text: item.text ?? '' }
+    if (item.recorded) map[item.questionId] = { recorded: true }
+    else map[item.questionId] = item.optionId != null ? { optionId: item.optionId } : { text: item.text ?? '' }
   }
   return map
 }
@@ -47,12 +61,12 @@ export function testParts(questions) {
 }
 
 export function unansweredQuestions(questions, answers) {
-  return questions.filter((question) => !answerPayload(question, answers[question.id]))
+  return questions.filter((question) => !isAnswered(question, answers[question.id]))
 }
 
 /** Where a resumed attempt opens: the first unanswered question, or the last one when every question is answered. */
 export function firstUnansweredIndex(questions, answers) {
-  const index = questions.findIndex((question) => !answerPayload(question, answers[question.id]))
+  const index = questions.findIndex((question) => !isAnswered(question, answers[question.id]))
   return index === -1 ? Math.max(questions.length - 1, 0) : index
 }
 

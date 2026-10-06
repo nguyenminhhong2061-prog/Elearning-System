@@ -80,7 +80,9 @@ function SkillBreakdown({ result }) {
 function reviewTag(item, stillGrading) {
   if (item.correct === true) return { tone: 'success', label: 'Đúng' }
   if (item.correct === false) return { tone: 'danger', label: 'Sai' }
-  if (stillGrading && !item.aiCriteria && item.answerText) return { tone: 'warning', label: 'Đang chấm' }
+  if (stillGrading && !item.aiCriteria && !item.pronunciation && item.answerText) {
+    return { tone: 'warning', label: 'Đang chấm' }
+  }
   return { tone: 'brand', label: `${Number(item.scoreEarned)}/${item.points} điểm` }
 }
 
@@ -104,6 +106,40 @@ function AiFeedback({ item }) {
         ))}
       </ul>
       {item.aiComment && <p className="text-ink-soft">{item.aiComment}</p>}
+    </div>
+  )
+}
+
+/**
+ * How a read-aloud answer was pronounced: the overall score, how much of the sentence matched, and the words that
+ * were mispronounced or left out, with what was expected and what was heard (IPA).
+ */
+function PronunciationFeedback({ pronunciation }) {
+  const percent = (value) => `${Math.round(Number(value))}%`
+  return (
+    <div className="mt-3 flex flex-col gap-1.5 rounded-lg bg-canvas p-3 text-label">
+      <p className="font-semibold text-ink">Chấm phát âm</p>
+      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-ink-soft">
+        <li>
+          Điểm phát âm: <span className="font-semibold text-ink">{Math.round(Number(pronunciation.score))}/100</span>
+        </li>
+        {pronunciation.phonemeAccuracy != null && <li>Khớp âm: {percent(pronunciation.phonemeAccuracy)}</li>}
+        {pronunciation.wordAccuracy != null && <li>Khớp từ: {percent(pronunciation.wordAccuracy)}</li>}
+      </ul>
+      {pronunciation.errors.length > 0 ? (
+        <ul className="flex list-disc flex-col gap-0.5 pl-5 text-ink-soft">
+          {pronunciation.errors.map((error, index) => (
+            <li key={`${error.word}-${index}`}>
+              {error.heardIpa
+                ? `“${error.word}”: mong đợi /${error.expectedIpa}/, nghe được /${error.heardIpa}/`
+                : `“${error.word}”: chưa đọc hoặc không nghe rõ`}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-ink-soft">Không phát hiện từ nào đọc sai.</p>
+      )}
+      <p className="text-xs text-muted">Điểm do mô hình ước lượng từ bản ghi âm, có thể sai với giọng lạ hoặc tiếng ồn.</p>
     </div>
   )
 }
@@ -144,6 +180,9 @@ function ReviewList({ questions, passages, review, stillGrading }) {
             ? item.answerText
             : (question?.options.find((option) => option.id === item.selectedOptionId)?.content ?? '—')
         const { tone, label } = reviewTag(item, stillGrading)
+        // A read-aloud answer is a recording: what is shown is what was heard in it, beside the sentence to read.
+        const readAloud = Boolean(question?.referenceText || item.pronunciation)
+        const noAnswer = readAloud ? (item.pronunciation ? '(không nghe rõ)' : 'Chưa ghi âm') : 'Không trả lời'
         // A passage is shown once, above the first of its questions.
         const passage = item.passageId != null && item.passageId !== review[index - 1]?.passageId
           ? passageById.get(item.passageId)
@@ -163,19 +202,20 @@ function ReviewList({ questions, passages, review, stillGrading }) {
             </div>
             <dl className="mt-3 flex flex-col gap-1 text-label">
               <div className="flex gap-2">
-                <dt className="flex-none text-muted">Bạn trả lời:</dt>
+                <dt className="flex-none text-muted">{readAloud ? 'Hệ thống nghe được:' : 'Bạn trả lời:'}</dt>
                 <dd className={cx('min-w-0 break-words', item.correct === true ? 'text-success' : 'text-ink')}>
-                  {selected || 'Không trả lời'}
+                  {selected || noAnswer}
                 </dd>
               </div>
               {item.correct !== true && item.correctAnswer && (
                 <div className="flex gap-2">
-                  <dt className="flex-none text-muted">Đáp án đúng:</dt>
+                  <dt className="flex-none text-muted">{readAloud ? 'Câu mẫu:' : 'Đáp án đúng:'}</dt>
                   <dd className="min-w-0 break-words font-semibold text-brand-dark">{item.correctAnswer}</dd>
                 </div>
               )}
             </dl>
             <AiFeedback item={item} />
+            {item.pronunciation && <PronunciationFeedback pronunciation={item.pronunciation} />}
           </li>,
         ]
       })}

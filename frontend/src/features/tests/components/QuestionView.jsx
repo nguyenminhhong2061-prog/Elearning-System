@@ -2,8 +2,9 @@ import { Card } from '@/components/ui/Card'
 import { ChoiceOptions } from '@/components/ui/ChoiceOptions'
 import { Tag } from '@/components/ui/Tag'
 import { TextField } from '@/components/ui/TextField'
-import { isChoice } from '../answers'
+import { isChoice, isReadAloud } from '../answers'
 import { QUESTION_TYPES, SKILL_LABELS } from '../constants'
+import { ReadAloudAnswer } from './ReadAloudAnswer'
 
 function TextAnswer({ question, value, onChange }) {
   const long = question.type === QUESTION_TYPES.WRITING || question.type === QUESTION_TYPES.SPEAKING
@@ -48,17 +49,20 @@ function TextAnswer({ question, value, onChange }) {
 }
 
 /**
- * One test question with its answer input: the design's pill options (native radios) for choice questions, a text
- * field or text area for typed ones.
+ * One test question with its answer input: the design's pill options (native radios) for choice questions, a
+ * recorder for read-aloud questions, a text field or text area for the other typed ones.
  *
  * @param {object} props
  * @param {number} props.number position in the test, from 1
  * @param {import('../types').TestQuestion} props.question
- * @param {{ optionId?: number | null, text?: string } | undefined} props.answer
+ * @param {{ optionId?: number | null, text?: string, recorded?: boolean } | undefined} props.answer
  * @param {(optionId: number) => void} props.onPick
  * @param {(text: string) => void} props.onType
+ * @param {object | undefined} props.upload the recording of a read-aloud question made on this visit
+ * @param {(wav: Blob) => void} props.onRecorded
+ * @param {() => void} props.onRetryRecording
  */
-export function QuestionView({ number, question, answer, onPick, onType }) {
+export function QuestionView({ number, question, answer, onPick, onType, upload, onRecorded, onRetryRecording }) {
   const skill = question.skill ? SKILL_LABELS[question.skill.toLowerCase()] : null
   return (
     <Card className="flex flex-col gap-5">
@@ -84,6 +88,14 @@ export function QuestionView({ number, question, answer, onPick, onType }) {
           options={question.options.map((option) => ({ id: option.id, text: option.content }))}
           selectedId={answer?.optionId ?? null}
           onSelect={onPick}
+        />
+      ) : isReadAloud(question) ? (
+        <ReadAloudAnswer
+          question={question}
+          recorded={Boolean(answer?.recorded)}
+          upload={upload}
+          onRecorded={onRecorded}
+          onRetry={onRetryRecording}
         />
       ) : (
         <TextAnswer question={question} value={answer?.text ?? ''} onChange={onType} />

@@ -37,8 +37,9 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Grades a submitted attempt (docs/api/tests.md): choice and short-text answers at once, spoken and written answers
- * through the AI examiner. While the examiner has not graded every answer the attempt stays SUBMITTED, and
+ * Grades a submitted attempt (docs/api/tests.md): choice and short-text answers at once, recorded read-aloud answers
+ * by the pronunciation score they got when they were recorded, other spoken and written answers through the AI
+ * examiner. While the examiner has not graded every answer the attempt stays SUBMITTED, and
  * {@link PendingTestGradingScheduler} comes back to it; once nothing is pending it becomes GRADED with its scores,
  * levels and roadmap.
  */
@@ -117,6 +118,8 @@ public class TestGradingService {
                     String normalized = AnswerNormalizer.normalize(answer.getAnswerContent());
                     boolean correct = accepted.stream().anyMatch(item -> item.getNormalizedAnswer().equals(normalized));
                     answer.grade(correct, correct ? BigDecimal.valueOf(question.getPoints()) : BigDecimal.ZERO);
+                } else if (question.isReadAloud()) {
+                    answer.grade(null, scorePoints(question.getPoints(), answer.getPronunciationScore()));
                 } else if (aiGraded) {
                     if (answer.getAiCriteria() == null && examinerAvailable) {
                         Optional<AiAssessment> assessment = aiGateway.assess(question, answer.getAnswerContent());
@@ -140,7 +143,8 @@ public class TestGradingService {
             }
 
             itemsBySkill.computeIfAbsent(skill, key -> new ArrayList<>())
-                    .add(new SkillAssessor.Item(question.getLevel(), question.getPoints(), earned, aiBand));
+                    .add(new SkillAssessor.Item(
+                            question.getLevel(), question.getPoints(), earned, aiBand, question.isReadAloud()));
         }
 
         // A skill still waiting for the examiner has no score yet; the others are final and are stored already.
@@ -209,12 +213,23 @@ public class TestGradingService {
         };
     }
 
-    /** A spoken or written answer with nothing to compare it with is the examiner's to grade. */
+    /**
+     * A spoken or written answer with nothing to compare it with is the examiner's to grade. A read-aloud answer is
+     * not: its pronunciation was scored when it was recorded.
+     */
     static boolean isAiGraded(
             TestQuestion question, List<TestQuestionOption> options, List<TestQuestionAcceptedAnswer> accepted) {
-        return options.isEmpty() && accepted.isEmpty()
+        return options.isEmpty() && accepted.isEmpty() && !question.isReadAloud()
                 && (question.getQuestionType() == TestQuestionType.SPEAKING
                         || question.getQuestionType() == TestQuestionType.WRITING);
+    }
+
+    /** The points a pronunciation score (0-100) earns: the share of the question's points. */
+    private static BigDecimal scorePoints(int points, BigDecimal score) {
+        if (score == null) {
+            return BigDecimal.ZERO;
+        }
+        return BigDecimal.valueOf(points).multiply(score).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
     }
 
     /** The points an examiner's band earns: the top band earns them all. */
