@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/Button'
 import { cx } from '@/lib/cx'
 import { scoreText, scoreTone } from './writing'
+import { TranslationAssessmentView } from './TranslationAssessmentView'
 
 const TONES = {
   success: 'border-success-line bg-success-bg text-success',
@@ -46,7 +47,8 @@ export function WritingFeedback({ result, onRegrade, regrading, regradeError = n
           <p className="leading-relaxed text-ink">{result.feedback}</p>
         </div>
       )}
-      {result.sampleAnswers.length > 0 && (
+      {result.translationAssessment && <TranslationAssessmentView assessment={result.translationAssessment} />}
+      {!result.translationAssessment && result.sampleAnswers.length > 0 && (
         <div className="flex flex-col gap-0.5">
           <p className="font-semibold">Câu trả lời mẫu</p>
           <ul className="flex list-disc flex-col gap-0.5 pl-5 text-ink">

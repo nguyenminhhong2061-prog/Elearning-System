@@ -7,9 +7,8 @@ export const AI_TIMEOUT_MS = 60_000
 // OpenPronounce downloads two model checkpoints the first time it assesses a recording.
 export const PRONUNCIATION_TIMEOUT_MS = 600_000
 
-// Until the backend follows the 02/10/2026 contract (grammar replaced by reading and writing), it still answers with
-// the GRAMMAR skill and does not know READING or WRITING. A grammar lesson is a reading lesson without a passage
-// (Business model), so it is shown as one; the writing tab is simply empty. Remove this once the backend has changed.
+// Compatibility with servers that still only expose the old GRAMMAR skill: show those lessons under Reading, and
+// show an empty Writing tab if that server rejects WRITING. Updated backends return WRITING lessons directly.
 const LEGACY_SKILL = { GRAMMAR: 'READING' }
 const withCurrentSkill = (lesson) => (LEGACY_SKILL[lesson.skill] ? { ...lesson, skill: LEGACY_SKILL[lesson.skill] } : lesson)
 

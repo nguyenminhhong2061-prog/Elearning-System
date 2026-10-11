@@ -1,6 +1,7 @@
 import { useId, useState } from 'react'
 import { WRITING_TYPES } from '../constants'
 import { feedbackSummary, scoreText, scoreTone } from './writing'
+import { TranslationAssessmentView } from './TranslationAssessmentView'
 
 const SCORE_COLOURS = { success: 'text-success', warning: 'text-warning', danger: 'text-danger' }
 
@@ -15,12 +16,12 @@ function ReviewItem({ number, question, item, onAsk }) {
         Câu {number} · {WRITING_TYPES[question.type].label} ·{' '}
         <span className={SCORE_COLOURS[scoreTone(item)]}>{scoreText(item)} điểm</span>
       </p>
-      <p lang={question.type === 'TRANSLATION' ? 'vi' : 'en'} className="font-semibold text-ink">
+      <p lang={question.type === 'TRANSLATION' ? 'vi' : 'en'} className={`font-semibold text-ink ${question.type === 'PARAGRAPH_TRANSLATION' ? 'whitespace-pre-line' : ''}`}>
         {question.prompt}
         {question.starter && ` → ${question.starter} …`}
       </p>
       <p className="text-ink-soft">
-        Câu trả lời của bạn: {item.answer ? <span lang="en" className="text-ink">{item.answer}</span> : <em>chưa trả lời</em>}
+        Câu trả lời của bạn: {item.answer ? <span lang={question.type === 'PARAGRAPH_TRANSLATION' ? 'vi' : 'en'} className="text-ink">{item.answer}</span> : <em>chưa trả lời</em>}
       </p>
       {summary && !open && <p className="leading-relaxed text-ink-soft">{summary}</p>}
       <div id={detailsId} hidden={!open} className="flex flex-col gap-1.5 border-t border-line pt-2">
@@ -43,6 +44,7 @@ function ReviewItem({ number, question, item, onAsk }) {
           </div>
         )}
         {item.explanation && <p className="leading-relaxed text-ink-soft">{item.explanation}</p>}
+        {item.translationAssessment && <TranslationAssessmentView assessment={item.translationAssessment} />}
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1">
         <button

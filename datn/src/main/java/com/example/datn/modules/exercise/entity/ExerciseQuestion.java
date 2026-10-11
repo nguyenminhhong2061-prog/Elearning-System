@@ -22,7 +22,7 @@ public class ExerciseQuestion {
     @Column(nullable = false, length = 100)
     private String code;
     @Convert(converter = QuestionTypeConverter.class)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 30)
     private QuestionType questionType;
     @Column(nullable = false, columnDefinition = "TEXT")
     private String prompt;
@@ -30,6 +30,10 @@ public class ExerciseQuestion {
     private String hintText;
     @Column(columnDefinition = "TEXT")
     private String explanation;
+    @Column(name = "starter_text", columnDefinition = "TEXT")
+    private String starterText;
+    @Column(name = "reference_answer", columnDefinition = "TEXT")
+    private String referenceAnswer;
     @Column(nullable = false, precision = 6, scale = 2)
     private BigDecimal points;
     @Column(nullable = false)
@@ -46,6 +50,8 @@ public class ExerciseQuestion {
     public String getPrompt() { return prompt; }
     public String getHintText() { return hintText; }
     public String getExplanation() { return explanation; }
+    public String getStarterText() { return starterText; }
+    public String getReferenceAnswer() { return referenceAnswer; }
     public BigDecimal getPoints() { return points; }
     public int getSortOrder() { return sortOrder; }
     public Instant getCreatedAt() { return createdAt; }

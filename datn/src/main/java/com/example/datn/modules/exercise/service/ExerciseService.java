@@ -108,11 +108,12 @@ public class ExerciseService {
 
     ExerciseSummaryResponse.InProgress resumableProgress(ExerciseLesson lesson, ExerciseAttempt attempt) {
         if (lesson.getSkill() == ExerciseSkill.LISTENING || lesson.getUpdatedAt().isAfter(attempt.getStartedAt())) return null;
-        long done = lesson.getSkill() == ExerciseSkill.GRAMMAR ? responses.countByAttemptId(attempt.getId())
+        long done = lesson.getSkill() == ExerciseSkill.GRAMMAR || lesson.getSkill() == ExerciseSkill.WRITING
+                ? responses.countByAttemptId(attempt.getId())
                 : pronunciationAttempts.findAllByAttemptId(attempt.getId()).stream()
                     .map(item -> item.getPronunciationItemId()).distinct().count();
         if (done == 0) return null;
-        Instant last = lesson.getSkill() == ExerciseSkill.GRAMMAR
+        Instant last = lesson.getSkill() == ExerciseSkill.GRAMMAR || lesson.getSkill() == ExerciseSkill.WRITING
                 ? responses.findFirstByAttemptIdOrderByAnsweredAtDescIdDesc(attempt.getId())
                     .map(item -> item.getAnsweredAt()).orElse(attempt.getStartedAt())
                 : pronunciationAttempts.findFirstByAttemptIdOrderByAssessedAtDescIdDesc(attempt.getId())

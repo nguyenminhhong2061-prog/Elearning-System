@@ -307,14 +307,16 @@ export function WritingExercise({ lesson, attemptId, progress, nextLesson, onRes
           </label>
           <textarea
             id={answerId}
-            lang="en"
-            rows={3}
+            lang={question.type === 'PARAGRAPH_TRANSLATION' ? 'vi' : 'en'}
+            rows={question.type === 'PARAGRAPH_TRANSLATION' ? 10 : 3}
             maxLength={MAX_WRITING_LENGTH}
             autoFocus={!result}
             spellCheck={false}
             value={result ? (sent ?? '') : draft}
             disabled={Boolean(result) || checking}
-            placeholder={question.starter ? `${question.starter} …` : 'Viết câu trả lời bằng tiếng Anh'}
+            placeholder={question.type === 'PARAGRAPH_TRANSLATION'
+              ? 'Viết bản dịch tiếng Việt của bạn'
+              : question.starter ? `${question.starter} …` : 'Viết câu trả lời bằng tiếng Anh'}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
               // Enter starts a new line; Ctrl+Enter checks, like a chat box.

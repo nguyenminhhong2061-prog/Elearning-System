@@ -44,6 +44,11 @@ public class ExerciseAttemptController {
         return service.answer(attemptId, request);
     }
 
+    @PostMapping("/{attemptId}/responses/{questionId}/grade")
+    public AnswerResultResponse regrade(@PathVariable Long attemptId, @PathVariable Long questionId) {
+        return service.regrade(attemptId, questionId);
+    }
+
     @PostMapping("/{attemptId}/complete")
     public AttemptResultResponse complete(
             @PathVariable Long attemptId,

@@ -21,7 +21,7 @@ public record ExerciseDetailResponse(
         Passage passage,
         List<PronunciationItem> pronunciationItems) {
 
-    public record Question(Long id, QuestionType type, String prompt, String hint, BigDecimal points,
+    public record Question(Long id, QuestionType type, String prompt, String hint, BigDecimal points, String starter,
                            List<Option> options) {}
     public record Option(Long id, String key, String text) {}
     public record Passage(String title, String audioUrl, int durationMs, List<Segment> segments) {}

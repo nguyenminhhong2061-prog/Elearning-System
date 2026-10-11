@@ -25,7 +25,7 @@ export function WritingPrompt({ question }) {
           ))}
         </ul>
       ) : (
-        <p lang={question.type === 'TRANSLATION' ? 'vi' : 'en'} className="text-[19px] leading-relaxed font-semibold text-ink">
+      <p lang={question.type === 'TRANSLATION' ? 'vi' : 'en'} className={`text-[19px] leading-relaxed font-semibold text-ink ${question.type === 'PARAGRAPH_TRANSLATION' ? 'whitespace-pre-line' : ''}`}>
           {question.prompt}
         </p>
       )}

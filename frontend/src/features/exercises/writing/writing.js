@@ -7,7 +7,12 @@ export const formatPoints = (value) => value.toFixed(1)
 export const formatTotal = (value) => (Number.isInteger(value) ? String(value) : value.toFixed(1))
 
 /** "1.0/2" for a graded answer. */
-export const scoreText = (result) => `${formatPoints(result.awardedPoints)}/${formatTotal(result.maxPoints)}`
+export const scoreText = (result) => {
+  const earned = result.maxPoints === 100 && Number.isInteger(result.awardedPoints)
+    ? String(result.awardedPoints)
+    : formatPoints(result.awardedPoints)
+  return `${earned}/${formatTotal(result.maxPoints)}`
+}
 
 /**
  * How a writing answer shows on the progress bar: full points green, none red, some amber, not graded yet striped

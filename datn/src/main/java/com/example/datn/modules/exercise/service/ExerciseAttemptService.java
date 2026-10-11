@@ -35,6 +35,9 @@ import com.example.datn.modules.exercise.repository.QuestionResponseRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -59,18 +62,21 @@ public class ExerciseAttemptService {
     private final ListeningSegmentRepository segments;
     private final ExerciseService exerciseService;
     private final CurrentUser currentUser;
+    private final GroqWritingGrader writingGrader;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ExerciseAttemptService(ExerciseAttemptRepository attempts, ExerciseLessonRepository lessons,
             ExerciseQuestionRepository questions, QuestionOptionRepository options,
             QuestionAcceptedAnswerRepository acceptedAnswers, QuestionResponseRepository responses,
             PronunciationAttemptRepository pronunciationAttempts, PronunciationItemRepository pronunciationItems,
             ListeningPassageRepository passages,
-            ListeningSegmentRepository segments, ExerciseService exerciseService, CurrentUser currentUser) {
+            ListeningSegmentRepository segments, ExerciseService exerciseService, CurrentUser currentUser,
+            GroqWritingGrader writingGrader) {
         this.attempts = attempts; this.lessons = lessons; this.questions = questions; this.options = options;
         this.acceptedAnswers = acceptedAnswers; this.responses = responses;
         this.pronunciationAttempts = pronunciationAttempts; this.pronunciationItems = pronunciationItems;
         this.passages = passages; this.segments = segments;
-        this.exerciseService = exerciseService; this.currentUser = currentUser;
+        this.exerciseService = exerciseService; this.currentUser = currentUser; this.writingGrader = writingGrader;
     }
 
     public Started start(Long lessonId, boolean restart) {
@@ -106,11 +112,15 @@ public class ExerciseAttemptService {
         return new CurrentAttemptResponse(current);
     }
 
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public AnswerResultResponse answer(Long attemptId, AnswerQuestionRequest request) {
         ExerciseAttempt attempt = ownedInProgress(attemptId);
         ExerciseLesson lesson = exerciseService.published(attempt.getLessonId());
+        if (lesson.getSkill() == ExerciseSkill.WRITING) {
+            return gradeWritingAndSave(attempt, request);
+        }
         if (lesson.getSkill() != ExerciseSkill.GRAMMAR) {
-            throw new InvalidExerciseRequestException("Only grammar questions are graded one at a time");
+            throw new InvalidExerciseRequestException("Only reading and writing questions are graded one at a time");
         }
         return gradeAndSave(attempt, request);
     }
@@ -118,6 +128,9 @@ public class ExerciseAttemptService {
     public AttemptResultResponse complete(Long attemptId, CompleteAttemptRequest request) {
         ExerciseAttempt attempt = ownedInProgress(attemptId);
         ExerciseLesson lesson = exerciseService.published(attempt.getLessonId());
+        if (lesson.getSkill() == ExerciseSkill.WRITING && !request.safeResponses().isEmpty()) {
+            throw new InvalidExerciseRequestException("Submit writing answers through the responses endpoint first");
+        }
         for (AnswerQuestionRequest pending : request.safeResponses()) gradeAndSave(attempt, pending);
 
         if (lesson.getSkill() == ExerciseSkill.PRONUNCIATION) {
@@ -126,9 +139,13 @@ public class ExerciseAttemptService {
 
         List<ExerciseQuestion> lessonQuestions = questions.findAllByLessonIdOrderBySortOrderAscIdAsc(lesson.getId());
         List<QuestionResponse> saved = responses.findAllByAttemptIdOrderByAnsweredAtAscIdAsc(attemptId);
+        if (lesson.getSkill() == ExerciseSkill.WRITING
+                && (saved.size() != lessonQuestions.size() || saved.stream().anyMatch(response -> !response.isGraded()))) {
+            throw new AttemptConflictException("Every writing answer must be graded before completing the attempt");
+        }
         BigDecimal total = lessonQuestions.stream().map(ExerciseQuestion::getPoints)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal earned = saved.stream().map(QuestionResponse::getAwardedPoints)
+        BigDecimal earned = saved.stream().map(QuestionResponse::getAwardedPoints).filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         int percent = total.signum() == 0 ? 0 : earned.multiply(BigDecimal.valueOf(100))
                 .divide(total, 0, RoundingMode.HALF_UP).intValue();
@@ -143,11 +160,17 @@ public class ExerciseAttemptService {
         List<AnswerResultResponse> review = lessonQuestions.stream().map(question -> saved.stream()
                 .filter(response -> response.getQuestionId().equals(question.getId())).findFirst()
                 .map(response -> result(question, response)).orElseGet(() -> unanswered(question))).toList();
+        long correctCount = lesson.getSkill() == ExerciseSkill.WRITING
+                ? lessonQuestions.stream().filter(question -> saved.stream()
+                    .filter(response -> response.getQuestionId().equals(question.getId()))
+                    .map(QuestionResponse::getAwardedPoints).filter(Objects::nonNull)
+                    .anyMatch(points -> points.compareTo(question.getPoints()) >= 0)).count()
+                : saved.stream().filter(QuestionResponse::isCorrect).count();
         List<AttemptResultResponse.Translation> translations = passages.findByLessonId(lesson.getId())
                 .map(passage -> segments.findAllByPassageIdOrderByOrderAscIdAsc(passage.getId()).stream()
                         .map(segment -> new AttemptResultResponse.Translation(segment.getId(), segment.getTranslationVi()))
                         .toList()).orElse(List.of());
-        return new AttemptResultResponse(attemptId, lesson.getId(), saved.stream().filter(QuestionResponse::isCorrect).count(),
+        return new AttemptResultResponse(attemptId, lesson.getId(), correctCount,
                 lessonQuestions.size(), earned, total, percent, best, personalBest, review, translations, null);
     }
 
@@ -221,15 +244,77 @@ public class ExerciseAttemptService {
         return result(question, saved);
     }
 
+    private AnswerResultResponse gradeWritingAndSave(ExerciseAttempt attempt, AnswerQuestionRequest request) {
+        if (request == null || request.questionId() == null || request.answer() == null || request.answer().isBlank()) {
+            throw new InvalidExerciseRequestException("questionId and a non-empty answer are required");
+        }
+        if (responses.findByAttemptIdAndQuestionId(attempt.getId(), request.questionId()).isPresent()) {
+            throw new AttemptConflictException("Question was already answered in this attempt");
+        }
+        ExerciseQuestion question = questions.findById(request.questionId())
+                .filter(item -> item.getLessonId().equals(attempt.getLessonId()))
+                .orElseThrow(() -> new InvalidExerciseRequestException("Question does not belong to this lesson"));
+        if (!isWritingType(question.getQuestionType())) {
+            throw new InvalidExerciseRequestException("This question is not a writing question");
+        }
+
+        QuestionResponse saved = new QuestionResponse(attempt.getId(), attempt.getLessonId(), question.getId(),
+                request.answer().strip(), Instant.now());
+        // Commit the learner's answer before the network call, so an AI timeout never loses their work.
+        QuestionResponse response = responses.save(saved);
+        writingGrader.grade(question, request.answer().strip()).ifPresent(grade -> {
+            BigDecimal awarded = question.getPoints().multiply(BigDecimal.valueOf(grade.scorePercent()))
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            JsonNode samples = objectMapper.valueToTree(grade.sampleAnswers());
+            response.applyAiGrade(awarded, grade.feedback(), grade.explanation(), samples, grade.translationAssessment());
+        });
+        return result(question, responses.save(response));
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public AnswerResultResponse regrade(Long attemptId, Long questionId) {
+        ExerciseAttempt attempt = ownedInProgress(attemptId);
+        ExerciseLesson lesson = exerciseService.published(attempt.getLessonId());
+        if (lesson.getSkill() != ExerciseSkill.WRITING) {
+            throw new InvalidExerciseRequestException("Only writing answers can be graded again");
+        }
+        QuestionResponse saved = responses.findByAttemptIdAndQuestionId(attemptId, questionId)
+                .orElseThrow(() -> new InvalidExerciseRequestException("Answer has not been submitted"));
+        ExerciseQuestion question = questions.findById(questionId)
+                .orElseThrow(() -> new InvalidExerciseRequestException("Question does not belong to this lesson"));
+        if (!question.getLessonId().equals(lesson.getId()) || !isWritingType(question.getQuestionType())) {
+            throw new InvalidExerciseRequestException("Question does not belong to this writing lesson");
+        }
+        writingGrader.grade(question, saved.getEnteredAnswer()).ifPresentOrElse(grade -> {
+            BigDecimal awarded = question.getPoints().multiply(BigDecimal.valueOf(grade.scorePercent()))
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            saved.applyAiGrade(awarded, grade.feedback(), grade.explanation(),
+                    objectMapper.valueToTree(grade.sampleAnswers()), grade.translationAssessment());
+        }, saved::markUngraded);
+        return result(question, responses.save(saved));
+    }
+
+    private static boolean isWritingType(QuestionType type) {
+        return type == QuestionType.TRANSLATION || type == QuestionType.REWRITE
+                || type == QuestionType.KEYWORD_SENTENCE || type == QuestionType.PARAGRAPH_TRANSLATION;
+    }
+
     private AnswerResultResponse result(ExerciseQuestion question, QuestionResponse response) {
+        if (isWritingType(question.getQuestionType())) {
+            return new AnswerResultResponse(question.getId(), response.isGraded(), null,
+                    response.getSelectedOptionId(), response.getEnteredAnswer(), null, null,
+                    response.getAiExplanation() == null ? question.getExplanation() : response.getAiExplanation(),
+                    response.getAwardedPoints(), question.getPoints(), response.getFeedback(),
+                    jsonStrings(response.getSampleAnswers()), response.getAiAssessment());
+        }
         QuestionOption correctOption = options.findFirstByQuestionIdAndCorrectTrueOrderBySortOrderAscIdAsc(question.getId())
                 .orElse(null);
         String correctAnswer = correctOption != null ? correctOption.getOptionText()
                 : acceptedAnswers.findFirstByQuestionIdAndPrimaryTrueOrderByIdAsc(question.getId())
                     .map(QuestionAcceptedAnswer::getAnswerText).orElse(null);
-        return new AnswerResultResponse(question.getId(), response.isCorrect(), response.getSelectedOptionId(),
+        return new AnswerResultResponse(question.getId(), true, response.getCorrect(), response.getSelectedOptionId(),
                 response.getEnteredAnswer(), correctOption == null ? null : correctOption.getId(), correctAnswer,
-                question.getExplanation(), response.getAwardedPoints());
+                question.getExplanation(), response.getAwardedPoints(), question.getPoints(), null, List.of(), null);
     }
 
     private AnswerResultResponse unanswered(ExerciseQuestion question) {
@@ -238,8 +323,16 @@ public class ExerciseAttemptService {
         String answer = correctOption != null ? correctOption.getOptionText()
                 : acceptedAnswers.findFirstByQuestionIdAndPrimaryTrueOrderByIdAsc(question.getId())
                     .map(QuestionAcceptedAnswer::getAnswerText).orElse(null);
-        return new AnswerResultResponse(question.getId(), false, null, null,
-                correctOption == null ? null : correctOption.getId(), answer, question.getExplanation(), BigDecimal.ZERO);
+        return new AnswerResultResponse(question.getId(), true, false, null, null,
+                correctOption == null ? null : correctOption.getId(), answer, question.getExplanation(), BigDecimal.ZERO,
+                question.getPoints(), null, List.of(), null);
+    }
+
+    private List<String> jsonStrings(JsonNode node) {
+        if (node == null || !node.isArray()) return List.of();
+        List<String> values = new ArrayList<>();
+        node.forEach(item -> { if (item.isString()) values.add(item.asString()); });
+        return values;
     }
 
     private ExerciseAttempt ownedInProgress(Long id) {

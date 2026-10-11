@@ -3,7 +3,7 @@
 /**
  * @typedef {'READING' | 'WRITING' | 'LISTENING' | 'PRONUNCIATION'} Skill
  * @typedef {'EASY' | 'MEDIUM' | 'HARD'} Difficulty
- * @typedef {'TRANSLATION' | 'REWRITE' | 'KEYWORD_SENTENCE'} WritingType
+ * @typedef {'TRANSLATION' | 'PARAGRAPH_TRANSLATION' | 'REWRITE' | 'KEYWORD_SENTENCE'} WritingType
  * @typedef {'MULTIPLE_CHOICE' | 'FILL_BLANK' | WritingType} QuestionType
  *
  * @typedef {object} LessonProgress
@@ -70,6 +70,7 @@
  * @property {number | null} correctOptionId null for FILL_BLANK
  * @property {string} correctAnswer
  * @property {string | null} explanation
+ * @property {{ level: string, criteria: Array<{ name: string, scorePercent: number, comment: string }>, suggestedTranslation: string, suggestions: string[], errors: Array<{ sourcePhrase: string, learnerVersion: string, correction: string, explanation: string }> | null} | null} [translationAssessment]
  * @property {number} awardedPoints
  *
  * @typedef {object} ReviewItem

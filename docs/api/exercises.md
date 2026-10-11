@@ -1,21 +1,24 @@
 # API bài tập luyện tập (module B: đọc hiểu, viết, nghe hiểu, phát âm) — contract
 
-> Trạng thái: **đề xuất, chờ Đạt duyệt.** Frontend (nhánh `feature/exercises-frontend`, `frontend/src/features/exercises/`)
-> đã viết theo tài liệu này và chạy được với dữ liệu giả (`npm run dev:mock`). Backend chưa có. Module B do Lý Quang
-> Đạt phụ trách; ngày 26/09/2026 Hồng nhận làm phần giao diện. Muốn đổi chỗ nào thì sửa tài liệu này trước, rồi sửa
-> frontend (`api/exercisesApi.js`) và dữ liệu giả (`frontend/mock/routes/exercises.js`) cho khớp.
+> Trạng thái: frontend và backend đang triển khai theo contract này. Backend hiện hỗ trợ bài tập viết dùng AI Groq,
+> lưu kết quả chấm theo từng lượt, và bài dịch đoạn văn Anh → Việt có nhận xét theo rubric; phần Đọc hiểu mới vẫn cần
+> hoàn thiện riêng. Module B do Lý Quang Đạt phụ trách; ngày 26/09/2026 Hồng nhận làm phần giao diện.
 >
 > **Cập nhật 27/09/2026 (Hồng chốt): làm tiếp bài dở.** Mở lại một bài ngữ pháp hoặc phát âm đang làm dở thì làm tiếp
 > từ câu chưa trả lời, không bắt đầu lại (thẻ "Tiếp tục" trên trang chủ của thiết kế cần điều này). Các chỗ đổi: mục
 > "Nguyên tắc", `progress.inProgress` của danh sách bài, `POST /api/exercises/{lessonId}/attempts` và endpoint mới
 > `GET /api/exercise-attempts/current`.
 >
-> **Cập nhật 02/10/2026 (Hồng, theo Business model và kịch bản 9, 10 của `docs/English Learning System/`): bỏ kỹ năng
+> **Cập nhật 11/10/2026 (Lý Đạt):** backend đã bổ sung chấm bài Viết bằng Groq, lưu lượt trả lời chưa chấm để gửi lại,
+> và dạng dịch đoạn văn Anh → Việt có rubric 5 tiêu chí. Migration `V202610111000__writing_paragraph_translation.sql`
+> tạo bài mẫu “Dịch đoạn văn: Bốn mùa”; `reference_answer` chỉ dùng nội bộ khi chấm, không gửi ở API nội dung bài.
+>
+> **Cập nhật 02/10/2026 (Hồng, theo Business model và kịch bản 9, 10 của `docs/English Learning System/`):** bỏ kỹ năng
 > Ngữ pháp, thay bằng Đọc hiểu (`READING`) và Viết (`WRITING`).** Bài đọc hiểu gồm câu trắc nghiệm ngữ pháp, câu điền chỗ
 > trống (chính là bài ngữ pháp cũ) và câu hỏi về một bài đọc. Bài viết gồm ba dạng câu viết (dịch câu, viết lại câu,
 > viết câu theo từ khóa), do **dịch vụ AI chấm điểm và nhận xét** từng câu. Các chỗ đổi được đánh dấu "(02/10)"; việc
-> backend cần làm ở mục "Thay đổi ngày 02/10/2026" cuối tài liệu. Backend hiện tại (PR #16) vẫn là `GRAMMAR`: tới khi
-> đổi theo tài liệu này, hai tab mới chỉ chạy với `npm run dev:mock`.
+> backend hiện vẫn giữ `GRAMMAR` cho bài cũ; kỹ năng `WRITING` đã được thêm bằng migration riêng, chưa thay thế phần
+> `READING` trong đợt này.
 
 Mọi endpoint cần đăng nhập (`Authorization: Bearer <token>`). Lỗi dùng định dạng chung
 `{ "timestamp": "...", "status": 404, "message": "..." }`. Giá trị enum trong JSON viết **chữ hoa** (DB lưu chữ thường,
@@ -59,7 +62,7 @@ xem bẫy "enum chữ thường" trong README). Dùng các bảng có sẵn tron
 |---|---|---|
 | `skill` | `READING`, `WRITING`, `LISTENING`, `PRONUNCIATION` (02/10) | `exercise_lessons.skill` (`reading`, `writing`, `listening`, `pronunciation`; cần migration) |
 | `difficulty` | `EASY`, `MEDIUM`, `HARD` (giao diện: Dễ, Trung bình, Khó) | `exercise_lessons.difficulty` |
-| `type` của câu hỏi | `MULTIPLE_CHOICE`, `FILL_BLANK` (đọc hiểu, nghe); `TRANSLATION`, `REWRITE`, `KEYWORD_SENTENCE` (viết, 02/10) | `exercise_questions.question_type` |
+| `type` của câu hỏi | `MULTIPLE_CHOICE`, `FILL_BLANK` (đọc hiểu, nghe); `TRANSLATION`, `REWRITE`, `KEYWORD_SENTENCE`, `PARAGRAPH_TRANSLATION` (viết) | `exercise_questions.question_type` |
 | `errorType` của từ | `NONE`, `MISPRONUNCIATION`, `OMISSION`, `INSERTION` | trong `pronunciation_attempts.assessment_details` |
 
 ## Danh sách bài
@@ -166,10 +169,10 @@ Sắp xếp "cơ bản đến nâng cao" (B1): `cefr_level` A1 → C2, rồi `so
   ]
   ```
 
-  `prompt` là câu tiếng Việt cần dịch (`TRANSLATION`), câu gốc cần viết lại (`REWRITE`) hoặc các từ khóa cách nhau bằng
-  `" / "` (`KEYWORD_SENTENCE`). `starter` (cột mới `starter_text`): phần mở đầu cho sẵn của câu viết lại ("We spent
-  …"), có thể `null`; các dạng khác luôn `null`. Giao diện tự thêm lời dẫn theo dạng câu ("Dịch sang tiếng Anh:", "Viết
-  lại câu sao cho nghĩa không đổi:", "Viết một câu có dùng các từ gợi ý:").
+  `prompt` là câu tiếng Việt cần dịch (`TRANSLATION`), câu gốc cần viết lại (`REWRITE`), các từ khóa cách nhau bằng
+  `" / "` (`KEYWORD_SENTENCE`), hoặc đoạn tiếng Anh cần dịch sang tiếng Việt (`PARAGRAPH_TRANSLATION`). `starter`
+  (cột `starter_text`) là phần mở đầu cho sẵn của câu viết lại; các dạng khác luôn `null`. Đáp án dịch tham khảo ở
+  `reference_answer` chỉ được dùng nội bộ cho AI, không trả ở `GET /api/exercises/{lessonId}`.
 - `passage` (chỉ `LISTENING`, còn lại `null`):
 
   ```json
@@ -270,9 +273,9 @@ hoặc với `FILL_BLANK`: `{ "questionId": 12, "answer": "seen" }` (1 đến 20
 - Mỗi câu chỉ trả lời **một lần** trong một lượt: lần thứ hai trả `409`. `400` nếu câu hỏi không thuộc bài, gửi cả hai
   hoặc không gửi `optionId`/`answer`, hoặc `optionId` không thuộc câu hỏi.
 
-**Câu viết (02/10, kịch bản 10 bước 5–8):** body `{ "questionId": 41, "answer": "I booked the hotel room before two
-weeks." }` (`answer` 1 đến 1000 ký tự; câu viết không nhận `optionId`). Server **lưu câu trả lời trước**, rồi gửi dịch
-vụ AI (cắt ở khoảng 20 giây). Trả `200`:
+**Câu viết:** body `{ "questionId": 41, "answer": "I booked the hotel room before two weeks." }` (`answer` 1 đến
+10.000 ký tự; câu viết không nhận `optionId`). Server lưu nội dung và nhờ AI chấm; nếu dịch vụ lỗi, câu vẫn được lưu ở
+trạng thái chưa chấm để người học gửi chấm lại. Trả `200`:
 
 ```json
 {
@@ -299,6 +302,10 @@ vụ AI (cắt ở khoảng 20 giây). Trả `200`:
   lượt này).
 - Câu đọc hiểu, câu nghe: kết quả như trên, không có `graded`, `maxPoints`, `feedback`, `sampleAnswers` (giao diện coi
   như đã chấm).
+- `PARAGRAPH_TRANSLATION` thêm `translationAssessment`: `{ level, criteria, suggestedTranslation, suggestions, errors }`.
+  `criteria` có 5 mục: chính xác ngữ nghĩa, văn phong/trôi chảy, chính tả-ngữ pháp-dấu câu, tác phong làm bài, hình thức
+  trình bày; mỗi mục có `scorePercent` và `comment`. `errors` nêu cụm gốc, phần người học viết, cách sửa và giải thích;
+  mảng rỗng nghĩa là không phát hiện lỗi đáng kể. Điểm `awardedPoints` tỷ lệ theo `scorePercent` và điểm tối đa.
 
 ### `POST /api/exercise-attempts/{attemptId}/responses/{questionId}/grade` — gửi chấm lại một câu viết (02/10)
 
@@ -420,6 +427,10 @@ theo mục trong lượt; `overall_score`; `accuracy_score` là tỷ lệ khớp
    `common.event` (như `WordReviewedEvent` của module A), đừng để module khác đọc thẳng bảng.
 
 ## Thay đổi ngày 02/10/2026: Ngữ pháp → Đọc hiểu và Viết (việc backend, Đạt)
+
+> Tình trạng 11/10/2026: phần chuyển kỹ năng sang `READING` chưa làm. Riêng `WRITING`, loại bài viết, lưu bài dài,
+> Groq primary/backup, chấm lại và bài mẫu dịch đoạn văn đã triển khai trong migration 11/10; phần dưới là backlog
+> thiết kế ban đầu, không phải mô tả đầy đủ schema đang chạy.
 
 Theo `docs/English Learning System/Requirements/Business_model.md` ("Chia bài tập ngữ pháp thành bài tập đọc hiểu và bài
 tập viết", "Dịch vụ AI chấm câu viết của bài tập viết") và thiết kế `Design/schema.sql` (`tbl_reading_passage`,

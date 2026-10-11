@@ -33,7 +33,7 @@ public class ExerciseMapper {
                 lesson.getCefrLevel(), lesson.getDifficulty(), lesson.getEstimatedMinutes(),
                 questions.stream().map(question -> new ExerciseDetailResponse.Question(
                         question.getId(), question.getQuestionType(), question.getPrompt(), question.getHintText(),
-                        question.getPoints(), options.getOrDefault(question.getId(), List.of()).stream()
+                        question.getPoints(), question.getStarterText(), options.getOrDefault(question.getId(), List.of()).stream()
                                 .map(option -> new ExerciseDetailResponse.Option(
                                         option.getId(), option.getOptionKey(), option.getOptionText()))
                 .toList())).toList(),

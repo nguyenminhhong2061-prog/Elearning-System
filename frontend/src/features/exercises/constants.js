@@ -33,17 +33,18 @@ export function skillPath(skill) {
 }
 
 /**
- * The three kinds of writing question (scenario 10): their tag, and the line put before the prompt, which holds only
+ * Writing question kinds (scenario 10): their tag, and the line put before the prompt, which holds only
  * the sentence to translate, the sentence to rewrite or the keywords.
  */
 export const WRITING_TYPES = Object.freeze({
   TRANSLATION: { label: 'Dịch câu', instruction: 'Dịch sang tiếng Anh:' },
+  PARAGRAPH_TRANSLATION: { label: 'Dịch đoạn văn', instruction: 'Dịch đoạn văn sau sang tiếng Việt:' },
   REWRITE: { label: 'Viết lại câu', instruction: 'Viết lại câu sao cho nghĩa không đổi:' },
   KEYWORD_SENTENCE: { label: 'Viết câu theo từ khóa', instruction: 'Viết một câu có dùng các từ gợi ý:' },
 })
 
 /** Longest writing answer the API takes. */
-export const MAX_WRITING_LENGTH = 1000
+export const MAX_WRITING_LENGTH = 5000
 
 export function lessonPath(lessonId) {
   return `${EXERCISES_PATH}/lessons/${lessonId}`

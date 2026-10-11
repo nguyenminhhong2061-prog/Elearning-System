@@ -62,6 +62,55 @@ describe('writing lessons', () => {
 })
 
 describe('writing exercise', () => {
+  it('supports paragraph translation and shows rubric, suggested translation, and specific corrections', async () => {
+    const submitted = 'Thời tiết thay đổi nhiều ở nước tôi. Chúng tôi có bốn mùa.'
+    const translationAssessment = {
+      level: 'Rất tốt',
+      criteria: [
+        { name: 'Độ chính xác ngữ nghĩa', scorePercent: 98, comment: 'Truyền đạt đầy đủ và chính xác ý nghĩa.' },
+        { name: 'Văn phong và sự trôi chảy', scorePercent: 96, comment: 'Diễn đạt tự nhiên, mạch lạc.' },
+      ],
+      suggestedTranslation: 'Thời tiết ở đất nước tôi thay đổi rất nhiều. Chúng tôi có bốn mùa rõ rệt.',
+      suggestions: ['Có thể lược bỏ từ “thường” để bám sát câu gốc hơn.'],
+      errors: [{ sourcePhrase: 'People go to the beach', learnerVersion: 'Mọi người thường ra bãi biển', correction: 'Mọi người ra bãi biển', explanation: 'Câu gốc không dùng trạng từ often.' }],
+    }
+    const graded = {
+      questionId: 351, graded: true, correct: null, answer: submitted, optionId: null,
+      awardedPoints: 98, maxPoints: 100, feedback: 'Bản dịch rất tốt và đầy đủ.', sampleAnswers: [], explanation: null,
+      translationAssessment,
+    }
+    const completed = {
+      attemptId: ATTEMPT_ID, lessonId: 35, correctCount: 0, questionCount: 1,
+      earnedPoints: 98, totalPoints: 100, scorePercent: 98, bestScorePercent: 98, isPersonalBest: true,
+      review: [graded], translations: [], pronunciation: null,
+    }
+    app = renderApp('/exercises/lessons/35', baseRoutes({
+      'POST /api/exercise-attempts/55/responses': () => ({ data: graded }),
+      'POST /api/exercise-attempts/55/complete': () => ({ data: completed }),
+    }))
+    const user = userEvent.setup()
+
+    expect(await screen.findByText('Dịch đoạn văn')).toBeInTheDocument()
+    expect(screen.getByText('Dịch đoạn văn sau sang tiếng Việt:')).toBeInTheDocument()
+    const box = screen.getByRole('textbox', { name: 'Câu trả lời của bạn' })
+    expect(box).toHaveAttribute('lang', 'vi')
+    expect(box).toHaveAttribute('rows', '10')
+    await user.type(box, submitted)
+    await user.click(screen.getByRole('button', { name: 'Kiểm tra' }))
+
+    expect(await screen.findByText('Điểm 98/100')).toBeInTheDocument()
+    expect(screen.getByText('Đánh giá theo tiêu chí · Rất tốt')).toBeInTheDocument()
+    expect(screen.getByText('Độ chính xác ngữ nghĩa')).toBeInTheDocument()
+    expect(screen.getByText(translationAssessment.suggestedTranslation)).toBeInTheDocument()
+    expect(screen.getByText('Các lỗi cần chú ý')).toBeInTheDocument()
+    expect(screen.getByText('Mọi người ra bãi biển')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Xem kết quả' }))
+    expect(await screen.findByRole('heading', { name: 'Hoàn thành bài tập' })).toBeInTheDocument()
+    const [item] = screen.getByRole('heading', { name: 'Xem lại từng câu' }).closest('section').querySelectorAll('li')
+    await user.click(within(item).getByRole('button', { name: 'Xem chi tiết' }))
+    expect(within(item).getByText('Gợi ý cải thiện')).toBeVisible()
+  })
+
   it('sends each answer to the AI and shows its points, feedback and sample answers (scenario 10, steps 4 to 14)', async () => {
     let finishGrading
     app = renderApp(

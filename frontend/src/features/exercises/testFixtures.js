@@ -144,6 +144,20 @@ export const WRITING_LESSON = {
   ],
 }
 
+export const PARAGRAPH_WRITING_LESSON = {
+  ...lessonFields({ id: 35, skill: 'WRITING', title: 'Dịch đoạn văn: Bốn mùa', description: null, topic: 'Thời tiết và các mùa', cefrLevel: 'B1', difficulty: 'MEDIUM', estimatedMinutes: 12 }),
+  questions: [{
+    id: 351,
+    type: 'PARAGRAPH_TRANSLATION',
+    prompt: 'The weather changes a lot in my country. We have four distinct seasons.',
+    hint: 'Ưu tiên truyền đạt đầy đủ ý và diễn đạt tự nhiên.',
+    points: 100,
+    options: [],
+    passageId: null,
+    starter: null,
+  }],
+}
+
 /** What the AI says about each writing question in these tests, once it has graded the answer. */
 export const WRITING_GRADES = {
   41: {
@@ -231,11 +245,13 @@ export function baseRoutes(overrides = {}) {
     'GET /api/exercises/3': () => ({ data: READING_LESSON }),
     'GET /api/exercises/8': () => ({ data: PASSAGE_LESSON }),
     'GET /api/exercises/33': () => ({ data: WRITING_LESSON }),
+    'GET /api/exercises/35': () => ({ data: PARAGRAPH_WRITING_LESSON }),
     'GET /api/exercises/11': () => ({ data: LISTENING_LESSON }),
     'GET /api/exercises/21': () => ({ data: PRONUNCIATION_LESSON }),
     'POST /api/exercises/3/attempts': () => ({ status: 201, data: { attemptId: ATTEMPT_ID + attemptNumber++, startedAt: '2026-09-26T02:00:00Z' } }),
     'POST /api/exercises/8/attempts': () => ({ status: 201, data: { attemptId: ATTEMPT_ID, startedAt: '2026-09-26T02:00:00Z' } }),
     'POST /api/exercises/33/attempts': () => ({ status: 201, data: { attemptId: ATTEMPT_ID + attemptNumber++, startedAt: '2026-09-26T02:00:00Z' } }),
+    'POST /api/exercises/35/attempts': () => ({ status: 201, data: { attemptId: ATTEMPT_ID + attemptNumber++, startedAt: '2026-09-26T02:00:00Z' } }),
     'POST /api/exercises/11/attempts': () => ({ status: 201, data: { attemptId: ATTEMPT_ID, startedAt: '2026-09-26T02:00:00Z' } }),
     'POST /api/exercises/21/attempts': () => ({ status: 201, data: { attemptId: ATTEMPT_ID, startedAt: '2026-09-26T02:00:00Z' } }),
     [`POST /api/exercise-attempts/${ATTEMPT_ID}/responses`]: ({ body }) =>
