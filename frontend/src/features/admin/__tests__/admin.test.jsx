@@ -529,8 +529,70 @@ describe('test administration', () => {
       status: 'VISIBLE',
       materials: [{ type: 'READING', title: null, audioUrl: null, text: 'Lan packed her luggage the night before her flight.' }],
     })
-    expect(body.questions[0]).toMatchObject({ vocabularyId: 105, materialIndex: 0, type: 'MULTIPLE_CHOICE' })
+    // The question starts at the level of the word it was made from (A2 in the mock word bank).
+    expect(body.questions[0]).toMatchObject({ vocabularyId: 105, materialIndex: 0, type: 'MULTIPLE_CHOICE', level: LUGGAGE.difficultyLevel, referenceText: '' })
     expect(body.questions[0].options.filter((option) => option.correct)).toEqual([{ text: 'luggage', correct: true }])
+  })
+
+  it('edits the level of a question, the sentence of a read-aloud question and the transcript of a recording', async () => {
+    const readAloud = {
+      id: 1002,
+      skill: 'SPEAKING',
+      type: 'SPEAKING',
+      points: 3,
+      level: 'B1',
+      referenceText: 'My sister works in a small hospital.',
+      audioUrl: null,
+      content: 'Read the sentence aloud.',
+      options: [],
+      acceptedAnswers: [],
+      vocabularyId: null,
+      materialId: null,
+    }
+    const draft = detail({
+      ...week40,
+      id: 101,
+      status: 'DRAFT',
+      submissions: 0,
+      averageScore: null,
+      materials: [{ id: 801, type: 'LISTENING', title: 'At the airport', audioUrl: '/media/tests/airport.mp3', text: null, transcript: 'Flight VN209 is boarding.' }],
+      questions: [{ ...question, level: 'A2', referenceText: null }, readAloud],
+    })
+    renderAdmin('/admin/tests/101', {
+      'GET /api/admin/tests/101': () => ({ data: draft }),
+      'PUT /api/admin/tests/101': ({ body }) => ({ data: { ...draft, ...body } }),
+    })
+    const user = userEvent.setup()
+
+    const first = (await screen.findByRole('heading', { name: 'Câu 1' })).closest('article')
+    expect(within(first).getByLabelText('Bậc CEFR')).toHaveValue('A2')
+    await user.selectOptions(within(first).getByLabelText('Bậc CEFR'), 'B2')
+
+    // A speaking question with a sentence to read is read aloud, not graded by the AI.
+    expect(screen.getByText(/Đọc theo mẫu · 3 điểm · bậc B1/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Sửa câu 2' }))
+    const second = screen.getByRole('heading', { name: 'Câu 2' }).closest('article')
+    expect(within(second).getByRole('button', { name: 'Đọc theo mẫu' })).toHaveAttribute('aria-pressed', 'true')
+    const sentence = within(second).getByLabelText('Câu mẫu *')
+    expect(sentence).toHaveValue('My sister works in a small hospital.')
+    await user.clear(sentence)
+    await user.click(screen.getByRole('button', { name: 'Lưu đề' }))
+    expect(await screen.findByText('Vui lòng nhập câu mẫu để người học đọc.')).toBeInTheDocument()
+    await fill(user, sentence, 'The train leaves at half past seven.')
+
+    const recording = screen.getByRole('article', { name: 'At the airport' })
+    const transcript = within(recording).getByLabelText('Lời thoại (không bắt buộc)')
+    expect(transcript).toHaveValue('Flight VN209 is boarding.')
+    await user.clear(transcript)
+    expect(within(recording).getByLabelText('Hoặc dán đường dẫn audio')).toHaveValue('/media/tests/airport.mp3')
+
+    await user.click(screen.getByRole('button', { name: 'Lưu đề' }))
+    await waitFor(() => expect(callsTo('PUT /api/admin/tests/101')).toHaveLength(1))
+    const body = callsTo('PUT /api/admin/tests/101')[0].body
+    // An empty transcript clears the stored one; a question that is not read aloud sends an empty sentence.
+    expect(body.materials[0]).toMatchObject({ id: 801, audioUrl: '/media/tests/airport.mp3', transcript: '' })
+    expect(body.questions[0]).toMatchObject({ id: 1001, level: 'B2', referenceText: '' })
+    expect(body.questions[1]).toMatchObject({ id: 1002, type: 'SPEAKING', level: 'B1', referenceText: 'The train leaves at half past seven.' })
   })
 
   it('dates a comprehensive test and asks for its four skills (scenario 24, branches 5a and 9b)', async () => {
@@ -545,7 +607,7 @@ describe('test administration', () => {
     await user.click(screen.getByRole('button', { name: 'Nói (AI chấm)' }))
     const speaking = screen.getByRole('heading', { name: 'Câu 1' }).closest('article')
     expect(within(speaking).getByRole('button', { name: 'Trắc nghiệm' })).toBeDisabled()
-    expect(within(speaking).getByText(/theo thang 10/)).toBeInTheDocument()
+    expect(within(speaking).getByText(/theo 4 tiêu chí/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Lưu đề' }))
 
     expect(await screen.findByText('Đề tổng hợp cần đủ 4 kỹ năng: còn thiếu Nghe, Đọc, Viết.')).toBeInTheDocument()

@@ -556,8 +556,8 @@ Toàn bộ giao diện bài viết là **[Đề xuất]**. Nó dùng lại khung
 10. Lan click nút "Nộp bài" ở câu 10.
 11. Hộp thoại "Nộp bài kiểm tra?" hiện ra: "Bạn còn 1 câu chưa trả lời (câu 7) **[Đề xuất: nêu số thứ tự câu]**. Câu bỏ trống được tính 0 điểm."
 12. Lan click nút "Nộp bài" trong hộp thoại.
-13. Hệ thống chấm tự động tất cả các câu, chuyển lượt làm bài sang trạng thái đã chấm với tổng điểm 8/10 và cộng 1 bài kiểm tra hoàn thành vào tiến độ ngày.
-14. Trang "Kết quả kiểm tra" hiện ra ngay với: tổng điểm 8/10 và dòng "Đúng 8/10 câu · 8/10 điểm"; khối "Xem lại bài làm" liệt kê từng câu với đề bài, dòng "Bạn trả lời: …", dòng "Đáp án đúng: …" và nhãn "Đúng" hoặc điểm của câu; cuối trang là các nút "← Về danh sách bài kiểm tra", "Làm lại" và "Xem kế hoạch cá nhân →":
+13. Hệ thống chấm tự động tất cả các câu, chuyển lượt làm bài sang trạng thái đã chấm với tổng điểm 80/100 (đúng 8/10 câu, mỗi câu 1 điểm) và cộng 1 bài kiểm tra hoàn thành vào tiến độ ngày.
+14. Trang "Kết quả kiểm tra" hiện ra ngay với: tổng điểm 80/100 và dòng "Đúng 8/10 câu · 8/10 điểm"; khối "Xem lại bài làm" liệt kê từng câu với đề bài, dòng "Bạn trả lời: …", dòng "Đáp án đúng: …" và nhãn "Đúng" hoặc điểm của câu; cuối trang là các nút "← Về danh sách bài kiểm tra", "Làm lại" và "Xem kế hoạch cá nhân →":
 
 | Câu | Câu hỏi (rút gọn) | Câu trả lời của Lan | Đáp án đúng | Điểm |
 |---|---|---|---|---|
@@ -594,32 +594,38 @@ Toàn bộ giao diện bài viết là **[Đề xuất]**. Nó dùng lại khung
 | 1 | Kiểm tra tổng hợp tháng 10/2026 | 23 câu · Còn 25 ngày · Chưa làm lần nào | 01/10/2026 | 31/10/2026 | 0 |
 
 3. Lan click nút "Bắt đầu" ở thẻ "Kiểm tra tổng hợp tháng 10/2026".
-4. Màn giới thiệu đề hiện ra với: tên đề; dòng "23 câu … · Kỹ năng: Nghe, Nói, Đọc, Viết"; bảng cấu trúc đề theo phần **[Đề xuất]**: phần nghe 10 câu trắc nghiệm, phần nói 2 đề bài (ghi âm, tối đa 1 phút mỗi đề), phần đọc 10 câu trắc nghiệm, phần viết 1 đề bài (120–150 từ), mỗi kỹ năng chấm theo thang 10; danh sách lưu ý có sẵn, gồm "Kết quả bài này xác định lại trình độ CEFR của bạn."; nút "Bắt đầu".
+4. Màn giới thiệu đề hiện ra với: tên đề; dòng "23 câu … · Kỹ năng: Nghe, Nói, Đọc, Viết"; bảng cấu trúc đề theo phần **[Đề xuất]**: phần nghe 10 câu trắc nghiệm, phần nói 2 câu (1 câu đọc theo câu mẫu trả lời bằng ghi âm, 1 đề bài nói), phần đọc 10 câu trắc nghiệm, phần viết 1 đề bài (120–150 từ); mỗi câu hỏi được gắn một bậc CEFR, mỗi kỹ năng có điểm trên thang 100 và một trình độ; danh sách lưu ý có sẵn, gồm "Mỗi bài nghe được nghe tối đa 2 lần.", "Kết quả bài này xác định lại trình độ CEFR của bạn." và "Bài này chỉ làm được một lần: sau khi nộp bạn không làm lại được."; nút "Bắt đầu".
 5. Lan click nút "Bắt đầu". Hệ thống tạo lượt làm bài ở trạng thái đang làm. Giao diện làm bài (cùng giao diện của kịch bản 14) hiện câu 1 thuộc phần Nghe. Dãy nút số câu được chia theo phần: Nghe 1–10, Nói 11–12, Đọc 13–22, Viết 23 **[Đề xuất]**. Phía trên câu hỏi là trình phát bài nghe chung của phần, "Planning a weekend trip" **[Đề xuất: tài liệu chung của phần, dùng lại trình phát của bài nghe hiểu]**.
 6. Lan nghe, chọn đáp án cho câu 1–10, rồi click "Câu tiếp theo →" để sang phần Nói.
-7. Phần Nói gồm câu 11 "Introduce yourself and your hobbies." và câu 12 "Describe a place you would like to visit and explain why."; mỗi câu có nút micro ghi âm **[Đề xuất: dùng lại bộ ghi âm của bài phát âm, tối đa 1 phút, có nút "▶ Nghe lại giọng bạn"; hiện màn này là ô gõ chữ "Gõ câu bạn sẽ đọc (bản demo chưa thu âm)"]**.
-8. Lan ghi âm câu trả lời cho hai đề (45 giây và 58 giây) rồi click "Câu tiếp theo →".
+7. Phần Nói gồm hai câu. Câu 11 là câu đọc theo câu mẫu: lời dẫn "Read the sentence aloud." và câu mẫu "I usually travel to work by bus because it is cheaper than driving."; câu có nút "Ghi âm" (tối đa 15 giây), ghi xong có trình phát để nghe lại và nút "Ghi lại". Câu 12 là đề bài nói "Describe a place you would like to visit and explain why." với ô gõ câu trả lời. **Hạn chế hiện tại: câu nói theo đề bài chưa thu âm, người học gõ điều mình sẽ nói; chỉ câu đọc theo câu mẫu được ghi âm.**
+8. Lan ghi âm câu 11 (9 giây). Hệ thống gửi bản ghi đến Dịch vụ chấm phát âm ngay lúc đó và lưu kết quả chấm, không lưu file ghi âm; kết quả chỉ hiện sau khi nộp bài. Lan gõ câu trả lời cho câu 12 rồi click "Câu tiếp theo →".
 9. Phần Đọc hiện đoạn văn chung "Eco-tourism in Vietnam" phía trên các câu 13–22 **[Đề xuất: tài liệu chung của phần]**. Lan trả lời 10 câu rồi click "Câu tiếp theo →".
 10. Phần Viết hiện đề bài câu 23 "Write an email to a friend about your last holiday (120–150 words)." và ô "Bài viết của bạn" kèm bộ đếm số từ **[Đề xuất: bộ đếm số từ]**.
 11. Lan viết bài 136 từ rồi click nút "Nộp bài".
 12. Hộp thoại "Nộp bài kiểm tra?" hiện "Bạn đã trả lời tất cả các câu. Sau khi nộp, bạn không sửa được câu trả lời nữa." Lan click nút "Nộp bài".
-13. Hệ thống ghi thời gian nộp, chuyển lượt làm bài sang trạng thái đã nộp và chấm phần nghe (đúng 7/10 câu, được 7.0) và phần đọc (đúng 8/10 câu, được 8.0) theo đáp án. Hệ thống gửi hai bản ghi âm phần nói và bài viết đến Dịch vụ AI. Trang "Kết quả kiểm tra" hiện tiêu đề "Đang chấm phần Nói, Viết" và dòng "Phần trắc nghiệm, điền từ đã chấm xong. Phần Nói, Viết do AI chấm…".
-14. Dịch vụ AI trả về điểm và nhận xét cho từng câu: đề nói 1 được 6.0, đề nói 2 được 7.0 (nhận xét chung: "Phát âm rõ, còn ngập ngừng, vốn từ về du lịch còn hạn chế"); bài viết được 6.5 (nhận xét: "Bố cục email đúng, còn lỗi chia thì quá khứ: 'we go' → 'we went'").
-15. Hệ thống tính điểm phần nói bằng trung bình hai đề: (6.0 + 7.0) / 2 = 6.5; tính tổng điểm bằng trung bình bốn kỹ năng: (7.0 + 6.5 + 8.0 + 6.5) / 4 = 7.0. Sau đó hệ thống gửi điểm bốn kỹ năng cùng trình độ hiện tại A2 đến Dịch vụ AI.
-16. Dịch vụ AI trả về trình độ đề xuất B1 và lộ trình đề xuất: "12 tuần hướng tới B2: ưu tiên nói và viết; mỗi tuần 40–50 từ mới, 1 bài đọc hiểu, 2 bài viết, 2 bài nghe, 2 bài phát âm."
+13. Hệ thống ghi thời gian nộp, chuyển lượt làm bài sang trạng thái đã nộp và chấm phần nghe (đúng 7/10 câu, 70 điểm) và phần đọc (đúng 8/10 câu, 80 điểm) theo đáp án; câu 11 đã có điểm phát âm 72/100 từ lúc ghi âm. Hệ thống gửi câu trả lời của câu 12 và bài viết đến Dịch vụ AI. Trang "Kết quả kiểm tra" hiện tiêu đề "Đang chấm phần Nói, Viết" và dòng "Phần trắc nghiệm, điền từ đã chấm xong. Phần Nói, Viết do AI chấm…".
+14. Dịch vụ AI chấm mỗi câu theo bốn tiêu chí (đúng yêu cầu đề, mạch lạc, từ vựng, ngữ pháp), mỗi tiêu chí một mức từ 0 đến 6 (1 ứng với A1 … 6 ứng với C2), kèm nhận xét: câu 12 được 3, 3, 2, 3 (trung bình 2,75; nhận xét: "Ý rõ ràng, vốn từ về du lịch còn hạn chế"); bài viết được 3, 3, 3, 2 (trung bình 2,75; nhận xét: "Bố cục email đúng, còn lỗi chia thì quá khứ: 'we go' → 'we went'").
+15. Hệ thống tính điểm và trình độ của từng kỹ năng. Điểm kỹ năng (thang 100) là phần điểm đạt được trên tổng điểm các câu của kỹ năng. Trình độ kỹ năng không quy đổi từ điểm mà tính theo bậc của câu hỏi và mức AI chấm:
+    - Nghe: 70 điểm. Lan được từ 60% điểm các câu bậc A2 (4/4) và bậc B1 (2/3) nhưng không đạt bậc B2 (1/3) → B1.
+    - Đọc: 80 điểm. Đạt bậc A2 (4/4), B1 (2/3) và B2 (2/3) → B2.
+    - Nói: câu 11 (3 điểm) được 3 × 72/100 = 2,16; câu 12 (6 điểm) được 6 × 2,75/6 = 2,75; điểm kỹ năng (2,16 + 2,75)/9 = 55. Phát âm đạt bậc B1 của câu mẫu (72 ≥ 60) nên được tính như tiêu chí thứ năm ở mức 3: (4 × 2,75 + 3)/5 = 2,8 → B1.
+    - Viết: bài viết (6 điểm) được 2,75 → 46 điểm; mức trung bình 2,75 → B1.
+
+    Tổng điểm là trung bình bốn kỹ năng: (70 + 55 + 80 + 46)/4 = 63. Trình độ đề xuất là trung bình trình độ bốn kỹ năng (A1 = 1 … C2 = 6): (3 + 3 + 4 + 3)/4 = 3,25 → B1. Sau đó hệ thống gửi trình độ B1 cùng điểm bốn kỹ năng đến Dịch vụ AI để viết lộ trình.
+16. Dịch vụ AI trả về lộ trình đề xuất: "12 tuần hướng tới B2: ưu tiên nói và viết; mỗi tuần 40–50 từ mới, 1 bài đọc hiểu, 2 bài viết, 2 bài nghe, 2 bài phát âm."
 17. Hệ thống chuyển lượt làm bài sang trạng thái đã chấm, lưu điểm từng kỹ năng, tổng điểm, trình độ đề xuất và lộ trình đề xuất. Hệ thống cập nhật trình độ hiện tại của Lan từ A2 lên B1, thêm một bản ghi lịch sử trình độ (B1, lượt kiểm tra này, 06/10/2026) và cộng 1 bài kiểm tra hoàn thành vào tiến độ ngày.
 18. Trang "Kết quả kiểm tra" hiện báo cáo với:
     - Tên đề "Kiểm tra tổng hợp tháng 10/2026" và dòng **[Đề xuất]** "Người học: Trần Thị Lan · Ngày làm: 06/10/2026 · Trình độ trước khi làm bài: A2" (hiện chỉ có ghi chú "Trình độ của bạn đổi từ A2 thành B1." ngay sau khi nộp),
-    - Tổng điểm 7.0/10 và trình độ đề xuất B1,
+    - Tổng điểm 63/100 và trình độ đề xuất B1,
     - Khối "Lộ trình đề xuất" (như bước 16),
     - Bảng điểm theo kỹ năng; mỗi dòng có điểm và trình độ của kỹ năng, thêm cột nhận xét **[Đề xuất]**:
 
-| Kỹ năng | Điểm | Nhận xét |
-|---|---|---|
-| Nghe | 7.0 | Đúng 7/10 câu |
-| Nói | 6.5 | Phát âm rõ, còn ngập ngừng, vốn từ về du lịch còn hạn chế |
-| Đọc | 8.0 | Đúng 8/10 câu |
-| Viết | 6.5 | Bố cục email đúng, còn lỗi chia thì quá khứ |
+| Kỹ năng | Điểm | Trình độ | Nhận xét |
+|---|---|---|---|
+| Nghe | 70 | B1 | Đúng 7/10 câu |
+| Nói | 55 | B1 | Ý rõ ràng, vốn từ về du lịch còn hạn chế; phát âm câu mẫu 72/100 |
+| Đọc | 80 | B2 | Đúng 8/10 câu |
+| Viết | 46 | B1 | Bố cục email đúng, còn lỗi chia thì quá khứ |
 
    - Khối "Xem lại bài làm" (trích):
 
@@ -627,10 +633,10 @@ Toàn bộ giao diện bài viết là **[Đề xuất]**. Nó dùng lại khung
 |---|---|---|---|---|
 | 1 | Nghe | B | B | 1 |
 | 4 | Nghe | A | C | 0 |
-| 11 | Nói | Bản ghi 45 giây | – (AI chấm) | 6.0/10 |
-| 12 | Nói | Bản ghi 58 giây | – (AI chấm) | 7.0/10 |
+| 11 | Nói | Bản ghi âm câu mẫu | – (chấm phát âm 72/100) | 2,16/3 |
+| 12 | Nói | Câu trả lời đã gõ | – (AI chấm) | 2,75/6 |
 | 13 | Đọc | D | D | 1 |
-| 23 | Viết | Bài viết 136 từ | – (AI chấm) | 6.5/10 |
+| 23 | Viết | Bài viết 136 từ | – (AI chấm) | 2,75/6 |
 
    - Các nút "Áp dụng lộ trình vào kế hoạch học →" **[Đề xuất: thay nút "Xem kế hoạch cá nhân →" hiện có, mang theo lượt kiểm tra sang trang Kế hoạch]** và "← Về danh sách bài kiểm tra".
 
@@ -640,7 +646,7 @@ Toàn bộ giao diện bài viết là **[Đề xuất]**. Nó dùng lại khung
 
 - **2a.** Không có đề tổng hợp nào đang mở: khối "Kiểm tra tổng hợp" báo "Hiện chưa có bài kiểm tra tổng hợp nào đang mở" **[Đề xuất: như nhánh 4a của kịch bản 14]**.
 - **5a.** Lan đóng trình duyệt giữa chừng: lượt làm bài giữ trạng thái đang làm cùng các câu đã trả lời. Lần sau, thẻ đề ghi "Đang làm dở · đã trả lời …/23 câu" với nút "Làm tiếp"; Lan làm tiếp từ phần đang dở.
-- **7a.** Lan từ chối quyền micro ở phần nói: hệ thống hiện hướng dẫn cấp quyền như nhánh 6a của kịch bản 12. Nếu Lan vẫn bỏ qua phần nói, hai câu nói không có câu trả lời và được tính 0 điểm khi nộp.
+- **7a.** Lan từ chối quyền micro ở phần nói: hệ thống hiện hướng dẫn cấp quyền như nhánh 6a của kịch bản 12. Nếu Lan vẫn bỏ qua, câu 11 (đọc theo câu mẫu) không có câu trả lời và được tính 0 điểm khi nộp; câu 12 gõ văn bản nên không cần micro. Dịch vụ chấm phát âm không chạy thì bản ghi không được lưu và Lan gửi lại sau.
 - **12a.** Còn câu chưa trả lời: hộp thoại "Nộp bài kiểm tra?" nêu số câu chưa trả lời; nếu Lan vẫn nộp, các câu đó được tính 0 điểm.
 - **14a.** Dịch vụ AI lỗi hoặc quá thời gian khi chấm phần nói/viết: lượt làm bài giữ trạng thái đã nộp. Trang kết quả báo "Bài của bạn đang được chấm, kết quả sẽ có trong lịch sử kiểm tra" và Lan quay về trang "Kiểm tra". Hệ thống gửi chấm lại sau; khi có đủ điểm mới thực hiện bước 15–17. Trình độ hiện tại của Lan chưa thay đổi khi bài chưa chấm xong. Lan xem báo cáo sau ở khối **[Đề xuất]** "Lịch sử kiểm tra".
 - **16a.** Trình độ đề xuất trùng trình độ hiện tại: lượt kiểm tra vẫn được lưu đầy đủ nhưng hệ thống không thêm bản ghi lịch sử trình độ.
@@ -666,13 +672,13 @@ Toàn bộ giao diện bài viết là **[Đề xuất]**. Nó dùng lại khung
 
 | Tuần | Số từ đã học | Bài tập hoàn thành | Bài kiểm tra | Điểm TB kiểm tra | Thời gian học |
 |---|---|---|---|---|---|
-| 36 (31/08–06/09) | 18 | 2 | 1 | 5.5 | 180 phút |
-| 37 (07/09–13/09) | 20 | 3 | 1 | 6.0 | 210 phút |
-| 38 (14/09–20/09) | 15 | 2 | 1 | 6.5 | 150 phút |
-| 39 (21/09–27/09) | 17 | 4 | 1 | 7.0 | 200 phút |
-| 40 (28/09–04/10) | 14 | 3 | 1 | 7.0 | 170 phút |
-| 41 (05/10–06/10) | 5 | 4 | 2 | 7.5 | 95 phút |
-| **Tổng** | **89** | **18** | **7** | **6.7** | **1 005 phút** |
+| 36 (31/08–06/09) | 18 | 2 | 1 | 55 | 180 phút |
+| 37 (07/09–13/09) | 20 | 3 | 1 | 60 | 210 phút |
+| 38 (14/09–20/09) | 15 | 2 | 1 | 65 | 150 phút |
+| 39 (21/09–27/09) | 17 | 4 | 1 | 70 | 200 phút |
+| 40 (28/09–04/10) | 14 | 3 | 1 | 70 | 170 phút |
+| 41 (05/10–06/10) | 5 | 4 | 2 | 72 | 95 phút |
+| **Tổng** | **89** | **18** | **7** | **66** | **1 005 phút** |
 
 7. Khối "Thành tích" hiển thị hai phần. Phần "Đạt gần đây" (huy hiệu và ngày đạt):
 
@@ -948,17 +954,17 @@ Kịch bản chuẩn đi theo chức năng thêm một đề kiểm tra định 
 4. Trang "Đề kiểm tra mới" hiện ra với: ô "Tên đề *", lựa chọn "Loại đề" (Định kỳ / Tổng hợp 4 kỹ năng), ô **[Đề xuất]** "Kỹ năng" (nội dung của đề), ô "Ngày mở *", ô "Ngày đóng *" (dd/mm/yyyy); danh sách câu hỏi (đang trống) với hai nút "+ Thêm câu hỏi" và **[Đề xuất]** "Thêm câu hỏi từ kho từ vựng"; lựa chọn cách mở đề "Mở theo lịch" ("Hiện với người học từ ngày mở đến hết ngày đóng."); nút "Lưu đề".
 5. Hùng nhập tên đề "Kiểm tra tuần 42 – 2026", chọn loại "Định kỳ", kỹ năng "Từ vựng và ngữ pháp", ngày mở 12/10/2026, ngày đóng 18/10/2026.
 6. Hùng click nút "Thêm câu hỏi từ kho từ vựng", tìm từ "customs" và chọn từ này. Hệ thống tạo sẵn một câu trắc nghiệm liên kết với từ "customs": nội dung "___ officers checked our bags at the airport.", đáp án đúng "Customs" và ba lựa chọn nhiễu lấy từ các từ khác cùng chủ đề (luggage, departure, itinerary). Hùng giữ nội dung, đặt điểm 1 và thêm câu vào đề.
-7. Hùng thêm tiếp 9 câu trắc nghiệm và điền từ bằng nút "+ Thêm câu hỏi" (mỗi câu có "Kỹ năng", "Cách chấm" Trắc nghiệm / Điền từ, "Điểm", "Đề bài *"), theo cách thêm câu hỏi ở kịch bản 23.
+7. Hùng thêm tiếp 9 câu trắc nghiệm và điền từ bằng nút "+ Thêm câu hỏi" (mỗi câu có "Kỹ năng", "Cách chấm" Trắc nghiệm / Điền từ, "Điểm", "Bậc CEFR", "Đề bài *"), theo cách thêm câu hỏi ở kịch bản 23. Câu tạo từ kho từ vựng nhận sẵn bậc của từ; bậc của câu hỏi dùng để xếp trình độ người học (kịch bản 15, bước 15).
 8. Hùng chọn "Mở theo lịch" rồi click nút "Lưu đề".
 9. Hệ thống kiểm tra: tiêu đề không trống, ngày đóng sau ngày mở, đề có ít nhất một câu hỏi, mỗi câu có đáp án đúng. Dữ liệu hợp lệ nên hệ thống lưu đề (mã 44) cùng 10 câu hỏi.
 10. Thông báo "Đã lưu" hiện ở góc màn hình. Bảng có thêm dòng mã 44 với trạng thái "Sắp mở". Đề hiện trong danh sách đề đang mở của người học từ 12/10/2026 đến hết 18/10/2026.
 
 **Kịch bản ngoại lệ**
 
-- **2a.** Sửa đề đã có lượt làm (ví dụ đề 41 đã có 150 lượt): trang đề báo "Đề đã có 150 bài nộp: chỉ sửa được tên đề, ngày đóng…"; hệ thống chỉ cho sửa tiêu đề và ngày đóng, không cho thêm, sửa hay xóa câu hỏi **[Đề xuất: khóa luôn lời văn câu hỏi, hiện vẫn sửa được]**, để điểm của các lượt đã làm luôn thống nhất. Đề chưa có lượt làm nào được sửa đầy đủ như bước 4–9.
+- **2a.** Sửa đề đã có lượt làm (ví dụ đề 41 đã có 150 lượt): trang đề báo "Đề đã có 150 bài nộp: chỉ sửa được tên đề, ngày đóng…"; hệ thống chỉ cho sửa tiêu đề, ngày đóng và trạng thái hiện/ẩn, không cho thêm, sửa hay xóa câu hỏi (kể cả lời văn câu hỏi), để điểm của các lượt đã làm luôn thống nhất. Đề chưa có lượt làm nào được sửa đầy đủ như bước 4–9.
 - **2b.** Xóa đề: nếu đề đã có lượt làm, hệ thống cảnh báo và chỉ ẩn đề, lịch sử kiểm tra của người học giữ nguyên; nếu chưa có lượt làm, đề bị xóa hẳn sau khi Hùng xác nhận (cùng mẫu hộp thoại xóa bài tập ở nhánh 2b của kịch bản 23).
 - **2c.** Nhân bản đề: Hùng click "Nhân bản" ở dòng của một đề, hoặc nút "Nhân bản đề tuần … thành tuần …" ở khối nhắc "Chưa có đề định kỳ cho tuần …" khi tuần tới chưa có đề. Hộp thoại "Nhân bản “…”" hiện ô "Tên đề mới *", "Ngày mở *", "Ngày đóng *" (điền sẵn cho tuần kế tiếp) và nút "Tạo bản nháp". Hệ thống tạo đề mới ở trạng thái "Nháp" với toàn bộ câu hỏi của đề gốc (không chép bài nộp), báo "Đã tạo bản nháp" và mở trang của đề mới; Hùng sửa nếu cần rồi chọn "Mở theo lịch" và lưu như bước 8–10.
-- **5a.** Thêm đề loại "Tổng hợp 4 kỹ năng": đề phải có câu hỏi của đủ bốn kỹ năng nghe, nói, đọc, viết, và có ngày mở, ngày đóng như đề định kỳ **[Đề xuất: hiện đề tổng hợp "luôn mở", không có ngày]**. Câu nghe phải có file âm thanh (ô "Âm thanh của câu", hoặc **[Đề xuất]** bài nghe chung của phần); câu nói và câu viết chọn cách chấm "Tự luận (AI chấm)", không có đáp án đúng.
+- **5a.** Thêm đề loại "Tổng hợp 4 kỹ năng": đề phải có câu hỏi của đủ bốn kỹ năng nghe, nói, đọc, viết, và có ngày mở, ngày đóng như đề định kỳ. Câu nghe phải có file âm thanh (ô "Âm thanh của câu", hoặc bài nghe chung của phần, kèm ô "Lời thoại" hiện cho người học sau khi nộp bài). Câu viết chọn cách chấm "Tự luận (AI chấm)". Câu nói chọn "Tự luận (AI chấm)" (đề bài nói, người học gõ câu trả lời) hoặc "Đọc theo mẫu" (admin nhập "Câu mẫu *", người học ghi âm, hệ thống chấm phát âm); cả hai không có đáp án đúng.
 - **9a.** Ngày đóng không sau ngày mở: dưới ô ngày đóng hiện lỗi "Ngày đóng phải sau ngày mở." và hệ thống không lưu.
 - **9b.** Đề tổng hợp thiếu câu hỏi của một kỹ năng: hệ thống báo "Đề tổng hợp cần đủ 4 kỹ năng: còn thiếu …" và không lưu.
 
@@ -1092,6 +1098,6 @@ Khi viết kịch bản chi tiết, một số quy tắc chưa có trong Busines
 5. **Nội dung đã có người dùng:** đề đã có lượt làm chỉ được sửa tiêu đề và ngày đóng; sửa đáp án bài tập không chấm lại các lượt cũ; không xóa chủ đề còn từ vựng; từ người học tự nhập chỉ người đó nhìn thấy.
 6. **Trò chơi:** tham số ván chơi (số câu, thời gian, điểm mỗi câu) là cố định trong hệ thống; kết quả trò chơi không ảnh hưởng lịch ôn.
 7. **Nghe hiểu:** phụ đề tạm ẩn khi người học trả lời câu hỏi.
-8. **Điểm kiểm tra:** mọi điểm quy về thang 10; điểm phần nói là trung bình các đề nói; tổng điểm kiểm tra tổng hợp là trung bình bốn kỹ năng.
+8. **Điểm kiểm tra:** điểm mỗi kỹ năng và tổng điểm theo thang 100; tổng điểm kiểm tra tổng hợp là trung bình bốn kỹ năng. **Trình độ không quy đổi từ điểm** (sửa ngày 13/10/2026, thay cho "mọi điểm quy về thang 10"): mỗi câu hỏi gắn một bậc CEFR; kỹ năng Nghe, Đọc đạt một bậc khi được từ 60% điểm các câu bậc đó và mọi bậc dưới nó; kỹ năng Nói, Viết lấy mức Dịch vụ AI chấm theo bốn tiêu chí (mỗi tiêu chí 0–6), điểm phát âm của câu đọc theo câu mẫu là tiêu chí thứ năm của kỹ năng Nói; trình độ đề xuất là trung bình trình độ bốn kỹ năng. Kỹ năng không có câu nào gắn bậc thì quy đổi theo điểm. Chi tiết ở `docs/api/tests.md`, mục "Đánh giá trình độ".
 9. **Kế hoạch học:** nhắc nhở vào 8:00 thứ Hai đầu mỗi tuần; khi áp dụng lộ trình mới trong lúc đang có kế hoạch đang thực hiện, kế hoạch cũ chuyển sang tạm dừng.
 10. **Bài tập viết** (kịch bản 10): Dịch vụ AI chấm theo thang điểm của từng câu, từ 0 đến điểm tối đa, bước 0,5. Mỗi câu viết chỉ được chấm một lần trong một lượt; muốn viết lại thì làm lại bài (lượt mới). Khi AI chưa chấm được một câu, người học vẫn chuyển sang câu tiếp theo được; lượt làm bài giữ trạng thái đang làm và chưa được tính vào tiến độ cho đến khi mọi câu có điểm. Sửa câu trả lời mẫu không chấm lại các lượt cũ.

@@ -195,6 +195,11 @@ Module dùng: Hỏi chatbot AI hỗ trợ giải thích bài tập (B4).
 ## tests
 
 - id BIGINT UNSIGNED PK, title, type ENUM(PERIODIC, COMPREHENSIVE), skill, start_date, end_date
+- status ENUM(DRAFT, VISIBLE, HIDDEN) DEFAULT VISIBLE (thêm ở migration V202610112215): người học chỉ thấy đề VISIBLE
+  đang trong khoảng ngày mở–đóng; đề tạo từ trang soạn đề mặc định DRAFT (do service đặt)
+- skill_text VARCHAR(200) nullable, instruction TEXT nullable (thêm ở migration V202610112215): nội dung của đề và
+  hướng dẫn làm bài do admin gõ. Cột skill ở trên lưu một kỹ năng dạng enum nên không dùng cho chữ tự do
+- duplicated_from_id FK→tests.id nullable, ON DELETE SET NULL (thêm ở migration V202610112215): đề gốc của bản nhân bản
 
 ## test_questions (đổi tên từ "questions" — đã chốt)
 
@@ -206,6 +211,8 @@ Module dùng: Hỏi chatbot AI hỗ trợ giải thích bài tập (B4).
   đứng riêng
 - reference_text TEXT nullable (thêm ở migration V202610052251): câu mẫu của câu Nói "đọc theo câu mẫu", trả lời bằng
   ghi âm; NULL với mọi câu khác
+- sort_order INT DEFAULT 0 (thêm ở migration V202610112215): thứ tự câu trong đề theo trang soạn đề; câu cùng thứ tự
+  xếp theo id
 
 ## test_passages (thêm ở migration V202610032151)
 

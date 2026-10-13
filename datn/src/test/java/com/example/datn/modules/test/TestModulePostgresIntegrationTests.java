@@ -65,6 +65,13 @@ class TestModulePostgresIntegrationTests extends AbstractPostgresIntegrationTest
                         List.of(new PronunciationDetails.WordError("shared", "ʃɛrd", "ʃɛd")))));
     }
 
+    @BeforeEach
+    void seededComprehensiveTestsAreOpen() {
+        // They are dated October 2026 (V202610122125): whenever the suite runs, learners can still take them.
+        jdbcTemplate.update(
+                "update tests set end_date = greatest(end_date, now() + interval '1 day') where id in (200, 201)");
+    }
+
     @Test
     void periodicTestGradesAndStoresUpperCaseEnumsAndJsonb() throws Exception {
         Account account = registerAndLogin();

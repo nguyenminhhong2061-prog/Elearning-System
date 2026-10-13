@@ -77,4 +77,12 @@ public class TestPassage {
     public boolean hasAudio() {
         return audioUrl != null;
     }
+
+    /** Rewrites the passage as the admin editor saved it. */
+    public void edit(String title, String content, String audioUrl, String transcript) {
+        this.title = title;
+        this.content = content;
+        this.audioUrl = audioUrl;
+        this.transcript = transcript;
+    }
 }

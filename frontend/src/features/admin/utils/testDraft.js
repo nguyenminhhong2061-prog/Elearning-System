@@ -5,24 +5,26 @@ import { isoWeek, parseTypedDate } from './format'
 
 // Test drafts of the admin editor (docs/api/admin.md, "Đề kiểm tra"). A question has a skill and a type, as in the
 // design: multiple choice, fill-in, or graded by the AI (SPEAKING for spoken answers, ESSAY for written ones). The
-// editor shows the type as a grading mode (`mode`). A question using a shared material holds the material's draft key
-// (`materialKey`); the body turns it into the material's place in the list (`materialIndex`).
+// editor shows the type as a grading mode (`mode`). A speaking question with a sentence to read (`referenceText`) is
+// read aloud and scored on pronunciation, not by the AI: mode READ. A question using a shared material holds the
+// material's draft key (`materialKey`); the body turns it into the material's place in the list (`materialIndex`).
 
 export const SKILLS = ['LISTENING', 'SPEAKING', 'READING', 'WRITING']
 
-/** Grading modes each skill allows: listening and reading are never graded by the AI, speaking always is. */
+/** Grading modes each skill allows: listening and reading are never graded by the AI, speaking is never typed. */
 export const MODES_BY_SKILL = {
   LISTENING: ['CHOICE', 'TEXT'],
-  SPEAKING: ['AI'],
+  SPEAKING: ['AI', 'READ'],
   READING: ['CHOICE', 'TEXT'],
   WRITING: ['CHOICE', 'TEXT', 'AI'],
 }
 
 const MODE_OF_TYPE = { MULTIPLE_CHOICE: 'CHOICE', FILL_BLANK: 'TEXT', SPEAKING: 'AI', ESSAY: 'AI' }
-export const modeOf = (question) => MODE_OF_TYPE[question.type]
+export const modeOf = (question) => (question.type === 'SPEAKING' && question.referenceText ? 'READ' : MODE_OF_TYPE[question.type])
 
 /** The API's question type for a skill and a grading mode. */
 export function typeFor(skill, mode) {
+  if (mode === 'READ') return 'SPEAKING'
   if (mode === 'AI') return skill === 'SPEAKING' ? 'SPEAKING' : 'ESSAY'
   return mode === 'CHOICE' ? 'MULTIPLE_CHOICE' : 'FILL_BLANK'
 }
@@ -36,6 +38,7 @@ export const TEMPLATES = [
   { id: 'blank', label: 'Điền từ', skill: 'WRITING', mode: 'TEXT' },
   { id: 'listening', label: 'Nghe', skill: 'LISTENING', mode: 'CHOICE' },
   { id: 'speaking', label: 'Nói (AI chấm)', skill: 'SPEAKING', mode: 'AI' },
+  { id: 'readAloud', label: 'Nói (đọc theo mẫu)', skill: 'SPEAKING', mode: 'READ' },
   { id: 'essay', label: 'Viết tự luận (AI chấm)', skill: 'WRITING', mode: 'AI' },
 ]
 
@@ -45,9 +48,11 @@ export function newTestQuestion(template) {
     skill: template.skill,
     type: typeFor(template.skill, template.mode),
     mode: template.mode,
-    points: template.mode === 'AI' ? 5 : 1,
+    points: { AI: 5, READ: 3 }[template.mode] ?? 1,
+    level: '',
     audioUrl: '',
-    content: '',
+    content: template.mode === 'READ' ? 'Read the sentence aloud.' : '',
+    referenceText: '',
     options: template.mode === 'CHOICE' ? [blankOption(), blankOption(), blankOption(), blankOption()] : [],
     acceptedAnswers: template.mode === 'TEXT' ? [''] : [],
     vocabularyId: null,
@@ -61,13 +66,15 @@ export function wordQuestionDraft(question) {
     ...question,
     key: newKey(),
     mode: modeOf(question),
+    level: question.level ?? '',
+    referenceText: '',
     audioUrl: question.audioUrl ?? '',
     options: question.options.map((option) => ({ ...option, key: newKey() })),
     materialKey: null,
   }
 }
 
-export const newMaterial = (type) => ({ key: newKey(), type, title: '', audioUrl: '', text: '' })
+export const newMaterial = (type) => ({ key: newKey(), type, title: '', audioUrl: '', text: '', transcript: '' })
 
 export const MATERIAL_KINDS = { LISTENING: 'Bài nghe', READING: 'Bài đọc' }
 
@@ -91,9 +98,17 @@ export function editableTest(test) {
     instruction: test.instruction ?? '',
     startText: typed(test.startDate),
     endText: typed(test.endDate),
-    materials: (test.materials ?? []).map((material) => ({ ...material, title: material.title ?? '', audioUrl: material.audioUrl ?? '', text: material.text ?? '' })),
+    materials: (test.materials ?? []).map((material) => ({
+      ...material,
+      title: material.title ?? '',
+      audioUrl: material.audioUrl ?? '',
+      text: material.text ?? '',
+      transcript: material.transcript ?? '',
+    })),
     questions: test.questions.map(({ materialId, ...question }) => ({
       ...question,
+      level: question.level ?? '',
+      referenceText: question.referenceText ?? '',
       audioUrl: question.audioUrl ?? '',
       vocabularyId: question.vocabularyId ?? null,
       mode: modeOf(question),
@@ -190,6 +205,7 @@ export function validateTest(draft) {
     const errors = {}
     if (!question.content.trim()) errors.content = 'Vui lòng nhập đề bài.'
     if (!Number.isInteger(question.points) || question.points < 1) errors.points = 'Điểm là số nguyên từ 1.'
+    if (question.mode === 'READ' && !question.referenceText.trim()) errors.referenceText = 'Vui lòng nhập câu mẫu để người học đọc.'
     Object.assign(errors, answerErrors(question, question.mode))
     if (Object.keys(errors).length > 0) questions[question.key] = errors
   })
@@ -210,12 +226,14 @@ export function testPayload(draft) {
     startDate: parseTypedDate(draft.startText),
     endDate: parseTypedDate(draft.endText),
     status: draft.status,
-    materials: draft.materials.map(({ id, type, title, audioUrl, text }) => ({
+    // An empty transcript or sentence to read clears the stored one; the server keeps it when the field is missing.
+    materials: draft.materials.map(({ id, type, title, audioUrl, text, transcript }) => ({
       id,
       type,
       title: orNull(title),
       audioUrl: type === 'LISTENING' ? orNull(audioUrl) : null,
       text: type === 'READING' ? orNull(text) : null,
+      transcript: type === 'LISTENING' ? (transcript ?? '').trim() : null,
     })),
     questions: draft.questions.map((question) => {
       const material = usableMaterial(draft, question)
@@ -224,8 +242,10 @@ export function testPayload(draft) {
         skill: question.skill,
         type: question.type,
         points: question.points,
+        level: question.level || null,
         audioUrl: question.skill === 'LISTENING' ? orNull(question.audioUrl) : null,
         content: question.content.trim(),
+        referenceText: question.mode === 'READ' ? question.referenceText.trim() : '',
         options: question.mode === 'CHOICE' ? question.options.map(({ id, text, correct }) => ({ id, text: text.trim(), correct })) : [],
         acceptedAnswers: question.mode === 'TEXT' ? question.acceptedAnswers.map((answer) => answer.trim()).filter(Boolean) : [],
         vocabularyId: question.vocabularyId ?? null,

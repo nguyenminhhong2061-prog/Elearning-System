@@ -8,7 +8,11 @@ import java.util.List;
 
 public interface TestQuestionRepository extends JpaRepository<TestQuestion, Long> {
 
-    List<TestQuestion> findByTestIdOrderByIdAsc(Long testId);
+    /** The questions of a test in the order the admin gave them; tests nobody ordered go by id. */
+    List<TestQuestion> findByTestIdOrderBySortOrderAscIdAsc(Long testId);
 
     List<TestQuestion> findByTestIdIn(Collection<Long> testIds);
+
+    /** The questions made from the given words of the vocabulary bank. */
+    List<TestQuestion> findByVocabularyIdIn(Collection<Long> vocabularyIds);
 }

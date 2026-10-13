@@ -58,17 +58,29 @@ export function TestMaterials({ draft, errors, locked, onChange }) {
             </div>
             <InputField label="Tiêu đề (không bắt buộc)" disabled={locked} value={material.title} onChange={(event) => update({ title: event.target.value })} />
             {material.type === 'LISTENING' ? (
-              <MediaPicker
-                kind="AUDIO"
-                label="File âm thanh *"
-                value={material.audioUrl}
-                onChange={(audioUrl) => update({ audioUrl })}
-                maxBytes={10 * 1024 * 1024}
-                emptyTitle="Chưa có file âm thanh"
-                emptyNote="Người học nghe bài này rồi trả lời các câu dùng nó."
-                error={materialErrors.audioUrl}
-                disabled={locked}
-              />
+              <>
+                <MediaPicker
+                  kind="AUDIO"
+                  label="File âm thanh *"
+                  value={material.audioUrl}
+                  onChange={(audioUrl) => update({ audioUrl })}
+                  maxBytes={10 * 1024 * 1024}
+                  emptyTitle="Chưa có file âm thanh"
+                  emptyNote="Người học nghe bài này rồi trả lời các câu dùng nó."
+                  error={materialErrors.audioUrl}
+                  allowUrl
+                  disabled={locked}
+                />
+                <TextAreaField
+                  label="Lời thoại (không bắt buộc)"
+                  lang="en"
+                  rows={3}
+                  disabled={locked}
+                  value={material.transcript}
+                  onChange={(event) => update({ transcript: event.target.value })}
+                  hint="Chỉ hiện cho người học sau khi nộp bài."
+                />
+              </>
             ) : (
               <TextAreaField
                 label="Nội dung bài đọc *"

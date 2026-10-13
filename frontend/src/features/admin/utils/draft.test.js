@@ -74,25 +74,34 @@ describe('test drafts', () => {
         endDate: '2026-10-31',
         status: 'VISIBLE',
         materials: [
-          { id: 801, type: 'LISTENING', title: null, audioUrl: '/a.mp3', text: null },
+          { id: 801, type: 'LISTENING', title: null, audioUrl: '/a.mp3', text: null, transcript: ' Flight VN209. ' },
           { id: 802, type: 'READING', title: 'Hanoi', audioUrl: null, text: 'Hanoi is…' },
         ],
         questions: [
           { id: 5, skill: 'READING', type: 'FILL_BLANK', points: 1, audioUrl: null, content: 'Q', options: [], acceptedAnswers: ['a'], vocabularyId: 7, materialId: 802 },
-          { id: 6, skill: 'WRITING', type: 'ESSAY', points: 5, audioUrl: null, content: 'W', options: [], acceptedAnswers: [], vocabularyId: null, materialId: null },
+          { id: 6, skill: 'WRITING', type: 'ESSAY', points: 5, level: 'B1', audioUrl: null, content: 'W', options: [], acceptedAnswers: [], vocabularyId: null, materialId: null },
+          { id: 7, skill: 'SPEAKING', type: 'SPEAKING', points: 3, referenceText: 'Read me.', audioUrl: null, content: 'S', options: [], acceptedAnswers: [], vocabularyId: null, materialId: null },
         ],
       }),
     )
     const body = testPayload(draft)
     expect(body).toMatchObject({ title: 'Đề', startDate: '2026-10-01', endDate: '2026-10-31', status: 'VISIBLE' })
     expect(body.materials).toEqual([
-      { id: 801, type: 'LISTENING', title: null, audioUrl: '/a.mp3', text: null },
-      { id: 802, type: 'READING', title: 'Hanoi', audioUrl: null, text: 'Hanoi is…' },
+      { id: 801, type: 'LISTENING', title: null, audioUrl: '/a.mp3', text: null, transcript: 'Flight VN209.' },
+      { id: 802, type: 'READING', title: 'Hanoi', audioUrl: null, text: 'Hanoi is…', transcript: null },
     ])
     expect(body.questions.map((question) => [question.type, question.vocabularyId, question.materialIndex])).toEqual([
       ['FILL_BLANK', 7, 1],
       ['ESSAY', null, null],
+      ['SPEAKING', null, null],
     ])
+    // A question without a level sends none; only a read-aloud question sends its sentence.
+    expect(body.questions.map((question) => [question.level, question.referenceText])).toEqual([
+      [null, ''],
+      ['B1', ''],
+      [null, 'Read me.'],
+    ])
+    expect(draft.questions.map((question) => question.mode)).toEqual(['TEXT', 'AI', 'READ'])
   })
 
   it('proposes next month for a new comprehensive test', () => {

@@ -1,3 +1,4 @@
+import { CEFR_LEVELS } from '@/api/constants'
 import { Segmented } from '../controls'
 import { InputField, MediaPicker, SelectField, TextAreaField } from '../fields'
 import { answerSummary, blankOption } from '../../utils/draft'
@@ -5,7 +6,15 @@ import { AcceptedAnswersEditor, OptionsEditor, QuestionFrame, QuestionPreview } 
 import { TEST_SKILL_LABELS } from '../../constants'
 import { MATERIAL_SKILLS, materialName, MODES_BY_SKILL, SKILLS, typeFor } from '../../utils/testDraft'
 
-const MODE_LABELS = { CHOICE: 'Trắc nghiệm', TEXT: 'Điền từ', AI: 'Tự luận (AI chấm)' }
+const MODE_LABELS = { CHOICE: 'Trắc nghiệm', TEXT: 'Điền từ', AI: 'Tự luận (AI chấm)', READ: 'Đọc theo mẫu' }
+const LEVEL_OPTIONS = [{ value: '', label: 'Chưa gắn' }, ...CEFR_LEVELS.map((level) => ({ value: level, label: level }))]
+
+/** The answer line of a collapsed question: what is right, or who grades it. */
+function previewAnswer(question) {
+  if (question.mode === 'AI') return ['Chấm', 'AI chấm theo 4 tiêu chí']
+  if (question.mode === 'READ') return ['Câu mẫu', question.referenceText.trim() || 'chưa nhập']
+  return answerSummary(question)
+}
 
 /** Fresh answer fields for a grading mode, keeping what fits from before. */
 function answersFor(question, mode) {
@@ -16,8 +25,9 @@ function answersFor(question, mode) {
 }
 
 /**
- * One question of the test editor (scenario 24, step 7): skill, grading mode, points, the shared material it uses,
- * and its prompt and answers. `locked` (a test with submissions) keeps everything as graded, wording included.
+ * One question of the test editor (scenario 24, step 7): skill, grading mode, points, the CEFR level it tests, the
+ * shared material it uses, and its prompt and answers. `locked` (a test with submissions) keeps everything as graded,
+ * wording included.
  *
  * @param {object} props
  * @param {object} props.question
@@ -39,6 +49,7 @@ export function TestQuestion({ question, materials, index, count, errors = {}, o
     TEST_SKILL_LABELS[question.skill],
     MODE_LABELS[question.mode],
     `${question.points} điểm`,
+    question.level && `bậc ${question.level}`,
     material && `dùng “${materialName(materials, material)}”`,
     question.vocabularyId && 'tạo từ kho từ vựng',
   ]
@@ -77,7 +88,7 @@ export function TestQuestion({ question, materials, index, count, errors = {}, o
       onMove={onMove}
       onRemove={locked ? undefined : onRemove}
       reorderLocked={locked}
-      preview={<QuestionPreview text={question.content} answer={question.mode === 'AI' ? ['Chấm', 'AI chấm theo thang 10'] : answerSummary(question)} />}
+      preview={<QuestionPreview text={question.content} answer={previewAnswer(question)} />}
     >
       <div className="flex flex-wrap items-end gap-3">
         <SelectField
@@ -103,7 +114,18 @@ export function TestQuestion({ question, materials, index, count, errors = {}, o
           onChange={(event) => onChange({ ...question, points: event.target.value === '' ? 0 : Number(event.target.value) })}
           className="w-24"
         />
+        <SelectField
+          label="Bậc CEFR"
+          value={question.level}
+          disabled={locked}
+          onChange={(event) => onChange({ ...question, level: event.target.value })}
+          options={LEVEL_OPTIONS}
+          className="w-28"
+        />
       </div>
+      {!question.level && !locked && (
+        <p className="-mt-1 text-xs text-muted-strong">Câu chưa gắn bậc không được dùng để xếp trình độ theo bậc; kỹ năng đó sẽ quy đổi theo điểm phần trăm.</p>
+      )}
       {MATERIAL_SKILLS.includes(question.skill) && (
         <SelectField
           label="Tài liệu dùng chung"
@@ -123,6 +145,7 @@ export function TestQuestion({ question, materials, index, count, errors = {}, o
           maxBytes={10 * 1024 * 1024}
           emptyTitle="Chưa có âm thanh"
           emptyNote="Không có file thì người học đọc nội dung thông báo trong đề bài."
+          allowUrl
           disabled={locked}
         />
       )}
@@ -141,9 +164,26 @@ export function TestQuestion({ question, materials, index, count, errors = {}, o
       {question.mode === 'TEXT' && (
         <AcceptedAnswersEditor answers={question.acceptedAnswers} onChange={(acceptedAnswers) => onChange({ ...question, acceptedAnswers })} error={errors.acceptedAnswers} locked={locked} />
       )}
+      {question.mode === 'READ' && (
+        <>
+          <TextAreaField
+            label="Câu mẫu *"
+            lang="en"
+            rows={2}
+            disabled={locked}
+            value={question.referenceText}
+            error={errors.referenceText}
+            onChange={(event) => onChange({ ...question, referenceText: event.target.value })}
+            hint="Người học đọc to câu này và ghi âm (tối đa 15 giây)."
+          />
+          <p className="rounded-[10px] bg-surface-alt px-3.5 py-3 text-label leading-4.5 text-ink-soft">
+            Hệ thống chấm phát âm của bản ghi (0–100), rồi quy ra {question.points} điểm của câu. Kết quả hiện sau khi người học nộp bài.
+          </p>
+        </>
+      )}
       {question.mode === 'AI' && (
         <p className="rounded-[10px] bg-surface-alt px-3.5 py-3 text-label leading-4.5 text-ink-soft">
-          Trợ lý AI chấm câu trả lời theo thang 10, rồi quy ra {question.points} điểm của câu. Khi AI lỗi, bài hiện “Đang chấm” và được chấm lại sau.
+          Trợ lý AI chấm câu trả lời theo 4 tiêu chí (mỗi tiêu chí mức 0–6), rồi quy ra {question.points} điểm của câu. Khi AI lỗi, bài hiện “Đang chấm” và được chấm lại sau.
         </p>
       )}
     </QuestionFrame>

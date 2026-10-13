@@ -242,7 +242,7 @@ public class TestAttemptService {
     private TestResultResponse buildResult(TestAttempt attempt) {
         Test test = testRepository.findById(attempt.getTestId())
                 .orElseThrow(() -> new TestNotFoundException(attempt.getTestId()));
-        List<TestQuestion> questions = questionRepository.findByTestIdOrderByIdAsc(test.getId());
+        List<TestQuestion> questions = questionRepository.findByTestIdOrderBySortOrderAscIdAsc(test.getId());
         List<Long> questionIds = questions.stream().map(TestQuestion::getId).toList();
 
         Map<Long, List<TestQuestionOption>> optionsByQuestion = optionsOf(questionIds);

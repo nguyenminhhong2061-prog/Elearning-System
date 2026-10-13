@@ -417,7 +417,14 @@ function readMaterials(body, s) {
     const text = clean(material.text)
     if (material.type === 'LISTENING' && !audioUrl) throw new HttpError(400, `${label}: a listening material needs its audio`)
     if (material.type === 'READING' && !text) throw new HttpError(400, `${label}: a reading material needs its text`)
-    return { id: material.id ?? (s.nextId += 1), type: material.type, title: clean(material.title), audioUrl: material.type === 'LISTENING' ? audioUrl : null, text: material.type === 'READING' ? text : null }
+    return {
+      id: material.id ?? (s.nextId += 1),
+      type: material.type,
+      title: clean(material.title),
+      audioUrl: material.type === 'LISTENING' ? audioUrl : null,
+      text: material.type === 'READING' ? text : null,
+      transcript: material.type === 'LISTENING' ? clean(material.transcript) : null,
+    }
   })
 }
 
@@ -433,11 +440,14 @@ function readTestQuestions(body, s, materials) {
     const materialIndex = question.materialIndex ?? null
     const material = materialIndex === null ? null : materials[materialIndex]
     if (materialIndex !== null && material?.type !== question.skill) throw new HttpError(400, `${label}: materialIndex must point at a ${question.skill} material of this test`)
+    if (question.type !== 'SPEAKING' && clean(question.referenceText)) throw new HttpError(400, `${label}: only a speaking question has a sentence to read aloud`)
     return {
       id: question.id ?? (s.nextId += 1),
       skill: question.skill,
       type: question.type,
       points: question.points,
+      level: question.level ?? null,
+      referenceText: question.type === 'SPEAKING' ? clean(question.referenceText) : null,
       audioUrl: question.skill === 'LISTENING' ? clean(question.audioUrl) : null,
       vocabularyId: question.vocabularyId ?? null,
       materialId: material?.id ?? null,
@@ -484,12 +494,14 @@ function sameGradedContent(before, after) {
       skillText: test.skillText,
       instruction: test.instruction,
       startDate: test.startDate,
-      materials: test.materials.map(({ id, type, title, audioUrl, text }) => [id, type, title, audioUrl, text]),
+      materials: test.materials.map(({ id, type, title, audioUrl, text, transcript }) => [id, type, title, audioUrl, text, transcript ?? null]),
       questions: test.questions.map((question) => [
         question.id,
         question.skill,
         question.type,
         question.points,
+        question.level ?? null,
+        question.referenceText ?? null,
         question.content,
         question.audioUrl,
         question.materialId,

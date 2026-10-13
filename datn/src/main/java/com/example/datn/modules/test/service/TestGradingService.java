@@ -79,7 +79,7 @@ public class TestGradingService {
     /** Grades everything that can be graded now and stores the outcome on the attempt (SUBMITTED or GRADED). */
     @Transactional
     public void grade(TestAttempt attempt, Instant submittedAt) {
-        List<TestQuestion> questions = questionRepository.findByTestIdOrderByIdAsc(attempt.getTestId());
+        List<TestQuestion> questions = questionRepository.findByTestIdOrderBySortOrderAscIdAsc(attempt.getTestId());
         List<Long> questionIds = questions.stream().map(TestQuestion::getId).toList();
         Map<Long, List<TestQuestionOption>> optionsByQuestion = questionIds.isEmpty()
                 ? Map.of()

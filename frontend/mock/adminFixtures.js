@@ -158,11 +158,13 @@ export function learnerDetail(learner, today) {
 // --- Tests -------------------------------------------------------------------------------------------------------------
 
 // Question types follow the design (skill + type): MULTIPLE_CHOICE, FILL_BLANK, SPEAKING and ESSAY (AI graded).
-const choice = (id, skill, content, options, correctIndex, { points = 1, materialId = null } = {}) => ({
+const choice = (id, skill, content, options, correctIndex, { points = 1, materialId = null, level = null } = {}) => ({
   id,
   skill,
   type: 'MULTIPLE_CHOICE',
   points,
+  level,
+  referenceText: null,
   audioUrl: null,
   vocabularyId: null,
   materialId,
@@ -170,11 +172,13 @@ const choice = (id, skill, content, options, correctIndex, { points = 1, materia
   options: options.map((text, index) => ({ id: id * 10 + index + 1, text, correct: index === correctIndex })),
   acceptedAnswers: [],
 })
-const text = (id, skill, content, accepted, { type = 'FILL_BLANK', points = 1 } = {}) => ({
+const text = (id, skill, content, accepted, { type = 'FILL_BLANK', points = 1, level = null, referenceText = null } = {}) => ({
   id,
   skill,
   type,
   points,
+  level,
+  referenceText,
   audioUrl: null,
   vocabularyId: null,
   materialId: null,
@@ -215,23 +219,32 @@ function olderWeek(base) {
 
 /** Shared materials of the comprehensive test (tbl_test_material): an announcement to listen to and a text to read. */
 const COMPREHENSIVE_MATERIALS = [
-  { id: 801, type: 'LISTENING', title: 'Thông báo ở sân bay', audioUrl: listeningAudioUrl(12), text: null },
+  {
+    id: 801,
+    type: 'LISTENING',
+    title: 'Thông báo ở sân bay',
+    audioUrl: listeningAudioUrl(12),
+    text: null,
+    transcript: 'Flight VN209 is now boarding at Gate 5. All passengers should proceed to the gate.',
+  },
   {
     id: 802,
     type: 'READING',
     title: 'Hanoi',
     audioUrl: null,
     text: 'Hanoi is the capital of Vietnam. It is known for its Old Quarter and Hoan Kiem Lake.\n\nThe Museum of Ethnology opens at 8.30 a.m. and closes at 5 p.m. every day except Monday.',
+    transcript: null,
   },
 ]
 
 const COMPREHENSIVE_QUESTIONS = [
-  choice(2001, 'LISTENING', 'What should passengers do?', ['Go to Gate 5', 'Wait at the check-in counter', 'Collect luggage', 'Leave the airport'], 0, { points: 2, materialId: 801 }),
-  choice(2002, 'READING', 'What is Hanoi known for?', ['Its beaches', 'Its Old Quarter and lake', 'Its mountains', 'Its desert'], 1, { points: 2, materialId: 802 }),
-  text(2003, 'WRITING', 'Complete the sentence with a reason: I stayed home ___ it was raining.', ['because'], { points: 2 }),
-  text(2004, 'SPEAKING', 'Read this sentence aloud: "Sustainability is a shared responsibility."', [], { type: 'SPEAKING', points: 5 }),
-  choice(2005, 'READING', 'When is the museum closed?', ['Monday', 'Tuesday', 'Sunday', 'Every day'], 0, { points: 2, materialId: 802 }),
-  text(2006, 'WRITING', 'Write two or three sentences about your last holiday.', [], { type: 'ESSAY', points: 5 }),
+  choice(2001, 'LISTENING', 'What should passengers do?', ['Go to Gate 5', 'Wait at the check-in counter', 'Collect luggage', 'Leave the airport'], 0, { points: 2, materialId: 801, level: 'A2' }),
+  choice(2002, 'READING', 'What is Hanoi known for?', ['Its beaches', 'Its Old Quarter and lake', 'Its mountains', 'Its desert'], 1, { points: 2, materialId: 802, level: 'A2' }),
+  text(2003, 'WRITING', 'Complete the sentence with a reason: I stayed home ___ it was raining.', ['because'], { points: 2, level: 'A2' }),
+  // Read aloud: recorded and scored on pronunciation, not by the AI.
+  text(2004, 'SPEAKING', 'Read the sentence aloud.', [], { type: 'SPEAKING', points: 5, level: 'B2', referenceText: 'Sustainability is a shared responsibility.' }),
+  choice(2005, 'READING', 'When is the museum closed?', ['Monday', 'Tuesday', 'Sunday', 'Every day'], 0, { points: 2, materialId: 802, level: 'B1' }),
+  text(2006, 'WRITING', 'Write two or three sentences about your last holiday.', [], { type: 'ESSAY', points: 5, level: 'B1' }),
 ]
 
 /** ISO week number of a "YYYY-MM-DD" date (the tests are named after the week they close in). */

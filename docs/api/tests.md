@@ -16,6 +16,10 @@
 > **Đổi ngày 05/10/2026 (backend và frontend đã làm):** câu Nói **đọc theo câu mẫu** được trả lời bằng **ghi âm** và
 > chấm phát âm bằng OpenPronounce (`referenceText`, `PUT .../answers/{questionId}/recording`, `review[].pronunciation`).
 > Câu Nói mở vẫn gõ văn bản và do AI chấm như trước.
+>
+> **Đổi ngày 11/10/2026 (backend đã làm):** thêm backend của trang soạn đề `/api/admin/tests` (mục "Quản trị đề kiểm
+> tra"). Đề có trạng thái `DRAFT`/`VISIBLE`/`HIDDEN`: **người học chỉ thấy đề `VISIBLE`**; câu hỏi xếp theo thứ tự admin
+> sắp. JSON của người học không đổi.
 
 Mọi endpoint cần đăng nhập (`Authorization: Bearer <token>`) và chỉ trả dữ liệu của **người đang gọi** (`userId` lấy
 qua `common.security.CurrentUser`). Lỗi dùng định dạng chung `{ "timestamp": "...", "status": 400, "message": "..." }`.
@@ -24,7 +28,10 @@ Dùng các bảng có sẵn trong `V1__init.sql`: `tests`, `test_questions`, `te
 `V202610031815__level_based_test_grading.sql` thêm `test_questions.level`, `test_attempts.skill_levels`,
 `test_attempt_answers.ai_criteria` và `ai_comment`. Migration `V202610032151__test_passages.sql` thêm bảng
 `test_passages`, `test_passage_plays` và cột `test_questions.passage_id`. Migration `V202610052251__test_read_aloud.sql`
-thêm `test_questions.reference_text`, `test_attempt_answers.pronunciation_score` và `pronunciation_details`.
+thêm `test_questions.reference_text`, `test_attempt_answers.pronunciation_score` và `pronunciation_details`. Migration
+`V202610112215__admin_tests.sql` thêm `tests.status`, `skill_text`, `instruction`, `duplicated_from_id` và
+`test_questions.sort_order`. Migration `V202610122125__date_comprehensive_tests.sql` chỉ sửa dữ liệu: gán ngày mở, ngày
+đóng cho hai đề tổng hợp mẫu.
 
 ## Khác biệt enum so với phần còn lại của hệ thống
 
@@ -34,6 +41,7 @@ Vì vậy entity của module này dùng `@Enumerated(EnumType.STRING)`, JSON tr
 | Trường | Giá trị JSON (= cột DB) |
 |---|---|
 | `tests.type` | `PERIODIC`, `COMPREHENSIVE` |
+| `tests.status` | `DRAFT`, `VISIBLE`, `HIDDEN` (chỉ có trong API quản trị) |
 | `test_questions.question_type` | `MULTIPLE_CHOICE`, `FILL_BLANK`, `LISTENING`, `SPEAKING`, `READING`, `WRITING` |
 | `test_attempts.status` | `IN_PROGRESS`, `SUBMITTED`, `GRADED` |
 | `skill` của câu hỏi | `LISTENING`, `SPEAKING`, `READING`, `WRITING` (cột `test_questions.skill` lưu chữ thường: `listening`...) |
@@ -69,8 +77,11 @@ Vì vậy entity của module này dùng `@Enumerated(EnumType.STRING)`, JSON tr
   `'GRADED'`. Kỹ năng không cần AI có điểm và trình độ ngay cả khi lượt còn `SUBMITTED`.
 - **Chỉ bài `COMPREHENSIVE` đổi trình độ** người học (ghi `users.current_level` + `user_level_history`). Bài
   `PERIODIC` chỉ đo tiến bộ, `suggested_level` chỉ để hiển thị.
-- **Đề đang mở** (`start_date IS NULL OR start_date <= now`) và (`end_date IS NULL OR now <= end_date`) mới hiện với
-  người học. Đề khác trả `404`.
+- **Đề đang mở** là đề `status = 'VISIBLE'` và (`start_date IS NULL OR start_date <= now`) và (`end_date IS NULL OR
+  now <= end_date`); chỉ đề đang mở mới hiện với người học và mới bắt đầu làm được, đề khác trả `404`. Đề đã ẩn hoặc đã
+  đóng vẫn đọc được kết quả và lịch sử các lượt đã nộp.
+- **Câu hỏi xếp theo thứ tự admin sắp** (`test_questions.sort_order`, rồi tới `id`). Đề chưa ai sắp (mọi câu là 0) xếp
+  theo `id` như trước.
 
 ## Ánh xạ loại câu hỏi sang kỹ năng
 
@@ -384,6 +395,77 @@ năng); một bậc chỉ có 1 câu thì đúng hay sai một câu quyết đ�
 Câu đọc theo câu mẫu nên có vài câu ở các bậc khác nhau (câu càng dài, từ càng khó thì bậc càng cao), mỗi câu đọc được
 trong 15 giây.
 
+## Quản trị đề kiểm tra — backend của `/api/admin/tests` (thêm ngày 11/10/2026)
+
+Contract của trang soạn đề nằm ở `docs/api/admin.md`, mục "Đề kiểm tra" (kịch bản 24). Backend đã làm đủ sáu endpoint
+theo đúng hình dạng JSON của contract đó, chỉ admin gọi được (người học nhận `403`):
+
+| Endpoint | Kết quả |
+|---|---|
+| `GET /api/admin/tests` | Mọi đề, mới nhất trước, kèm `phase`, `questionCount`, `skills`, `submissions`, `averageScore` |
+| `GET /api/admin/tests/{id}` | Một đề kèm `instruction`, `duplicatedFrom`, `materials`, `questions` (có đáp án) |
+| `POST /api/admin/tests` | `201`, đề mới (`status` mặc định `DRAFT`) |
+| `PUT /api/admin/tests/{id}` | Đề sau khi lưu; đề đã có bài nộp mà đổi nội dung → `409` |
+| `DELETE /api/admin/tests/{id}` | `{ "result": "HIDDEN" }` nếu đã có bài nộp, ngược lại xóa hẳn: `{ "result": "DELETED" }` |
+| `POST /api/admin/tests/{id}/duplicate` | `201`, bản sao `DRAFT` có `duplicatedFrom` |
+
+Lỗi kiểm tra dữ liệu trả `400` với `message` nêu luật bị vi phạm ("question 2: exactly one correct option").
+
+**Trang soạn đề nói một ngôn ngữ, bảng của module này nói ngôn ngữ khác; lớp admin dịch giữa hai bên**, phần làm bài và
+chấm điểm không đổi:
+
+| Contract admin | Lưu trong module `test` |
+|---|---|
+| `materials[]` (`type` `LISTENING`/`READING`, `audioUrl`, `text`) | Bảng `test_passages`: có `audio_url` là bài nghe, ngược lại là bài đọc (`content`). Không có bảng `test_materials` |
+| `materialId` (khi đọc), `materialIndex` (khi ghi) | `test_questions.passage_id` |
+| `type` `MULTIPLE_CHOICE`, `FILL_BLANK`, `SPEAKING` | Cùng tên trong `question_type`; kỹ năng nằm ở cột `skill` |
+| `type` `ESSAY` | `question_type = 'WRITING'` và không có đáp án chấp nhận (AI chấm) |
+| `status` `DRAFT`/`VISIBLE`/`HIDDEN` | Cột mới `tests.status` |
+| `skillText`, `instruction`, `duplicatedFrom` | Cột mới `tests.skill_text`, `instruction`, `duplicated_from_id` |
+| `startDate`, `endDate` (ngày, giờ Việt Nam) | `start_date` = 00:00 của ngày mở, `end_date` = 23:59:59 của ngày đóng |
+| Thứ tự câu hỏi trong thân yêu cầu | Cột mới `test_questions.sort_order` |
+| `phase` | Tính từ `start_date`, `end_date` và giờ hiện tại, không lưu |
+
+Câu hỏi cũ lưu kỹ năng làm loại câu (`LISTENING`, `READING`, `WRITING`) được đọc ra theo cách trả lời: có lựa chọn là
+`MULTIPLE_CHOICE`, có đáp án chấp nhận là `FILL_BLANK`, câu `WRITING` không có cả hai là `ESSAY`. Câu không đổi kỹ năng
+và loại khi lưu thì giữ nguyên `question_type` đang có.
+
+**Ba trường của module này chưa có trong `admin.md`** được trả về và nhận vào; trang soạn đề đã có ô nhập cho cả ba
+từ ngày 12/10/2026 (ô "Bậc CEFR", cách chấm "Đọc theo mẫu" kèm "Câu mẫu", ô "Lời thoại" của bài nghe):
+
+| Trường | Ở đâu | Ý nghĩa |
+|---|---|---|
+| `level` | Câu hỏi | Bậc CEFR của câu (`A1`–`C2`), cần để xếp trình độ theo bậc; `null` thì kỹ năng đó quy đổi theo điểm phần trăm. **Lưu đúng giá trị gửi lên**: `null` hoặc thiếu là bỏ bậc của câu |
+| `referenceText` | Câu hỏi `SPEAKING` | Câu mẫu của câu "đọc theo câu mẫu" (trả lời bằng ghi âm). Câu loại khác gửi trường này → `400` |
+| `transcript` | Tài liệu `LISTENING` | Lời thoại bài nghe, hiện sau khi nộp bài |
+
+Riêng `referenceText` và `transcript`: **thiếu hoặc `null` nghĩa là giữ nguyên giá trị đang lưu** của câu hỏi, tài liệu
+đã có (câu mới, tài liệu mới thì để trống), gửi chuỗi rỗng `""` thì xóa. Nhờ vậy một client chưa biết hai trường này
+không làm mất câu mẫu hay lời thoại khi lưu. `level` thì không: trang soạn đề luôn gửi bậc của từng câu, nên chọn "Chưa
+gắn" là bỏ bậc (đổi ngày 13/10/2026; trước đó `null` cũng giữ nguyên).
+
+Các luật khác với lời văn của `admin.md`, hoặc `admin.md` chưa nói:
+
+- **Đề đã có bài nộp** là đề có ít nhất một lượt `SUBMITTED` hoặc `GRADED`. Lượt đang làm dở không tính: đề chỉ có lượt
+  dở vẫn sửa được và xóa hẳn được (lượt dở bị xóa theo). `averageScore` là trung bình điểm các lượt `GRADED`, lượt còn
+  chờ AI chấm chỉ tính vào `submissions`.
+- **Sửa đề chưa có bài nộp ghi đè tại chỗ theo `id`**: tài liệu, câu hỏi, lựa chọn có `id` được sửa, không có `id` được
+  thêm, cái nào vắng mặt trong thân yêu cầu thì bị xóa. `id` không thuộc đề này → `400`.
+- **Ngày mở, ngày đóng bắt buộc khi tạo và khi sửa**, trừ đề chưa có ngày (đề chèn bằng SQL mà để trống ngày, "luôn
+  mở"): đề đó đọc ra `startDate`, `endDate` là `null`, `phase` là `OPEN`, và được lưu tiếp mà không cần ngày. Cột DB vẫn
+  cho `NULL`. Hai đề tổng hợp mẫu 200 và 201 từng như vậy; migration `V202610122125` đã gán ngày cho chúng (mục "Dữ liệu
+  mẫu"), vì trang soạn đề hiện không hiển thị được đề thiếu ngày.
+- **`vocabularyId` trỏ tới từ không tồn tại** → `400`.
+- Điểm AI chấm theo bốn tiêu chí bậc 0–6 (mục "Đánh giá trình độ"), không phải thang 10 như lời văn của `admin.md`.
+
+`common.test.WordQuestionLookup` đã được cài (`TestWordQuestionLookup`): bảng từ vựng của admin nhận số câu hỏi tạo từ
+mỗi từ (mọi đề, kể cả nháp và đã ẩn) và các đề **đang mở** có câu hỏi đó.
+
+`GET /api/tests/{id}` của người học trả thêm `skillText` và `instruction` (13/10/2026, `null` khi admin không nhập);
+màn giới thiệu đề hiện "Nội dung: …" và hướng dẫn làm bài phía trên bảng cấu trúc đề.
+
+**Chưa làm:** tải file âm thanh `POST /api/admin/media` (phần của module A).
+
 ## Dữ liệu mẫu
 
 Seed bằng migration Flyway (xem `V...__seed_tests.sql`): ít nhất một đề `PERIODIC` (trắc nghiệm + điền từ, chấm xong
@@ -396,6 +478,11 @@ Migration `V202610062104__seed_tests_october.sql` thêm hai đề dùng đủ c�
 **101** (11 câu, mở 30 ngày) và đề tổng hợp **201** (23 câu: 2 Nghe, 12 Đọc A2–C1, 4 Viết, 5 Nói). Cả hai có ngữ liệu dùng
 chung, câu Nói đọc theo câu mẫu (cần OpenPronounce) và câu Nói, Viết mở (cần `GROQ_API_KEY`). Bài nghe của đề 201 dùng
 file mẫu duy nhất hiện có (`/media/r2/media/listening/airport.mp3`), nên phần Nghe mới đo được tới bậc A2.
+
+Migration `V202610122125__date_comprehensive_tests.sql` gán ngày cho hai đề tổng hợp **200** và **201**, trước đó để
+trống ngày ("luôn mở"): cả hai mở từ **01/10/2026 đến hết 31/10/2026** (giờ Việt Nam). Sau ngày 31/10/2026 người học
+không còn thấy hai đề này cho tới khi admin kéo dài ngày đóng (đề đã có bài nộp vẫn sửa được ngày đóng) hoặc nhân bản
+thành đề của tháng sau. Tên đề 200 vẫn là "Kiểm tra tổng hợp tháng 9".
 
 ## Việc frontend cần làm (theo thay đổi lần 2 ngày 03/10/2026)
 
@@ -435,3 +522,6 @@ file mẫu duy nhất hiện có (`/media/r2/media/listening/airport.mp3`), nên
 8. Chấm phát âm qua interface `PronunciationAssessor`; bản cài đặt `OpenPronounceAssessor` đọc cùng cấu hình
    `app.pronunciation.openpronounce.*` (`OPENPRONOUNCE_BASE_URL`) với bài tập phát âm của module B nhưng không gọi vào
    module B. `TestRecordingService` không mở transaction trong lúc chờ dịch vụ chấm.
+9. Trang soạn đề (11/10/2026): `AdminTestController` và `AdminTestService`; luật kiểm tra dữ liệu là hàm thuần ở
+   `AdminTestRules`, phần dịch giữa contract admin và bảng của module ở `AdminTestViews`. Xóa một đề dựa vào
+   `ON DELETE CASCADE` của `test_id`.

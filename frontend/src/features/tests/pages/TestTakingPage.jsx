@@ -403,7 +403,8 @@ function StartCard({ test, starting, error, onStart }) {
           {kinds.length > 1 ? ` (${kinds.join(', ')})` : ''}
           {skillList(test.questions) ? ` · Kỹ năng: ${skillList(test.questions)}` : ''}
         </p>
-        {test.skill && <p className="text-body text-ink-soft">Nội dung: {test.skill}</p>}
+        {(test.skillText || test.skill) && <p className="text-body text-ink-soft">Nội dung: {test.skillText || test.skill}</p>}
+        {test.instruction && <p className="text-body whitespace-pre-line text-ink">{test.instruction}</p>}
         <PartTable questions={test.questions} />
         <ul className="flex list-disc flex-col gap-1 pl-5 text-label text-muted">
           <li>Câu trả lời được lưu ngay khi bạn chọn hoặc gõ; rời trang rồi quay lại vẫn làm tiếp được.</li>

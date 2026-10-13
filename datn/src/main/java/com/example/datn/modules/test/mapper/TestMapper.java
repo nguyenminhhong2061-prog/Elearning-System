@@ -53,6 +53,8 @@ public class TestMapper {
                 test.getTitle(),
                 test.getType(),
                 test.getSkill(),
+                test.getSkillText(),
+                test.getInstruction(),
                 test.getStartDate(),
                 test.getEndDate(),
                 test.getType().retakeAllowed(),

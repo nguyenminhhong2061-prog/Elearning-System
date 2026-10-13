@@ -35,7 +35,8 @@ function WordPicker({ onClose, onAdd }) {
   function choose(word) {
     make.mutate(word.id, {
       onSuccess: (question) => {
-        onAdd(question)
+        // The question tests the word, so it starts at the word's level; the admin can change it.
+        onAdd({ ...question, level: question.level ?? word.difficultyLevel ?? null })
         onClose()
       },
     })

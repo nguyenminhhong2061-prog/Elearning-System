@@ -13,6 +13,7 @@ import com.example.datn.modules.test.entity.TestAttempt;
 import com.example.datn.modules.test.entity.TestQuestion;
 import com.example.datn.modules.test.entity.TestQuestionOption;
 import com.example.datn.modules.test.enums.TestAttemptStatus;
+import com.example.datn.modules.test.enums.TestStatus;
 import com.example.datn.modules.test.exception.TestNotFoundException;
 import com.example.datn.modules.test.mapper.TestMapper;
 import com.example.datn.modules.test.repository.TestAttemptAnswerRepository;
@@ -97,7 +98,7 @@ public class TestService {
 
     public TestDetailResponse detail(Long testId) {
         Test test = findOpen(testId);
-        List<TestQuestion> questions = questionRepository.findByTestIdOrderByIdAsc(testId);
+        List<TestQuestion> questions = questionRepository.findByTestIdOrderBySortOrderAscIdAsc(testId);
 
         List<Long> questionIds = questions.stream().map(TestQuestion::getId).toList();
         Map<Long, List<TestQuestionOption>> options = questionIds.isEmpty()
@@ -151,8 +152,10 @@ public class TestService {
         return test;
     }
 
+    /** Open to learners: shown by the admin, and now is within its dates (a missing date is no bound). */
     static boolean isOpen(Test test, Instant now) {
-        return (test.getStartDate() == null || !test.getStartDate().isAfter(now))
+        return test.getStatus() == TestStatus.VISIBLE
+                && (test.getStartDate() == null || !test.getStartDate().isAfter(now))
                 && (test.getEndDate() == null || !test.getEndDate().isBefore(now));
     }
 

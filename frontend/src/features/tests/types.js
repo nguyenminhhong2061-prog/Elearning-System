@@ -84,6 +84,8 @@
  * @property {string} title
  * @property {TestType} type
  * @property {TestSkill | null} skill
+ * @property {string | null} [skillText] what the test covers, in the admin's words ("Từ vựng và ngữ pháp")
+ * @property {string | null} [instruction] how to take the test, in the admin's words
  * @property {string | null} startDate
  * @property {string | null} endDate
  * @property {boolean} retakeAllowed

@@ -181,6 +181,8 @@ CREATE TABLE tbl_test (
     open_date    DATE NOT NULL,
     close_date   DATE NOT NULL,
     status       VARCHAR(20) NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'VISIBLE', 'HIDDEN')),
+    -- đề gốc khi đề được tạo bằng "Nhân bản" (kịch bản 24, nhánh 2c)
+    duplicated_from_id  BIGINT REFERENCES tbl_test (id) ON DELETE SET NULL,
     CHECK (close_date > open_date)
 );
 
@@ -190,8 +192,11 @@ CREATE TABLE tbl_test_material (
     title    VARCHAR(200),
     audio    VARCHAR(255),
     text     TEXT,
+    -- lời thoại của bài nghe, chỉ hiện cho người học sau khi nộp bài
+    transcript  TEXT,
     test_id  BIGINT NOT NULL REFERENCES tbl_test (id) ON DELETE CASCADE,
-    CHECK ((type = 'LISTENING' AND audio IS NOT NULL) OR (type = 'READING' AND text IS NOT NULL))
+    CHECK ((type = 'LISTENING' AND audio IS NOT NULL) OR (type = 'READING' AND text IS NOT NULL)),
+    CHECK (transcript IS NULL OR type = 'LISTENING')
 );
 
 -- ---------------------------------------------------------------------------
@@ -216,6 +221,14 @@ CREATE TABLE tbl_question (
     test_id             BIGINT REFERENCES tbl_test (id) ON DELETE CASCADE,
     material_id         BIGINT REFERENCES tbl_test_material (id),
     vocabulary_id       BIGINT REFERENCES tbl_vocabulary (id),
+    -- bậc CEFR mà câu hỏi kiểm tra; trình độ người học tính theo bậc của các câu làm được (kịch bản 15, bước 15)
+    level               VARCHAR(2) CHECK (level IN ('A1', 'A2', 'B1', 'B2', 'C1', 'C2')),
+    -- câu mẫu của câu nói "đọc theo câu mẫu": trả lời bằng ghi âm, chấm phát âm; rỗng với mọi câu khác
+    reference_text      TEXT,
+    -- thứ tự của câu trong đề do admin sắp
+    sort_order          INT NOT NULL DEFAULT 0,
+    CHECK (reference_text IS NULL OR (kind = 'TEST' AND type = 'SPEAKING')),
+    CHECK (level IS NULL OR kind = 'TEST'),
     CHECK (
         (kind = 'EXERCISE'
             AND lesson_id IS NOT NULL
@@ -326,17 +339,32 @@ CREATE TABLE tbl_test_attempt (
 );
 
 -- score rỗng nghĩa là câu nói/câu viết chưa được Dịch vụ AI chấm.
+-- Không lưu file ghi âm: bản ghi của câu đọc theo câu mẫu được chấm phát âm ngay khi gửi lên, chỉ kết quả chấm được
+-- lưu (answer_text giữ văn bản dịch vụ nghe được).
 CREATE TABLE tbl_test_answer (
     id                  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     answer_text         TEXT,
-    recording           VARCHAR(255),
     is_correct          BOOLEAN,
     score               REAL CHECK (score >= 0),
     ai_feedback         TEXT,
+    -- mức 0–6 Dịch vụ AI cho từng tiêu chí: {"task":3,"coherence":3,"vocabulary":2,"grammar":3}
+    ai_criteria         JSONB,
+    -- điểm phát âm 0–100 của câu đọc theo câu mẫu và chi tiết (độ chính xác âm vị, từ; các từ đọc sai)
+    pronunciation_score    REAL CHECK (pronunciation_score BETWEEN 0 AND 100),
+    pronunciation_details  JSONB,
     test_attempt_id     BIGINT NOT NULL REFERENCES tbl_test_attempt (id) ON DELETE CASCADE,
     question_id         BIGINT NOT NULL REFERENCES tbl_question (id),
     selected_option_id  BIGINT REFERENCES tbl_answer_option (id),
     UNIQUE (test_attempt_id, question_id)
+);
+
+-- Số lần người học đã nghe một bài nghe trong một lượt làm bài (tối đa 2 lần mỗi bài, mỗi lượt).
+CREATE TABLE tbl_test_material_play (
+    id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    play_count       INT NOT NULL DEFAULT 0 CHECK (play_count BETWEEN 0 AND 2),
+    test_attempt_id  BIGINT NOT NULL REFERENCES tbl_test_attempt (id) ON DELETE CASCADE,
+    material_id      BIGINT NOT NULL REFERENCES tbl_test_material (id) ON DELETE CASCADE,
+    UNIQUE (test_attempt_id, material_id)
 );
 
 -- Mỗi lượt kiểm tra sinh ra tối đa một bản ghi lịch sử trình độ.

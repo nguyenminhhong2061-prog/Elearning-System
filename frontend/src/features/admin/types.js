@@ -156,6 +156,7 @@
  * @property {string | null} title
  * @property {string | null} audioUrl LISTENING only
  * @property {string | null} text READING only
+ * @property {string | null} [transcript] LISTENING only: what is said, shown to learners after they submit
  */
 
 /**
@@ -172,6 +173,8 @@
  * @property {{ id?: number, text: string, correct: boolean }[]} options
  * @property {string[]} acceptedAnswers
  * @property {number | null} vocabularyId the word the question was made from
+ * @property {CefrLevel | null} [level] the CEFR level the question tests, null when it has none
+ * @property {string | null} [referenceText] SPEAKING only: the sentence of a read-aloud question (recorded, scored on pronunciation)
  * @property {number | null} [materialId]
  * @property {number | null} [materialIndex]
  */

@@ -61,6 +61,10 @@ public class TestQuestion {
     @Column(name = "reference_text", columnDefinition = "TEXT")
     private String referenceText;
 
+    // The place of the question in its test as the admin ordered it; questions with the same place go by id.
+    @Column(name = "sort_order", nullable = false)
+    private int sortOrder;
+
     protected TestQuestion() {
     }
 
@@ -139,5 +143,24 @@ public class TestQuestion {
     public TestQuestion asReadAloud(String referenceText) {
         this.referenceText = referenceText;
         return this;
+    }
+
+    public int getSortOrder() {
+        return sortOrder;
+    }
+
+    /** Rewrites the question as the admin editor saved it; its test never changes. */
+    public void edit(TestQuestionType questionType, TestSkill skill, String content, int points, String audioUrl,
+            CefrLevel level, Long passageId, String referenceText, Long vocabularyId, int sortOrder) {
+        this.questionType = questionType;
+        this.skill = skill;
+        this.content = content;
+        this.points = points;
+        this.audioUrl = audioUrl;
+        this.level = level;
+        this.passageId = passageId;
+        this.referenceText = referenceText;
+        this.vocabularyId = vocabularyId;
+        this.sortOrder = sortOrder;
     }
 }

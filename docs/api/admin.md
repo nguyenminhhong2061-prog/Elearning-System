@@ -13,10 +13,10 @@
 >
 > | Phần | Backend | Tình trạng |
 > |---|---|---|
-> | Chủ đề, từ vựng | Hồng (module A `vocabulary`) | **Đã làm** (05/10/2026): `/api/admin/topics`, `/api/admin/vocabulary`, `/api/admin/vocabulary/{id}/test-question` và các luật mới (ẩn từ đang được dùng, chặn trùng, chặn xóa chủ đề còn từ). Chưa làm: `/api/admin/media`. `questionCount`, `openTests` luôn `0`, `[]` cho đến khi module C cài `common.test.WordQuestionLookup` |
+> | Chủ đề, từ vựng | Hồng (module A `vocabulary`) | **Đã làm** (05/10/2026): `/api/admin/topics`, `/api/admin/vocabulary`, `/api/admin/vocabulary/{id}/test-question` và các luật mới (ẩn từ đang được dùng, chặn trùng, chặn xóa chủ đề còn từ). Chưa làm: `/api/admin/media`. `questionCount`, `openTests` có số liệu thật từ 11/10/2026 (module C đã cài `common.test.WordQuestionLookup`) |
 > | Người dùng | Hồng (module `user`) | Đề xuất |
 > | Bài tập | Đạt (module B `exercise`) | Đề xuất |
-> | Đề kiểm tra | Nhân (module C `test`) | Đề xuất |
+> | Đề kiểm tra | Nhân (module C `test`) | **Đã làm** (11–13/10/2026): đủ sáu endpoint `/api/admin/tests`, kèm ba trường mới `level`, `referenceText`, `transcript` và trang soạn đề tương ứng. Cách lưu ở mục "Thay đổi database cần có"; chi tiết cài đặt ở `docs/api/tests.md`, mục "Quản trị đề kiểm tra" |
 > | Thống kê | Chưa có người (cần số liệu của mọi module) | Đề xuất |
 
 Mọi endpoint dưới đây cần đăng nhập bằng tài khoản **admin** (`@PreAuthorize("hasRole('ADMIN')")`); người học nhận
@@ -250,7 +250,8 @@ Theo `tbl_test`, `tbl_test_material`, `tbl_question` của thiết kế (KB 24).
 - **Đề định kỳ và đề tổng hợp đều có `startDate`, `endDate`** (KB 24 nhánh 5a; `tbl_test.open_date`, `close_date`
   `NOT NULL`). Không còn đề tổng hợp "luôn mở".
 - `skillText`: nội dung của đề ("Từ vựng và ngữ pháp"), cột `tbl_test.skill` của thiết kế, có thể `null`. `skills` là
-  các kỹ năng có câu hỏi trong đề. `averageScore` 0–100, `null` khi chưa có bài nộp.
+  các kỹ năng có câu hỏi trong đề. `averageScore` 0–100 là trung bình các bài đã chấm xong (bài còn chờ AI chấm chỉ tính
+  vào `submissions`), `null` khi chưa có bài nào chấm xong.
 
 ### `GET /api/admin/tests/{id}`
 
@@ -260,12 +261,12 @@ Theo `tbl_test`, `tbl_test_material`, `tbl_question` của thiết kế (KB 24).
   "instruction": "Làm lần lượt bốn phần. …", "startDate": "2026-10-01", "endDate": "2026-10-31",
   "status": "VISIBLE", "phase": "OPEN", "submissions": 15, "averageScore": 58, "duplicatedFrom": null,
   "materials": [
-    { "id": 801, "type": "LISTENING", "title": "Thông báo ở sân bay", "audioUrl": "/media/tests/801.mp3", "text": null },
-    { "id": 802, "type": "READING", "title": "Hanoi", "audioUrl": null, "text": "Hanoi is the capital of Vietnam. …" }
+    { "id": 801, "type": "LISTENING", "title": "Thông báo ở sân bay", "audioUrl": "/media/tests/801.mp3", "text": null, "transcript": "Flight VN209 is now boarding at Gate 5. …" },
+    { "id": 802, "type": "READING", "title": "Hanoi", "audioUrl": null, "text": "Hanoi is the capital of Vietnam. …", "transcript": null }
   ],
   "questions": [{
-    "id": 2002, "skill": "READING", "type": "MULTIPLE_CHOICE", "points": 2, "audioUrl": null,
-    "content": "What is Hanoi known for?", "materialId": 802, "vocabularyId": null,
+    "id": 2002, "skill": "READING", "type": "MULTIPLE_CHOICE", "points": 2, "level": "A2", "audioUrl": null,
+    "content": "What is Hanoi known for?", "referenceText": null, "materialId": 802, "vocabularyId": null,
     "options": [{ "id": 20021, "text": "Its Old Quarter and lake", "correct": true }], "acceptedAnswers": []
   }]
 }
@@ -274,11 +275,19 @@ Theo `tbl_test`, `tbl_test_material`, `tbl_question` của thiết kế (KB 24).
 - `instruction`: hướng dẫn làm bài (`tbl_test.instruction`), có thể `null`.
 - `materials`: tài liệu dùng chung cho một phần (`tbl_test_material`): `LISTENING` có `audioUrl` (bắt buộc), `READING`
   có `text` (bắt buộc). Câu hỏi dùng tài liệu có `materialId`; câu nghe không dùng tài liệu chung vẫn có thể có
-  `audioUrl` riêng.
+  `audioUrl` riêng. **Thêm 13/10/2026:** tài liệu `LISTENING` có `transcript` (lời thoại, không bắt buộc), chỉ hiện cho
+  người học sau khi nộp bài.
 - `type` của câu (theo `tbl_question` của thiết kế): `MULTIPLE_CHOICE`, `FILL_BLANK` (thiết kế gọi là `FILL_IN`),
   `SPEAKING`, `ESSAY`; kỹ năng nằm ở `skill`. Bản trước trộn kỹ năng vào `type` (`LISTENING`, `READING`, `WRITING`).
   Kỹ năng và loại đi được với nhau: Nghe, Đọc: trắc nghiệm hoặc điền từ; Viết: trắc nghiệm, điền từ hoặc `ESSAY`; Nói:
-  chỉ `SPEAKING`. `SPEAKING`, `ESSAY` do AI chấm theo thang 10 rồi quy ra `points` của câu, không có đáp án.
+  chỉ `SPEAKING`. `SPEAKING`, `ESSAY` không có đáp án. **Sửa 13/10/2026 (trước ghi "thang 10"):** AI chấm theo bốn
+  tiêu chí (đúng yêu cầu đề, mạch lạc, từ vựng, ngữ pháp), mỗi tiêu chí một mức 0–6 (1 = A1 … 6 = C2); điểm của câu =
+  `points` × mức trung bình / 6.
+- **Thêm 13/10/2026.** `level`: bậc CEFR của câu (`A1`–`C2` hoặc `null`), dùng để xếp trình độ người học theo bậc của
+  câu hỏi; câu không có bậc thì kỹ năng đó quy đổi theo điểm phần trăm. Câu tạo từ kho từ vựng nhận sẵn bậc của từ.
+- **Thêm 13/10/2026.** `referenceText`: câu mẫu của câu Nói **đọc theo câu mẫu**, `null` với mọi câu khác. Câu `SPEAKING`
+  có `referenceText` được trả lời bằng ghi âm (tối đa 15 giây) và chấm phát âm, không qua AI; câu `SPEAKING` không có là
+  đề bài nói, người học gõ câu trả lời và AI chấm (**hạn chế hiện tại: câu nói theo đề bài chưa thu âm**).
 - `vocabularyId`: từ mà câu hỏi được tạo từ đó (`tbl_question.vocabulary_id`), xem `GET /api/admin/vocabulary/{id}/test-question`.
 
 ### `POST /api/admin/tests`, `PUT /api/admin/tests/{id}`
@@ -289,9 +298,12 @@ trí trong `materials` của chính thân yêu cầu, từ 0) thay cho `material
 `DRAFT` hoặc `VISIBLE`; khi sửa thêm `HIDDEN`. Kiểm tra (sai → `400`): tiêu đề 1–200 ký tự; ngày mở, ngày đóng bắt buộc,
 ngày đóng sau ngày mở; ít nhất một câu hỏi; loại câu đúng với kỹ năng (ở trên); trắc nghiệm đúng một lựa chọn đúng;
 điền từ có đáp án chấp nhận; tài liệu nghe có file, tài liệu đọc có nội dung; `materialIndex` trỏ tới tài liệu cùng loại
-với kỹ năng của câu; đề tổng hợp cần đủ bốn kỹ năng.
+với kỹ năng của câu; đề tổng hợp cần đủ bốn kỹ năng; chỉ câu `SPEAKING` được có `referenceText`. `level` lưu đúng giá
+trị gửi lên (`null` là bỏ bậc); `referenceText` và `transcript` thiếu hoặc `null` thì giữ giá trị đang lưu, gửi chuỗi
+rỗng thì xóa. Tài liệu, câu hỏi, lựa chọn có `id` được sửa tại chỗ, không có `id` được thêm, vắng mặt thì bị xóa.
 
-**Đề đã có bài nộp** (KB 24 nhánh 2a) chỉ được đổi tiêu đề, ngày đóng và chuyển giữa `VISIBLE` và `HIDDEN`. Đổi bất kỳ
+**Đề đã có bài nộp** (KB 24 nhánh 2a; tức có ít nhất một lượt đã nộp, lượt đang làm dở không tính) chỉ được đổi tiêu
+đề, ngày đóng và chuyển giữa `VISIBLE` và `HIDDEN`. Đổi bất kỳ
 thứ gì khác, **kể cả lời văn câu hỏi**, `skillText`, `instruction`, tài liệu, hoặc đưa về `DRAFT` → `409`. Bản trước cho
 sửa lời văn; nay khóa để điểm của các bài đã nộp luôn khớp với đề.
 
@@ -387,9 +399,9 @@ hoặc lưu thời điểm khóa và từ chối token cấp trước đó); đ�
 | `vocabulary` | `status VARCHAR(20) NOT NULL DEFAULT 'visible'` (`visible`/`hidden`, chữ thường như các enum khác của DB hiện tại), `updated_at TIMESTAMPTZ NULL`, chỉ mục unique `(topic_id, lower(btrim(word)))` cho từ hệ thống chưa ẩn — **đã có** (`V202610041000`) | Ẩn thay cho xóa (kịch bản 21), cột "Cập nhật", chặn từ trùng (kịch bản 19, 20); `tbl_vocabulary.status` của thiết kế |
 | `exercise_lessons` | giá trị `archived` của `publication_status` đổi thành `hidden` | Cùng tên với thiết kế (`tbl_exercise_lesson.status`) |
 | `topics` | `updated_at TIMESTAMPTZ NULL`, chỉ mục unique `lower(btrim(name))` — **đã có** (`V202610041000`) | Cột "Cập nhật", chặn tên trùng (kịch bản 22) |
-| `tests` | Mới: `status VARCHAR(20) NOT NULL DEFAULT 'DRAFT'` (`DRAFT`/`VISIBLE`/`HIDDEN`, chữ hoa như `tests.type`), `instruction TEXT NULL`. Đã có `skill VARCHAR(100)` (dùng cho `skillText`; thiết kế để 200). `start_date`, `end_date` thành `NOT NULL` cho cả đề tổng hợp | Trạng thái, ẩn đề, hướng dẫn (KB 24); như `tbl_test` |
-| `test_materials` (mới) | `id`, `test_id → tests ON DELETE CASCADE`, `type` (`LISTENING`/`READING`), `title`, `audio_url`, `text`; CHECK nghe có audio, đọc có text | Tài liệu dùng chung (KB 24 nhánh 5a); như `tbl_test_material` |
-| `test_questions` | `material_id BIGINT NULL → test_materials`; `question_type` còn `MULTIPLE_CHOICE`, `FILL_BLANK`, `SPEAKING`, `ESSAY`: chuyển `LISTENING`, `READING` → `MULTIPLE_CHOICE` (hoặc `FILL_BLANK` nếu không có lựa chọn), `WRITING` → `FILL_BLANK` nếu có đáp án chấp nhận, không thì `ESSAY`; kỹ năng đã nằm ở cột `skill` | Loại câu theo thiết kế |
+| `tests` | **Đã có** (`V202610112215`, `V202610122125`): `status VARCHAR(20) NOT NULL DEFAULT 'VISIBLE'` (`DRAFT`/`VISIBLE`/`HIDDEN`; mặc định của cột là `VISIBLE` để đề chèn bằng SQL vẫn hiện, còn đề tạo từ trang soạn đề mặc định `DRAFT`), `instruction TEXT NULL`, `skill_text VARCHAR(200) NULL` cho `skillText` (cột `skill` cũ lưu một kỹ năng dạng enum nên không dùng được), `duplicated_from_id` cho `duplicatedFrom`. `start_date`, `end_date` vẫn cho `NULL` ở DB; API bắt buộc có ngày khi tạo và sửa, hai đề tổng hợp mẫu đã được gán ngày | Trạng thái, ẩn đề, hướng dẫn, nhân bản (KB 24); như `tbl_test` |
+| `test_passages` (đã có từ `V202610032151`, thay cho `test_materials` đề xuất trước đây) | `id`, `test_id → tests ON DELETE CASCADE`, `title`, `content` (bài đọc), `audio_url` (bài nghe), `transcript`; không có cột `type`: có `audio_url` là bài nghe. API vẫn gọi là `materials` | Tài liệu dùng chung (KB 24 nhánh 5a); như `tbl_test_material` |
+| `test_questions` | **Đã có:** `passage_id BIGINT NULL → test_passages` (là `materialId`), `level`, `reference_text`, `sort_order` (thứ tự câu trong đề). **Không chuyển đổi `question_type`:** DB giữ sáu giá trị cũ (`MULTIPLE_CHOICE`, `FILL_BLANK`, `LISTENING`, `SPEAKING`, `READING`, `WRITING`), API dịch sang bốn loại của contract khi đọc (`LISTENING`, `READING` → `MULTIPLE_CHOICE`, hoặc `FILL_BLANK` nếu không có lựa chọn; `WRITING` → `FILL_BLANK` nếu có đáp án chấp nhận, không thì `ESSAY`) và ghi `ESSAY` thành `WRITING` không có đáp án | Loại câu theo thiết kế, không phải sửa dữ liệu đã có |
 | `users` | `last_active_at TIMESTAMPTZ NULL` | "Hoạt động gần nhất" |
 
 ## Câu hỏi mở
@@ -415,8 +427,20 @@ hoặc lưu thời điểm khóa và từ chối token cấp trước đó); đ�
 - **Đề kiểm tra (KB 24):** `status` `DRAFT`/`VISIBLE`/`HIDDEN` + `phase` thay `draft` và trạng thái tính sẵn; `DELETE`
   (ẩn hoặc xóa); `skillText`, `instruction`; đề tổng hợp có ngày; `materials` + `materialIndex`/`materialId`; loại câu
   `MULTIPLE_CHOICE`/`FILL_BLANK`/`SPEAKING`/`ESSAY` tách khỏi kỹ năng; khóa cả lời văn khi đã có bài nộp;
-  `GET /api/admin/vocabulary/{id}/test-question`; AI chấm theo thang 10.
+  `GET /api/admin/vocabulary/{id}/test-question`; AI chấm theo thang 10 (đã sửa ngày 13/10/2026, xem dưới).
 - **Bài tập (KB 23):** kỹ năng `READING`, `WRITING` thay `GRAMMAR`; `readingPassages` và `passageIndex`/`passageId`; câu
   viết `TRANSLATION`/`REWRITE`/`KEYWORD_SENTENCE` với `starter`, `sampleAnswers`; bài mới được tạo ở `PUBLISHED`; câu mẫu
   phát âm bắt buộc IPA và âm thanh mẫu (`issues` thêm `INCOMPLETE_ITEMS`); `passageCount` trong danh sách; xóa ngay ở
   từng dòng. Bảng và cột mới cho đọc hiểu, viết đã ghi ở mục cuối `exercises.md`.
+
+## Thay đổi ngày 13/10/2026 (module C đã làm backend đề kiểm tra)
+
+- **Thang điểm:** AI chấm câu Nói, Viết theo bốn tiêu chí mức 0–6, không phải thang 10; điểm kỹ năng và điểm đề vẫn là
+  0–100. Trình độ người học tính theo bậc của câu hỏi (`docs/api/tests.md`, mục "Đánh giá trình độ").
+- **Ba trường mới của đề kiểm tra:** `level` và `referenceText` của câu hỏi, `transcript` của tài liệu nghe; trang soạn
+  đề có ô "Bậc CEFR", cách chấm "Đọc theo mẫu" kèm "Câu mẫu", và ô "Lời thoại".
+- **Câu Nói:** hai dạng, đọc theo câu mẫu (ghi âm, chấm phát âm) và đề bài nói (gõ văn bản, AI chấm). Câu nói theo đề
+  bài chưa thu âm là hạn chế hiện tại.
+- **Database:** dùng bảng `test_passages` sẵn có thay cho `test_materials`; không chuyển đổi `question_type`; mặc định
+  của cột `tests.status` là `VISIBLE`. JSON của API không đổi vì những điểm này.
+- **Giao diện:** ô chọn audio của đề kiểm tra nhận cả đường dẫn dán vào, vì `POST /api/admin/media` chưa có.

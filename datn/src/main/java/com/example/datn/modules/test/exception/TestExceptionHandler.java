@@ -23,8 +23,8 @@ public class TestExceptionHandler {
                 .body(new ApiErrorResponse(Instant.now(), 404, exception.getMessage()));
     }
 
-    @ExceptionHandler(InvalidTestAnswerException.class)
-    public ResponseEntity<ApiErrorResponse> handleInvalidAnswer(InvalidTestAnswerException exception) {
+    @ExceptionHandler({InvalidTestAnswerException.class, InvalidTestException.class})
+    public ResponseEntity<ApiErrorResponse> handleInvalid(RuntimeException exception) {
         return badRequest(exception.getMessage());
     }
 
@@ -32,6 +32,7 @@ public class TestExceptionHandler {
             TestAttemptNotInProgressException.class,
             TestAttemptNotSubmittedException.class,
             TestRetakeNotAllowedException.class,
+            TestLockedException.class,
             ListenLimitReachedException.class})
     public ResponseEntity<ApiErrorResponse> handleConflict(RuntimeException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)

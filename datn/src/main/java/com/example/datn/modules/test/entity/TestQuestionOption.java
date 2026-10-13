@@ -49,4 +49,10 @@ public class TestQuestionOption {
     public boolean isCorrect() {
         return correct;
     }
+
+    /** Rewrites the option as the admin editor saved it. */
+    public void edit(String content, boolean correct) {
+        this.content = content;
+        this.correct = correct;
+    }
 }

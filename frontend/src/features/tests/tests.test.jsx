@@ -330,12 +330,15 @@ describe('taking a test', () => {
       { id: 23, type: 'WRITING', skill: 'WRITING', content: 'Write about your last holiday.', points: 5, audioUrl: null, options: [] },
     ]
     renderSignedIn('/tests/200', {
-      'GET /api/tests/200': () => ({ data: { ...DETAIL, id: 200, type: 'COMPREHENSIVE', skill: 'Nghe, nói, viết về du lịch', questions } }),
+      'GET /api/tests/200': () => ({
+        data: { ...DETAIL, id: 200, type: 'COMPREHENSIVE', skillText: 'Nghe, nói, viết về du lịch', instruction: 'Làm lần lượt ba phần.', questions },
+      }),
       'POST /api/tests/200/attempts': () => ({ status: 201, data: NEW_ATTEMPT }),
       'PUT /api/test-attempts/57/answers/23': () => ({ status: 204 }),
     })
 
     expect(await screen.findByText('Nội dung: Nghe, nói, viết về du lịch')).toBeInTheDocument()
+    expect(screen.getByText('Làm lần lượt ba phần.')).toBeInTheDocument()
     const parts = screen.getByRole('table', { name: 'Cấu trúc đề' })
     expect(within(parts).getAllByRole('row').slice(1).map((row) => row.textContent)).toEqual([
       'Nghe1trắc nghiệm',

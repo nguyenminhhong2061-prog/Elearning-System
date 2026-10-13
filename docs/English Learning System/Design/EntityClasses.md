@@ -15,7 +15,7 @@ Thêm thuộc tính `id : Long` cho 35 lớp cần lưu và không kế thừa l
 - Học từ vựng: Topic, Vocabulary, LearnerVocabulary, VocabularyReview, CustomList, CustomListItem, GamePlay.
 - Bài tập: ExerciseLesson, ReadingPassage, ListeningPassage, ListeningSegment, PronunciationItem, PronunciationAttempt, Question, AnswerOption, AcceptedAnswer, SampleAnswer, ExerciseAttempt, ExerciseAnswer.
 - Chatbot: ChatSession, ChatMessage, MessageSource, KnowledgeChunk.
-- Kiểm tra: Test, TestMaterial, TestAttempt, TestAnswer.
+- Kiểm tra: Test, TestMaterial, TestAttempt, TestAnswer, TestMaterialPlay.
 - Tiến độ và kế hoạch: DailyProgress, Badge, LearnerBadge, StudyPlan, StudyWeek, Reminder.
 
 Mẫu case study dùng id kiểu int. Ở đây id dùng kiểu `Long` vì khóa chính trong CSDL là số nguyên 64 bit (quy ước đã chốt).
@@ -46,7 +46,7 @@ Mẫu dùng `String` cho các thuộc tính như loại phòng hay chức vụ. 
 
 **Thuộc tính có thể chưa có giá trị** dùng kiểu bao `Float`, `Boolean` thay cho `float`, `boolean`, để phân biệt "chưa có" với 0 hoặc false:
 
-- `ExerciseAttempt.score`, `percent`; `ExerciseAnswer.score`, `isCorrect`; `TestAttempt.totalScore` và bốn điểm kỹ năng; `TestAnswer.score`, `isCorrect`. Điểm chưa có khi Dịch vụ AI chưa chấm xong, vì theo Business model hệ thống không tự đặt điểm thay AI. isCorrect không áp dụng cho câu viết và câu nói.
+- `ExerciseAttempt.score`, `percent`; `ExerciseAnswer.score`, `isCorrect`; `TestAttempt.totalScore` và bốn điểm kỹ năng; `TestAnswer.score`, `isCorrect`. Điểm chưa có khi Dịch vụ AI chưa chấm xong, vì theo Business model hệ thống không tự đặt điểm thay AI. isCorrect không áp dụng cho câu viết và câu nói. Câu đọc theo câu mẫu không chờ AI: nó có điểm ngay khi người học ghi âm (`TestAnswer.pronunciationScore`), còn `aiCriteria` của nó rỗng.
 - `LessonStat.bestPercent` khi người học chưa làm bài; `ProgressStat.avgTestScore` khi trong kỳ không có bài kiểm tra (giao diện hiển thị "–").
 - Thuộc tính kiểu lớp hoặc enum (ví dụ `Learner.currentLevel`, `Vocabulary.topic`) vốn đã có thể rỗng nên không cần kiểu bao.
 
@@ -80,9 +80,10 @@ Một số lưu ý về kiểu dữ liệu:
 
 - `Test.skill` vẫn là `String`, vì đây là mô tả nội dung của đề (ví dụ "Từ vựng và ngữ pháp", kịch bản 24). Thuộc tính này khác `TestQuestion.skill`, là kiểu `TestSkill`.
 - `PronunciationAttempt.aiFeedback` lưu cả nhận xét theo từng từ để tô màu văn bản mẫu (kịch bản 12). Dạng lưu cụ thể, ví dụ JSON, sẽ quyết ở bước thiết kế CSDL.
-- `TestReport.skillComments` có kiểu `Map<TestSkill, String>`: mỗi kỹ năng một nhận xét. Tương tự, `TestReport.skillLevels` có kiểu `Map<TestSkill, CefrLevel>`: mỗi kỹ năng một trình độ, quy đổi từ điểm của kỹ năng đó (cách quy đổi cần nhóm chốt).
+- `TestReport.skillComments` có kiểu `Map<TestSkill, String>`: mỗi kỹ năng một nhận xét. Tương tự, `TestReport.skillLevels` có kiểu `Map<TestSkill, CefrLevel>`: mỗi kỹ năng một trình độ. **Đã chốt (13/10/2026):** trình độ không quy đổi từ điểm mà tính theo bậc của câu hỏi (`TestQuestion.level`): kỹ năng Nghe, Đọc đạt một bậc khi được từ 60% điểm các câu bậc đó; kỹ năng Nói, Viết lấy mức Dịch vụ AI chấm (`TestAnswer.aiCriteria`), điểm phát âm của câu đọc theo câu mẫu là tiêu chí thứ năm của kỹ năng Nói. Chỉ kỹ năng không có câu nào gắn bậc mới quy đổi theo điểm (kịch bản 15, bước 15; `docs/api/tests.md`, mục "Đánh giá trình độ").
 - `Vocabulary.updatedDate` (thêm ngày 01/10/2026, khi kịch bản được cập nhật theo giao diện đang chạy) là ngày sửa gần nhất, hiện ở dòng "cập nhật lần cuối …" của ngăn kéo sửa từ (kịch bản 19). Từ chưa sửa lần nào thì giá trị là ngày tạo.
 - Thêm ngày 03/10/2026, khi đối chiếu khu quản trị với tài liệu: `Topic.updatedDate` (`LocalDate`, cột "Cập nhật" của bảng chủ đề), `User.lastActiveTime` (`LocalDateTime`, rỗng khi chưa đăng nhập lần nào), `ExerciseLesson.difficulty` (`Difficulty`), `ListeningSegment.speaker` và `PronunciationItem.notes` (`String`, có thể rỗng). `Test.status` đổi sang kiểu `TestStatus`, có thêm giá trị DRAFT cho đề chưa mở với người học.
+- Thêm ngày 13/10/2026, theo phần kiểm tra đã cài đặt (xếp trình độ theo bậc, câu đọc theo câu mẫu, nhân bản đề): `TestQuestion.level` (`CefrLevel`, rỗng khi câu chưa gắn bậc), `TestQuestion.referenceText` (`String`, câu mẫu của câu đọc theo câu mẫu, rỗng với mọi câu khác), `TestQuestion.sortOrder` (`int`, thứ tự câu trong đề), `TestMaterial.transcript` (`String`, lời thoại của bài nghe, có thể rỗng), `TestAnswer.aiCriteria` (`Map<String, Integer>`, mức 0–6 của bốn tiêu chí AI chấm, rỗng khi chưa chấm), `TestAnswer.pronunciationScore` (`Float`, 0–100) và `TestAnswer.pronunciationDetails` (độ chính xác và các từ đọc sai; dạng lưu là JSON). `TestAnswer.recording` được **bỏ**: hệ thống không lưu file ghi âm, bản ghi được chấm ngay khi gửi lên và chỉ kết quả chấm được lưu. Lớp mới `TestMaterialPlay` (`playCount` kiểu `int`) đếm số lần người học đã nghe một bài nghe trong một lượt làm bài, tối đa 2.
 - Các thuộc tính thống kê thêm cùng đợt đều kiểu `int`: `VocabularyStat.learnerCount`, `TopicStat.dueCount`, `LessonStat.attemptCount`, `LessonStat.answeredCount`, `TestStat.answeredCount`. `answeredCount` bằng 0 khi người học không có lượt đang làm dở.
 - Thuộc tính tổng điểm của ExerciseAttempt được **đổi tên từ totalScore thành maxScore** (tổng điểm tối đa của bài, ví dụ 10 trong "8/10"), vì `TestAttempt.totalScore` lại là điểm đạt (ví dụ 7.0). Hai thuộc tính trùng tên nhưng khác nghĩa rất dễ gây lỗi khi code. Tên mới đã được sửa ngược vào Business model và `EntityClassExtraction.md`.
 
@@ -152,8 +153,10 @@ Quan hệ LearnerVocabulary – VocabularyReview là composition ở bước ph�
 
 **Kiểm tra**
 
-- TestMaterial, TestQuestion là thành phần của Test, kiểu n-1 → Test có danh sách TestMaterial (`materials`) và danh sách TestQuestion (`questions`).
-- TestMaterial là thành phần của TestQuestion, kiểu 1-n → TestQuestion có một TestMaterial (`material`); rỗng với câu nói, câu viết và câu của đề định kỳ.
+- TestMaterial, TestQuestion là thành phần của Test, kiểu n-1 → Test có danh sách TestMaterial (`materials`) và danh sách TestQuestion (`questions`, theo thứ tự admin sắp).
+- TestMaterial là thành phần của TestQuestion, kiểu 1-n → TestQuestion có một TestMaterial (`material`); rỗng với câu nói, câu viết và câu không hỏi về bài nghe hay đoạn văn chung nào (đề định kỳ cũng dùng được tài liệu chung).
+- Test là thành phần của Test, kiểu 1-n không bắt buộc → Test có một Test (`duplicatedFrom`, đề gốc khi đề được tạo bằng "Nhân bản"), có thể rỗng.
+- TestAttempt, TestMaterial là thành phần của TestMaterialPlay, kiểu 1-n → TestMaterialPlay có một TestAttempt (`attempt`), một TestMaterial (`material`); mỗi cặp lượt làm bài và bài nghe có tối đa một TestMaterialPlay.
 - Vocabulary là thành phần của TestQuestion, kiểu 1-n → TestQuestion có một Vocabulary (`vocabulary`), có thể rỗng.
 - Learner, Test là thành phần của TestAttempt, kiểu 1-n → TestAttempt có một Learner (`learner`), một Test (`test`).
 - TestAnswer là thành phần của TestAttempt, kiểu n-1 → TestAttempt có danh sách TestAnswer (`answers`).
